@@ -4,11 +4,12 @@ class TextureDesc;
 class ShaderDesc;
 class PipelineDesc;
 class DescriptorDesc;
+class Window;
 
 class IRHI 
 {
 public:
-	virtual void Initialise() = 0;
+	virtual void Initialise(Window* window) = 0;
 	virtual void Shutdown() = 0;
 	virtual void CreateDevice() = 0;
 	virtual void CreateSwapchain() = 0;
@@ -22,4 +23,5 @@ public:
 	virtual void BeginFrame() = 0;
 	virtual void EndFrame() = 0;
 	virtual void Present() = 0;
+	virtual void WaitIdle() = 0;
 };

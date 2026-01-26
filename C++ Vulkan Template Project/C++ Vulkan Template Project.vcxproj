@@ -162,8 +162,10 @@
     <ClCompile Include="Renderer\RenderMeshProxy.h" />
     <ClCompile Include="Renderer\RenderQueue.h" />
     <ClCompile Include="Renderer\RHI\IRHI.h" />
+    <ClCompile Include="Renderer\RHI\VulkanRHI.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Graphics\Window.h" />
     <ClInclude Include="IMGUI\imconfig.h" />
     <ClInclude Include="IMGUI\imgui.h" />
     <ClInclude Include="IMGUI\imgui_impl_glfw.h" />
@@ -184,6 +186,7 @@
     <ClInclude Include="Renderer\RenderPass\ShadowPass.h" />
     <ClInclude Include="Renderer\RHI\IRHICommandBuffer.h" />
     <ClInclude Include="Renderer\RHI\IRHICommandQueue.h" />
+    <ClInclude Include="Renderer\RHI\VulkanRHI.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
