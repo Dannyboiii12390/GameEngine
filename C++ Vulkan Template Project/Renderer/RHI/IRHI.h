@@ -1,0 +1,25 @@
+
+class BufferDesc;
+class TextureDesc;
+class ShaderDesc;
+class PipelineDesc;
+class DescriptorDesc;
+
+class IRHI 
+{
+public:
+	virtual void Initialise() = 0;
+	virtual void Shutdown() = 0;
+	virtual void CreateDevice() = 0;
+	virtual void CreateSwapchain() = 0;
+	virtual void CreateCommandQueue() = 0;
+	virtual void CreateCommandBuffer() = 0;
+	virtual void CreateBuffer(const BufferDesc& desc) = 0;
+	virtual void CreateTexture(const TextureDesc& desc) = 0;
+	virtual void CreateShader(const ShaderDesc& desc) = 0;
+	virtual void CreatePipelineState(const PipelineDesc& desc) = 0;
+	virtual void CreateDescriptorSet(const DescriptorDesc& desc) = 0;
+	virtual void BeginFrame() = 0;
+	virtual void EndFrame() = 0;
+	virtual void Present() = 0;
+};

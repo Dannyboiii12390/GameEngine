@@ -18,42 +18,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Window.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\DebugUtils.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics\Mesh.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\ModelLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics\Buffer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics\Swapchain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics\VulkanTypes.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\InputHandler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Window.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics\Mesh.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\GUI.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="IMGUI\imgui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -75,71 +39,26 @@
     <ClCompile Include="IMGUI\imgui_widgets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\Shader.cpp">
+    <ClCompile Include="Renderer\IRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\RHI\IRHI.h">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\IBuffer.h">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\Object.cpp">
+    <ClCompile Include="Renderer\IShader.h">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\Pipelines\ParticlePipeline.cpp">
+    <ClCompile Include="Renderer\RenderQueue.h">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\Pipelines\SkyboxPipeline.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics\Pipelines\Pipeline.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanContext.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics\Texture.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\LightSource.cpp">
+    <ClCompile Include="Renderer\RenderMeshProxy.h">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="VulkanContext.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Debug Utils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics\Mesh.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\ModelLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics\Buffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics\Swapchain.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics\VulkanTypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Camera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\InputHandler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics\Mesh.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\GUI.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="IMGUI\imconfig.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -164,43 +83,44 @@
     <ClInclude Include="IMGUI\imstb_truetype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Shader.h">
+    <ClInclude Include="Renderer\RenderGraph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Object.h">
+    <ClInclude Include="Renderer\RenderPass\DeferredLightingPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Pipelines\ParticlePipeline.h">
+    <ClInclude Include="Renderer\RenderPass\GBufferPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Pipelines\SkyboxPipeline.h">
+    <ClInclude Include="Renderer\RenderPass\IRenderPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Pipelines\Pipeline.h">
+    <ClInclude Include="Renderer\RenderPass\PostProcessPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\Texture.h">
+    <ClInclude Include="Renderer\RenderPass\ShadowPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\LightSource.h">
+    <ClInclude Include="Renderer\RHI\IRHICommandBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\RHI\IRHICommandQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\ITexture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\IPipelineState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\IDescriptorSet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\LightProxy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="shaders\shader.frag" />
-    <CustomBuild Include="shaders\shader.vert" />
-    <CustomBuild Include="SHADERS\skybox.frag" />
-    <CustomBuild Include="SHADERS\skybox.vert" />
-    <CustomBuild Include="SHADERS\particle.vert" />
-    <CustomBuild Include="SHADERS\particle.frag" />
-    <CustomBuild Include="SHADERS\template.frag" />
-    <CustomBuild Include="SHADERS\template.vert" />
-    <CustomBuild Include="SHADERS\textureVertLighting.frag" />
-    <CustomBuild Include="SHADERS\textureVertLighting.vert" />
-    <CustomBuild Include="SHADERS\textureFragLighting.frag" />
-    <CustomBuild Include="SHADERS\textureFragLighting.vert" />
   </ItemGroup>
 </Project>

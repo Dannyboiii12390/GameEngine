@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -24,7 +24,7 @@
     <ProjectGuid>{9686341c-b5d3-4da0-a3e4-fb789b8fd6f8}</ProjectGuid>
     <RootNamespace>CVulkanTemplateProject</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>Vulkan Template Project</ProjectName>
+    <ProjectName>Engine</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -148,17 +148,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Core\Camera.cpp" />
-    <ClCompile Include="Core\GUI.cpp" />
-    <ClCompile Include="Core\LightSource.cpp" />
-    <ClCompile Include="Graphics\Buffer.cpp" />
-    <ClCompile Include="Core\DebugUtils.cpp" />
-    <ClCompile Include="Core\InputHandler.cpp" />
-    <ClCompile Include="Graphics\Object.cpp" />
-    <ClCompile Include="Graphics\Pipelines\ParticlePipeline.cpp" />
-    <ClCompile Include="Graphics\Shader.cpp" />
-    <ClCompile Include="Graphics\Pipelines\SkyboxPipeline.cpp" />
-    <ClCompile Include="Graphics\Texture.cpp" />
     <ClCompile Include="IMGUI\imgui.cpp" />
     <ClCompile Include="IMGUI\imgui_demo.cpp" />
     <ClCompile Include="IMGUI\imgui_draw.cpp" />
@@ -167,31 +156,14 @@
     <ClCompile Include="IMGUI\imgui_tables.cpp" />
     <ClCompile Include="IMGUI\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Graphics\VulkanTypes.cpp" />
-    <ClCompile Include="Graphics\Mesh.cpp" />
-    <ClCompile Include="Graphics\Pipelines\Pipeline.cpp" />
-    <ClCompile Include="Core\ModelLoader.cpp" />
-    <ClCompile Include="Graphics\Swapchain.cpp" />
-    <ClCompile Include="Core\Window.cpp" />
-    <ClCompile Include="VulkanContext.cpp" />
+    <ClCompile Include="Renderer\IBuffer.h" />
+    <ClCompile Include="Renderer\IRenderer.h" />
+    <ClCompile Include="Renderer\IShader.h" />
+    <ClCompile Include="Renderer\RenderMeshProxy.h" />
+    <ClCompile Include="Renderer\RenderQueue.h" />
+    <ClCompile Include="Renderer\RHI\IRHI.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Core\Camera.h" />
-    <ClInclude Include="Core\GUI.h" />
-    <ClInclude Include="Core\LightSource.h" />
-    <ClInclude Include="Graphics\Buffer.h" />
-    <ClInclude Include="Core\Debug Utils.h" />
-    <ClInclude Include="Graphics\Object.h" />
-    <ClInclude Include="Graphics\Pipelines\ParticlePipeline.h" />
-    <ClInclude Include="Graphics\Shader.h" />
-    <ClInclude Include="Graphics\Pipelines\SkyboxPipeline.h" />
-    <ClInclude Include="Graphics\Texture.h" />
-    <ClInclude Include="Graphics\VulkanTypes.h" />
-    <ClInclude Include="Graphics\Mesh.h" />
-    <ClInclude Include="Graphics\Pipelines\Pipeline.h" />
-    <ClInclude Include="Core\ModelLoader.h" />
-    <ClInclude Include="Graphics\Swapchain.h" />
-    <ClInclude Include="Core\InputHandler.h" />
     <ClInclude Include="IMGUI\imconfig.h" />
     <ClInclude Include="IMGUI\imgui.h" />
     <ClInclude Include="IMGUI\imgui_impl_glfw.h" />
@@ -200,134 +172,21 @@
     <ClInclude Include="IMGUI\imstb_rectpack.h" />
     <ClInclude Include="IMGUI\imstb_textedit.h" />
     <ClInclude Include="IMGUI\imstb_truetype.h" />
-    <ClInclude Include="VulkanContext.h" />
-    <ClInclude Include="Core\Window.h" />
+    <ClInclude Include="Renderer\IDescriptorSet.h" />
+    <ClInclude Include="Renderer\IPipelineState.h" />
+    <ClInclude Include="Renderer\ITexture.h" />
+    <ClInclude Include="Renderer\LightProxy.h" />
+    <ClInclude Include="Renderer\RenderGraph.h" />
+    <ClInclude Include="Renderer\RenderPass\DeferredLightingPass.h" />
+    <ClInclude Include="Renderer\RenderPass\GBufferPass.h" />
+    <ClInclude Include="Renderer\RenderPass\IRenderPass.h" />
+    <ClInclude Include="Renderer\RenderPass\PostProcessPass.h" />
+    <ClInclude Include="Renderer\RenderPass\ShadowPass.h" />
+    <ClInclude Include="Renderer\RHI\IRHICommandBuffer.h" />
+    <ClInclude Include="Renderer\RHI\IRHICommandQueue.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <CustomBuild Include="shaders\shader.frag">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\VulkanSDK\1.4.313.2\Bin\glslc.exe .\shaders\shader.frag -o .\shaders\shader.frag.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\VulkanSDK\1.4.313.2\Bin\glslc.exe .\shaders\shader.frag -o .\shaders\shader.frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\shader.frag.spv;%(Outputs)</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\shader.frag.spv;%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="shaders\shader.vert">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\VulkanSDK\1.4.313.2\Bin\glslc.exe .\shaders\shader.vert -o .\shaders\shader.vert.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\VulkanSDK\1.4.313.2\Bin\glslc.exe .\shaders\shader.vert -o .\shaders\shader.vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\shader.vert.spv;%(Outputs)</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\shaders\shader.vert.spv;%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\skybox.frag">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\VulkanSDK\1.4.313.2\Bin\glslc.exe .\shaders\skybox.frag -o .\shaders\skybox.frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\skybox.frag.spv;%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\skybox.vert">
-      <DeploymentContent>false</DeploymentContent>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\VulkanSDK\1.4.313.2\Bin\glslc.exe .\shaders\skybox.vert -o .\shaders\skybox.vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\skybox.vert.spv;%(Outputs)</Outputs>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\particle.frag">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\particle.frag.spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\particle.vert">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\VulkanSDK\1.4.313.2\Bin\glslc.exe .\shaders\particle.vert -o .\shaders\particle.vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\shaders\particle.vert.spv;%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\template.frag">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).frag.spv;%(Outputs)</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).frag.spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv"</Command>
-      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
-      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\template.vert">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv;%(Outputs)</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv;%(Outputs)</Outputs>
-      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
-      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\textureVertLighting.frag">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(Filename).spv</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(Filename).spv</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\textureVertLighting.vert">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(Filename).spv</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(Filename).spv</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\textureFragLighting.frag">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(Filename).spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(Filename).spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv;%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="SHADERS\textureFragLighting.vert">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(Filename).spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(Filename).spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).spv;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).spv;%(Outputs)</Outputs>
-    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
