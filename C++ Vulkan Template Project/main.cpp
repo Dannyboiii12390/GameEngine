@@ -44,12 +44,14 @@ int main()
         return -1;
     }
 
+	const std::array<float, 3> bg_color = { 0.2f, 0.2f, 0.2f};
+
     // ---- Main loop ----
     while (!glfwWindowShouldClose(window.GetGLFWwindow()))
     {
         glfwPollEvents();
 
-        rhi->BeginFrame();
+        rhi->BeginFrame(bg_color);
 
         // NOTE:
         // Here you would normally record rendering commands into your command buffer.

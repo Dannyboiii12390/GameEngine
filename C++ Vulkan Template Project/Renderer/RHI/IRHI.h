@@ -1,5 +1,6 @@
 
 #include "../ResourcesDescriptors.h"
+#include <array>
 
 class BufferDesc;
 class TextureDesc;
@@ -22,7 +23,7 @@ public:
 	virtual void CreateShader(const RHI::ShaderDesc& desc) = 0;
 	virtual void CreatePipelineState(const RHI::PipelineDesc& desc) = 0;
 	virtual void CreateDescriptorSet(const RHI::DescriptorDesc& desc) = 0;
-	virtual void BeginFrame() = 0;
+	virtual void BeginFrame(const std::array<float, 3> bg_color) = 0;
 	virtual void EndFrame() = 0;
 	virtual void Present() = 0;
 	virtual void WaitIdle() = 0;

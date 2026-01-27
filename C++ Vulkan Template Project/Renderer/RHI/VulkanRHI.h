@@ -12,7 +12,7 @@ public:
     void Initialise(Window* window) override;
     void Shutdown() override;
 
-    void BeginFrame() override;
+    void BeginFrame(const std::array<float, 3> bg_color) override;
     void EndFrame() override;
     void Present() override;
     void WaitIdle() override;

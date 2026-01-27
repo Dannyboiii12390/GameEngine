@@ -458,7 +458,7 @@ void VulkanRHI::Shutdown()
     m_RenderFinished = VK_NULL_HANDLE;
     m_InFlightFence = VK_NULL_HANDLE;
 }
-void VulkanRHI::BeginFrame()
+void VulkanRHI::BeginFrame(const std::array<float, 3> bg_color)
 {
     // Wait for previous frame to finish
     vkWaitForFences(m_Device, 1, &m_InFlightFence, VK_TRUE, UINT64_MAX);
@@ -496,7 +496,7 @@ void VulkanRHI::BeginFrame()
         rpBegin.renderArea.extent = m_SwapchainExtent;
 
         VkClearValue clearColor{};
-        clearColor.color = { { 0.0, 0.0, 0.0, 1.0f } };
+        clearColor.color = { { bg_color[0], bg_color[1], bg_color[2], 1.0f } };
         rpBegin.clearValueCount = 1;
         rpBegin.pClearValues = &clearColor;
 
