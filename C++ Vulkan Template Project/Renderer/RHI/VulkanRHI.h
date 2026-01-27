@@ -21,13 +21,13 @@ public:
     void CreateSwapchain() override;
 
     
-    void CreateCommandQueue() {};
-    void CreateCommandBuffer() {};
-    void CreateBuffer(const BufferDesc& desc) {};
-    void CreateTexture(const TextureDesc& desc) {};
-    void CreateShader(const ShaderDesc& desc) {};
-    void CreatePipelineState(const PipelineDesc& desc) {};
-    void CreateDescriptorSet(const DescriptorDesc& desc) {};
+    void CreateCommandQueue();
+    void CreateCommandBuffer();
+    void CreateBuffer(const RHI::BufferDesc& desc);
+    void CreateTexture(const RHI::TextureDesc& desc);
+    void CreateShader(const RHI::ShaderDesc& desc);
+    void CreatePipelineState(const RHI::PipelineDesc& desc);
+    void CreateDescriptorSet(const RHI::DescriptorDesc& desc);
     
 
 private:

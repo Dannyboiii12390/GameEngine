@@ -1,6 +1,7 @@
 #pragma once
 
 #include <GLFW/glfw3.h>
+#define GLFW_INCLUDE_VULKAN
 
 //creates an openGL window using GLFW
 class Window 

@@ -1,4 +1,6 @@
 
+#include "../ResourcesDescriptors.h"
+
 class BufferDesc;
 class TextureDesc;
 class ShaderDesc;
@@ -15,11 +17,11 @@ public:
 	virtual void CreateSwapchain() = 0;
 	virtual void CreateCommandQueue() = 0;
 	virtual void CreateCommandBuffer() = 0;
-	virtual void CreateBuffer(const BufferDesc& desc) = 0;
-	virtual void CreateTexture(const TextureDesc& desc) = 0;
-	virtual void CreateShader(const ShaderDesc& desc) = 0;
-	virtual void CreatePipelineState(const PipelineDesc& desc) = 0;
-	virtual void CreateDescriptorSet(const DescriptorDesc& desc) = 0;
+	virtual void CreateBuffer(const RHI::BufferDesc& desc) = 0;
+	virtual void CreateTexture(const RHI::TextureDesc& desc) = 0;
+	virtual void CreateShader(const RHI::ShaderDesc& desc) = 0;
+	virtual void CreatePipelineState(const RHI::PipelineDesc& desc) = 0;
+	virtual void CreateDescriptorSet(const RHI::DescriptorDesc& desc) = 0;
 	virtual void BeginFrame() = 0;
 	virtual void EndFrame() = 0;
 	virtual void Present() = 0;

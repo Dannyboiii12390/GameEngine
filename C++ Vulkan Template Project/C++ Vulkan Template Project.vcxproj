@@ -184,6 +184,7 @@
     <ClInclude Include="Renderer\RenderPass\IRenderPass.h" />
     <ClInclude Include="Renderer\RenderPass\PostProcessPass.h" />
     <ClInclude Include="Renderer\RenderPass\ShadowPass.h" />
+    <ClInclude Include="Renderer\ResourcesDescriptors.h" />
     <ClInclude Include="Renderer\RHI\IRHICommandBuffer.h" />
     <ClInclude Include="Renderer\RHI\IRHICommandQueue.h" />
     <ClInclude Include="Renderer\RHI\VulkanRHI.h" />
