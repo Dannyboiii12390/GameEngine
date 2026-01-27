@@ -29,12 +29,12 @@ int main()
     Window window(w);
 
     // ---- Vulkan RHI ----
-    VulkanRHI rhi;
+	std::unique_ptr<IRHI> rhi = std::make_unique<VulkanRHI>();
 
     try
     {
         // RHI::Initialise expects a Window* per project signatures
-        rhi.Initialise(&window);
+        rhi->Initialise(&window);
     }
     catch (const std::exception& e)
     {
@@ -49,19 +49,19 @@ int main()
     {
         glfwPollEvents();
 
-        rhi.BeginFrame();
+        rhi->BeginFrame();
 
         // NOTE:
         // Here you would normally record rendering commands into your command buffer.
         // For a minimal test, we just begin/end and present.
 
-        rhi.EndFrame();
-        rhi.Present();
+        rhi->EndFrame();
+        rhi->Present();
     }
 
     // ---- Cleanup ----
-    rhi.WaitIdle();
-    rhi.Shutdown();
+    rhi->WaitIdle();
+    rhi->Shutdown();
 
     glfwDestroyWindow(window.GetGLFWwindow());
     glfwTerminate();
