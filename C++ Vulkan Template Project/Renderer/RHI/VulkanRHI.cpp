@@ -29,6 +29,13 @@ static std::vector<VkShaderModule>         s_ShaderModules;
 static std::vector<VkPipelineLayout>       s_PipelineLayouts;
 static std::vector<VkDescriptorSetLayout>  s_DescriptorSetLayouts;
 
+// Added caches for triangle demo resources
+static std::vector<VkRenderPass>           s_RenderPasses;
+static std::vector<VkPipeline>             s_Pipelines;
+static std::vector<VkFramebuffer>          s_Framebuffers;
+static std::vector<VkBuffer>               s_TriangleVertexBuffers;
+static std::vector<VkDeviceMemory>         s_TriangleVertexMemories;
+
 // Helpers
 static uint32_t FindMemoryTypeIndex(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
@@ -42,7 +49,6 @@ static uint32_t FindMemoryTypeIndex(VkPhysicalDevice physicalDevice, uint32_t ty
 
     throw std::runtime_error("FindMemoryTypeIndex: suitable memory type not found");
 }
-
 static VkFormat MapTextureFormatToVk(int formatEnum)
 {
     // The project uses a project-agnostic TextureFormat enum definition.
@@ -80,6 +86,303 @@ static VkFormat MapTextureFormatToVk(int formatEnum)
     }
 }
 
+// Helper: load a SPIR-V shader module from disk and cache it.
+static VkShaderModule LoadShaderModuleFromFile(VkDevice device, const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
+    if (!file) {
+        throw std::runtime_error("LoadShaderModuleFromFile: failed to open " + filename);
+    }
+    size_t size = static_cast<size_t>(file.tellg());
+    file.seekg(0);
+    std::vector<uint8_t> code(size);
+    file.read(reinterpret_cast<char*>(code.data()), size);
+    if (code.size() % 4 != 0)
+        throw std::runtime_error("LoadShaderModuleFromFile: SPIR-V size not multiple of 4: " + filename);
+
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = code.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+    VkShaderModule module = VK_NULL_HANDLE;
+    if (vkCreateShaderModule(device, &createInfo, nullptr, &module) != VK_SUCCESS)
+        throw std::runtime_error("LoadShaderModuleFromFile: failed to create shader module for " + filename);
+
+    s_ShaderModules.push_back(module);
+    return module;
+}
+
+// Create a basic render pass suitable for on-screen color rendering.
+void VulkanRHI::CreateRenderPass()
+{
+    // destroy previous renderpass/framebuffers if present
+    if (!s_Framebuffers.empty()) {
+        for (VkFramebuffer fb : s_Framebuffers) {
+            if (fb != VK_NULL_HANDLE) vkDestroyFramebuffer(m_Device, fb, nullptr);
+        }
+        s_Framebuffers.clear();
+    }
+    if (!s_RenderPasses.empty()) {
+        for (VkRenderPass rp : s_RenderPasses) {
+            if (rp != VK_NULL_HANDLE) vkDestroyRenderPass(m_Device, rp, nullptr);
+        }
+        s_RenderPasses.clear();
+    }
+
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = m_SwapchainFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo rpInfo{};
+    rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    rpInfo.attachmentCount = 1;
+    rpInfo.pAttachments = &colorAttachment;
+    rpInfo.subpassCount = 1;
+    rpInfo.pSubpasses = &subpass;
+    rpInfo.dependencyCount = 1;
+    rpInfo.pDependencies = &dependency;
+
+    VkRenderPass renderPass = VK_NULL_HANDLE;
+    if (vkCreateRenderPass(m_Device, &rpInfo, nullptr, &renderPass) != VK_SUCCESS)
+        throw std::runtime_error("CreateRenderPass: failed to create render pass");
+
+    s_RenderPasses.push_back(renderPass);
+
+    // create framebuffers for current swapchain image views
+    s_Framebuffers.resize(m_SwapchainImageViews.size());
+    for (size_t i = 0; i < m_SwapchainImageViews.size(); ++i) {
+        VkImageView attachments[] = { m_SwapchainImageViews[i] };
+
+        VkFramebufferCreateInfo fbInfo{};
+        fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        fbInfo.renderPass = renderPass;
+        fbInfo.attachmentCount = 1;
+        fbInfo.pAttachments = attachments;
+        fbInfo.width = m_SwapchainExtent.width;
+        fbInfo.height = m_SwapchainExtent.height;
+        fbInfo.layers = 1;
+
+        if (vkCreateFramebuffer(m_Device, &fbInfo, nullptr, &s_Framebuffers[i]) != VK_SUCCESS)
+            throw std::runtime_error("CreateRenderPass: failed to create framebuffer");
+    }
+}
+
+// Create a simple graphics pipeline to render a colored triangle.
+// Expects compiled SPIR-V files at "shaders/triangle.vert.spv" and "shaders/triangle.frag.spv".
+void VulkanRHI::CreateGraphicsPipeline()
+{
+    // Destroy any previous pipelines/layouts created by the demo
+    for (VkPipeline p : s_Pipelines) if (p != VK_NULL_HANDLE) vkDestroyPipeline(m_Device, p, nullptr);
+    s_Pipelines.clear();
+
+    // Load shader modules
+    VkShaderModule vertModule = LoadShaderModuleFromFile(m_Device, "shaders/triangle.vert.spv");
+    VkShaderModule fragModule = LoadShaderModuleFromFile(m_Device, "shaders/triangle.frag.spv");
+
+    VkPipelineShaderStageCreateInfo vertStage{};
+    vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertStage.module = vertModule;
+    vertStage.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragStage{};
+    fragStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragStage.module = fragModule;
+    fragStage.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = { vertStage, fragStage };
+
+    // Vertex input: vec2 position + vec3 color
+    VkVertexInputBindingDescription bindingDesc{};
+    bindingDesc.binding = 0;
+    bindingDesc.stride = sizeof(float) * 5; // vec2 + vec3
+    bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkVertexInputAttributeDescription attrDesc[2]{};
+    // inPos location=0 (vec2)
+    attrDesc[0].binding = 0;
+    attrDesc[0].location = 0;
+    attrDesc[0].format = VK_FORMAT_R32G32_SFLOAT;
+    attrDesc[0].offset = 0;
+    // inColor location=1 (vec3)
+    attrDesc[1].binding = 0;
+    attrDesc[1].location = 1;
+    attrDesc[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attrDesc[1].offset = sizeof(float) * 2;
+
+    VkPipelineVertexInputStateCreateInfo vertexInput{};
+    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInput.vertexBindingDescriptionCount = 1;
+    vertexInput.pVertexBindingDescriptions = &bindingDesc;
+    vertexInput.vertexAttributeDescriptionCount = 2;
+    vertexInput.pVertexAttributeDescriptions = attrDesc;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(m_SwapchainExtent.width);
+    viewport.height = static_cast<float>(m_SwapchainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = m_SwapchainExtent;
+
+    VkPipelineViewportStateCreateInfo vpState{};
+    vpState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    vpState.viewportCount = 1;
+    vpState.pViewports = &viewport;
+    vpState.scissorCount = 1;
+    vpState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo raster{};
+    raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    raster.depthClampEnable = VK_FALSE;
+    raster.rasterizerDiscardEnable = VK_FALSE;
+    raster.polygonMode = VK_POLYGON_MODE_FILL;
+    raster.cullMode = VK_CULL_MODE_BACK_BIT;
+    raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    raster.depthBiasEnable = VK_FALSE;
+    raster.lineWidth = 1.0f;
+
+    VkPipelineMultisampleStateCreateInfo ms{};
+    ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    ms.sampleShadingEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState colorAttach{};
+    colorAttach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorAttach.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlend{};
+    colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlend.logicOpEnable = VK_FALSE;
+    colorBlend.attachmentCount = 1;
+    colorBlend.pAttachments = &colorAttach;
+
+    // pipeline layout (no descriptors for this simple demo)
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    VkPipelineLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    if (vkCreatePipelineLayout(m_Device, &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+        throw std::runtime_error("CreateGraphicsPipeline: failed to create pipeline layout");
+    s_PipelineLayouts.push_back(pipelineLayout);
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInput;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &vpState;
+    pipelineInfo.pRasterizationState = &raster;
+    pipelineInfo.pMultisampleState = &ms;
+    pipelineInfo.pColorBlendState = &colorBlend;
+    pipelineInfo.layout = pipelineLayout;
+    pipelineInfo.renderPass = s_RenderPasses.back();
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    if (vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS)
+        throw std::runtime_error("CreateGraphicsPipeline: failed to create graphics pipeline");
+
+    s_Pipelines.push_back(pipeline);
+}
+
+// Create a simple host-visible vertex buffer with 3 vertices (pos.xy, color.rgb)
+void VulkanRHI::CreateTriangleVertexBuffer()
+{
+    // Destroy previous if present
+    for (VkBuffer b : s_TriangleVertexBuffers) if (b != VK_NULL_HANDLE) vkDestroyBuffer(m_Device, b, nullptr);
+    for (VkDeviceMemory m : s_TriangleVertexMemories) if (m != VK_NULL_HANDLE) vkFreeMemory(m_Device, m, nullptr);
+    s_TriangleVertexBuffers.clear();
+    s_TriangleVertexMemories.clear();
+
+    // Vertex format: x,y,r,g,b (5 floats)
+    const float vertices[] = {
+        0.0f, -0.5f, 1.0f, 0.0f, 0.0f,
+        0.5f,  0.5f, 0.0f, 1.0f, 0.0f,
+       -0.5f,  0.5f, 0.0f, 0.0f, 1.0f
+    };
+    VkDeviceSize bufferSize = sizeof(vertices);
+
+    VkBufferCreateInfo bufInfo{};
+    bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufInfo.size = bufferSize;
+    bufInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+    if (vkCreateBuffer(m_Device, &bufInfo, nullptr, &vertexBuffer) != VK_SUCCESS)
+        throw std::runtime_error("CreateTriangleVertexBuffer: failed to create buffer");
+
+    VkMemoryRequirements memReq{};
+    vkGetBufferMemoryRequirements(m_Device, vertexBuffer, &memReq);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReq.size;
+    allocInfo.memoryTypeIndex = FindMemoryTypeIndex(m_PhysicalDevice, memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
+    if (vkAllocateMemory(m_Device, &allocInfo, nullptr, &vertexMemory) != VK_SUCCESS) {
+        vkDestroyBuffer(m_Device, vertexBuffer, nullptr);
+        throw std::runtime_error("CreateTriangleVertexBuffer: failed to allocate memory");
+    }
+
+    vkBindBufferMemory(m_Device, vertexBuffer, vertexMemory, 0);
+
+    // copy data
+    void* mapped = nullptr;
+    vkMapMemory(m_Device, vertexMemory, 0, bufferSize, 0, &mapped);
+    std::memcpy(mapped, vertices, static_cast<size_t>(bufferSize));
+    vkUnmapMemory(m_Device, vertexMemory);
+
+    s_TriangleVertexBuffers.push_back(vertexBuffer);
+    s_TriangleVertexMemories.push_back(vertexMemory);
+}
+
+// Setup function to create renderpass, pipeline and vertex buffer after swapchain exists.
+void VulkanRHI::SetupTriangle()
+{
+    if (m_Device == VK_NULL_HANDLE) return;
+    CreateRenderPass();
+    CreateGraphicsPipeline();
+    CreateTriangleVertexBuffer();
+}
+
 void VulkanRHI::Initialise(Window* window)
 {
     if (!window || !window->GetGLFWwindow())
@@ -93,11 +396,36 @@ void VulkanRHI::Initialise(Window* window)
     CreateCommandPool();
     AllocateCommandBuffers();
     CreateSyncObjects();
-}
 
+    // Setup triangle demo resources (requires swapchain & image views to exist)
+    SetupTriangle();
+}
 void VulkanRHI::Shutdown()
 {
     vkDeviceWaitIdle(m_Device);
+
+    // Destroy triangle resources
+    for (VkPipeline p : s_Pipelines) if (p != VK_NULL_HANDLE) vkDestroyPipeline(m_Device, p, nullptr);
+    s_Pipelines.clear();
+
+    for (VkPipelineLayout pl : s_PipelineLayouts) if (pl != VK_NULL_HANDLE) vkDestroyPipelineLayout(m_Device, pl, nullptr);
+    s_PipelineLayouts.clear();
+
+    for (VkFramebuffer fb : s_Framebuffers) if (fb != VK_NULL_HANDLE) vkDestroyFramebuffer(m_Device, fb, nullptr);
+    s_Framebuffers.clear();
+
+    for (VkRenderPass rp : s_RenderPasses) if (rp != VK_NULL_HANDLE) vkDestroyRenderPass(m_Device, rp, nullptr);
+    s_RenderPasses.clear();
+
+    for (VkBuffer vb : s_TriangleVertexBuffers) if (vb != VK_NULL_HANDLE) vkDestroyBuffer(m_Device, vb, nullptr);
+    for (VkDeviceMemory mem : s_TriangleVertexMemories) if (mem != VK_NULL_HANDLE) vkFreeMemory(m_Device, mem, nullptr);
+    s_TriangleVertexBuffers.clear();
+    s_TriangleVertexMemories.clear();
+
+    // Destroy cached shader modules
+    for (VkShaderModule sm : s_ShaderModules)
+        if (sm != VK_NULL_HANDLE) vkDestroyShaderModule(m_Device, sm, nullptr);
+    s_ShaderModules.clear();
 
     if (m_ImageAvailable != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, m_ImageAvailable, nullptr);
     if (m_RenderFinished != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, m_RenderFinished, nullptr);
@@ -130,7 +458,6 @@ void VulkanRHI::Shutdown()
     m_RenderFinished = VK_NULL_HANDLE;
     m_InFlightFence = VK_NULL_HANDLE;
 }
-
 void VulkanRHI::BeginFrame()
 {
     // Wait for previous frame to finish
@@ -140,6 +467,7 @@ void VulkanRHI::BeginFrame()
     VkResult res = vkAcquireNextImageKHR(m_Device, m_Swapchain, UINT64_MAX, m_ImageAvailable, VK_NULL_HANDLE, &m_CurrentImageIndex);
     if (res == VK_ERROR_OUT_OF_DATE_KHR) {
         CreateSwapchain();
+        SetupTriangle();
         return;
     }
     else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
@@ -158,9 +486,32 @@ void VulkanRHI::BeginFrame()
         throw std::runtime_error("Failed to begin command buffer");
     }
 
-    // Minimal: here you'd normally record render pass / draw commands.
-}
+    // Record render pass and draw triangle if pipeline/resources available
+    if (!s_RenderPasses.empty() && !s_Framebuffers.empty() && !s_Pipelines.empty() && !s_TriangleVertexBuffers.empty()) {
+        VkRenderPassBeginInfo rpBegin{};
+        rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        rpBegin.renderPass = s_RenderPasses.back();
+        rpBegin.framebuffer = s_Framebuffers[m_CurrentImageIndex];
+        rpBegin.renderArea.offset = { 0, 0 };
+        rpBegin.renderArea.extent = m_SwapchainExtent;
 
+        VkClearValue clearColor{};
+        clearColor.color = { { 0.2f, 0.3f, 0.3f, 1.0f } };
+        rpBegin.clearValueCount = 1;
+        rpBegin.pClearValues = &clearColor;
+
+        vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, s_Pipelines.back());
+
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(cmd, 0, 1, &s_TriangleVertexBuffers[0], offsets);
+
+        vkCmdDraw(cmd, 3, 1, 0, 0);
+
+        vkCmdEndRenderPass(cmd);
+    }
+}
 void VulkanRHI::EndFrame()
 {
     VkCommandBuffer cmd = m_CommandBuffers[m_CurrentImageIndex];
@@ -189,7 +540,6 @@ void VulkanRHI::EndFrame()
         throw std::runtime_error("Failed to submit draw command buffer");
     }
 }
-
 void VulkanRHI::Present()
 {
     VkPresentInfoKHR presentInfo{};
@@ -208,18 +558,17 @@ void VulkanRHI::Present()
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR) {
         CreateSwapchain();
+        SetupTriangle();
     } else if (res != VK_SUCCESS) {
         throw std::runtime_error("Failed to present swapchain image");
     }
 
     m_CurrentFrame++;
 }
-
 void VulkanRHI::WaitIdle()
 {
     vkDeviceWaitIdle(m_Device);
 }
-
 void VulkanRHI::CreateDevice()
 {
     // Query queue family
@@ -247,7 +596,6 @@ void VulkanRHI::CreateDevice()
 
     vkGetDeviceQueue(m_Device, m_GraphicsQueueFamily, 0, &m_GraphicsQueue);
 }
-
 void VulkanRHI::CreateSwapchain()
 {
     // Query surface capabilities
@@ -266,15 +614,16 @@ void VulkanRHI::CreateSwapchain()
     if (presentModeCount > 0)
         vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, presentModes.data());
 
-    VkSurfaceFormatKHR surfaceFormat = (formats.empty() ? VkSurfaceFormatKHR{VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR} : ChooseSurfaceFormat());
+    VkSurfaceFormatKHR surfaceFormat = (formats.empty() ? VkSurfaceFormatKHR{ VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR } : ChooseSurfaceFormat());
     VkPresentModeKHR presentMode = ChoosePresentMode();
     VkExtent2D extent;
 
     if (capabilities.currentExtent.width != UINT32_MAX) {
         extent = capabilities.currentExtent;
-    } else {
+    }
+    else {
         // fallback size
-        extent = {800, 600};
+        extent = { 800, 600 };
         extent.width = std::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
         extent.height = std::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
     }
@@ -315,8 +664,12 @@ void VulkanRHI::CreateSwapchain()
     m_SwapchainExtent = extent;
 
     CreateSwapchainImageViews();
-}
 
+    // Recreate triangle resources for new swapchain
+    CreateRenderPass();
+    CreateGraphicsPipeline();
+    CreateTriangleVertexBuffer();
+}
 void VulkanRHI::CreateCommandQueue()
 {
     if (m_Device == VK_NULL_HANDLE)
@@ -328,7 +681,6 @@ void VulkanRHI::CreateCommandQueue()
         vkGetDeviceQueue(m_Device, m_GraphicsQueueFamily, 0, &m_GraphicsQueue);
     }
 }
-
 void VulkanRHI::CreateCommandBuffer()
 {
     if (m_Device == VK_NULL_HANDLE)
@@ -349,7 +701,6 @@ void VulkanRHI::CreateCommandBuffer()
 
     m_CommandBuffers.push_back(cmd);
 }
-
 void VulkanRHI::CreateBuffer(const RHI::BufferDesc& desc)
 {
     
@@ -630,7 +981,6 @@ void VulkanRHI::CreateDescriptorSet(const RHI::DescriptorDesc& desc)
     // layout only; allocation of sets from a pool can be implemented later when the
     // pool is available / descriptor counts are known.
 }
-
 void VulkanRHI::CreateInstance()
 {
     VkApplicationInfo appInfo{};
@@ -654,7 +1004,6 @@ void VulkanRHI::CreateInstance()
     if (vkCreateInstance(&createInfo, nullptr, &m_Instance) != VK_SUCCESS)
         throw std::runtime_error("Failed to create Vulkan instance");
 }
-
 void VulkanRHI::CreateSurface(Window* window)
 {
     if (!window || !window->GetGLFWwindow())
@@ -663,7 +1012,6 @@ void VulkanRHI::CreateSurface(Window* window)
     if (glfwCreateWindowSurface(m_Instance, window->GetGLFWwindow(), nullptr, &m_Surface) != VK_SUCCESS)
         throw std::runtime_error("Failed to create window surface");
 }
-
 void VulkanRHI::PickPhysicalDevice()
 {
     uint32_t deviceCount = 0;
@@ -711,7 +1059,6 @@ void VulkanRHI::PickPhysicalDevice()
     if (m_PhysicalDevice == VK_NULL_HANDLE)
         throw std::runtime_error("Failed to find a suitable GPU");
 }
-
 void VulkanRHI::CreateCommandPool()
 {
     VkCommandPoolCreateInfo poolInfo{};
@@ -722,7 +1069,6 @@ void VulkanRHI::CreateCommandPool()
     if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
         throw std::runtime_error("Failed to create command pool");
 }
-
 void VulkanRHI::AllocateCommandBuffers()
 {
     m_CommandBuffers.resize(m_SwapchainImages.size());
@@ -736,7 +1082,6 @@ void VulkanRHI::AllocateCommandBuffers()
     if (vkAllocateCommandBuffers(m_Device, &allocInfo, m_CommandBuffers.data()) != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate command buffers");
 }
-
 void VulkanRHI::CreateSyncObjects()
 {
     VkSemaphoreCreateInfo semaphoreInfo{};
@@ -752,7 +1097,6 @@ void VulkanRHI::CreateSyncObjects()
         throw std::runtime_error("Failed to create synchronization objects for a frame");
     }
 }
-
 void VulkanRHI::CreateSwapchainImageViews()
 {
     m_SwapchainImageViews.resize(m_SwapchainImages.size());
@@ -776,7 +1120,6 @@ void VulkanRHI::CreateSwapchainImageViews()
             throw std::runtime_error("Failed to create image views");
     }
 }
-
 uint32_t VulkanRHI::FindGraphicsQueueFamily()
 {
     uint32_t queueFamilyCount = 0;
@@ -794,7 +1137,6 @@ uint32_t VulkanRHI::FindGraphicsQueueFamily()
 
     throw std::runtime_error("Failed to find graphics queue family");
 }
-
 VkSurfaceFormatKHR VulkanRHI::ChooseSurfaceFormat()
 {
     uint32_t formatCount = 0;
@@ -813,7 +1155,6 @@ VkSurfaceFormatKHR VulkanRHI::ChooseSurfaceFormat()
 
     return formats[0];
 }
-
 VkPresentModeKHR VulkanRHI::ChoosePresentMode()
 {
     uint32_t presentModeCount = 0;

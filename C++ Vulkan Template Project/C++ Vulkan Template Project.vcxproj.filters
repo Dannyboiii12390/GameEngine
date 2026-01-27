@@ -135,4 +135,8 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="SHADERS\triangle.frag" />
+    <CustomBuild Include="SHADERS\triangle.vert" />
+  </ItemGroup>
 </Project>

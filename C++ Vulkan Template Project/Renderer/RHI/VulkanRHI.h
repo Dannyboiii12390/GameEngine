@@ -20,15 +20,13 @@ public:
     void CreateDevice() override;
     void CreateSwapchain() override;
 
-    
-    void CreateCommandQueue();
-    void CreateCommandBuffer();
-    void CreateBuffer(const RHI::BufferDesc& desc);
-    void CreateTexture(const RHI::TextureDesc& desc);
-    void CreateShader(const RHI::ShaderDesc& desc);
-    void CreatePipelineState(const RHI::PipelineDesc& desc);
-    void CreateDescriptorSet(const RHI::DescriptorDesc& desc);
-    
+    void CreateCommandQueue() override;
+    void CreateCommandBuffer() override;
+    void CreateBuffer(const RHI::BufferDesc& desc) override;
+    void CreateTexture(const RHI::TextureDesc& desc) override;
+    void CreateShader(const RHI::ShaderDesc& desc) override;
+    void CreatePipelineState(const RHI::PipelineDesc& desc) override;
+    void CreateDescriptorSet(const RHI::DescriptorDesc& desc) override;
 
 private:
     void CreateInstance();
@@ -38,6 +36,10 @@ private:
     void AllocateCommandBuffers();
     void CreateSyncObjects();
     void CreateSwapchainImageViews();
+	void CreateRenderPass();
+	void CreateGraphicsPipeline();
+	void CreateTriangleVertexBuffer();
+	void SetupTriangle();
 
     //helpers
     uint32_t FindGraphicsQueueFamily();
