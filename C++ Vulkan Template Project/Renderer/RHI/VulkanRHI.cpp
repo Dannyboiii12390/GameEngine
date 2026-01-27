@@ -496,7 +496,7 @@ void VulkanRHI::BeginFrame()
         rpBegin.renderArea.extent = m_SwapchainExtent;
 
         VkClearValue clearColor{};
-        clearColor.color = { { 0.2f, 0.3f, 0.3f, 1.0f } };
+        clearColor.color = { { 0.0, 0.0, 0.0, 1.0f } };
         rpBegin.clearValueCount = 1;
         rpBegin.pClearValues = &clearColor;
 
