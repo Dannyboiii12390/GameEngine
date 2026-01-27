@@ -36,9 +36,11 @@ private:
     void AllocateCommandBuffers();
     void CreateSyncObjects();
     void CreateSwapchainImageViews();
-	void CreateRenderPass();
+    void CreateRenderPass();
+
+	// triangle demo setup
 	void CreateGraphicsPipeline();
-	void CreateTriangleVertexBuffer();
+    void CreateTriangleVertexBuffer();
 	void SetupTriangle();
 
     //helpers
