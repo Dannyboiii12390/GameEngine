@@ -156,16 +156,10 @@
     <ClCompile Include="IMGUI\imgui_tables.cpp" />
     <ClCompile Include="IMGUI\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Renderer\IBuffer.h" />
-    <ClCompile Include="Renderer\IRenderer.h" />
-    <ClCompile Include="Renderer\IShader.h" />
-    <ClCompile Include="Renderer\RenderMeshProxy.h" />
-    <ClCompile Include="Renderer\RenderQueue.h" />
-    <ClCompile Include="Renderer\RHI\IRHI.h" />
-    <ClCompile Include="Renderer\RHI\VulkanRHI.cpp" />
+    <ClCompile Include="Renderer\VulkanRHI.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Graphics\Window.h" />
+    <ClInclude Include="Renderer\Window.h" />
     <ClInclude Include="IMGUI\imconfig.h" />
     <ClInclude Include="IMGUI\imgui.h" />
     <ClInclude Include="IMGUI\imgui_impl_glfw.h" />
@@ -174,20 +168,12 @@
     <ClInclude Include="IMGUI\imstb_rectpack.h" />
     <ClInclude Include="IMGUI\imstb_textedit.h" />
     <ClInclude Include="IMGUI\imstb_truetype.h" />
-    <ClInclude Include="Renderer\IDescriptorSet.h" />
-    <ClInclude Include="Renderer\IPipelineState.h" />
-    <ClInclude Include="Renderer\ITexture.h" />
-    <ClInclude Include="Renderer\LightProxy.h" />
-    <ClInclude Include="Renderer\RenderGraph.h" />
     <ClInclude Include="Renderer\RenderPass\DeferredLightingPass.h" />
     <ClInclude Include="Renderer\RenderPass\GBufferPass.h" />
     <ClInclude Include="Renderer\RenderPass\IRenderPass.h" />
     <ClInclude Include="Renderer\RenderPass\PostProcessPass.h" />
     <ClInclude Include="Renderer\RenderPass\ShadowPass.h" />
-    <ClInclude Include="Renderer\ResourcesDescriptors.h" />
-    <ClInclude Include="Renderer\RHI\IRHICommandBuffer.h" />
-    <ClInclude Include="Renderer\RHI\IRHICommandQueue.h" />
-    <ClInclude Include="Renderer\RHI\VulkanRHI.h" />
+    <ClInclude Include="Renderer\VulkanRHI.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

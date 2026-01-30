@@ -3,7 +3,9 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "Renderer/RHI/VulkanRHI.h"
+#include <array>
+
+#include "Renderer/VulkanRHI.h"
 #include "Graphics/Window.h"
 
 
@@ -29,7 +31,7 @@ int main()
     Window window(w);
 
     // ---- Vulkan RHI ----
-	std::unique_ptr<IRHI> rhi = std::make_unique<VulkanRHI>();
+	std::unique_ptr<VulkanRHI> rhi = std::make_unique<VulkanRHI>();
 
     try
     {
@@ -51,7 +53,7 @@ int main()
     {
         glfwPollEvents();
 
-        rhi->BeginFrame(bg_color);
+        rhi->BeginFrame();
 
         // NOTE:
         // Here you would normally record rendering commands into your command buffer.
