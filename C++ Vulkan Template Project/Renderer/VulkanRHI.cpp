@@ -245,8 +245,6 @@ void VulkanRHI::BeginFrame()
 	// Store current image index for EndFrame/Present
 	m_CurrentImageIndex = imageIndex;
 }
-
-
 void VulkanRHI::BeginFrame(const Scene& scene)
 {
 	// todo implement full scene drawFor now, just call the basic BeginFrame
@@ -264,7 +262,8 @@ void VulkanRHI::EndFrame()
 	}
 
 	VkSemaphore waitSem = m_ImageAvailableSemaphores[m_CurrentFrame];
-	VkSemaphore signalSem = m_RenderFinishedSemaphores[m_CurrentFrame];
+	// Use the semaphore specific to the currently acquired image to avoid reuse while presentation may still hold it
+	VkSemaphore signalSem = m_RenderFinishedSemaphores[m_CurrentImageIndex];
 	VkFence inFlightFence = m_InFlightFences[m_CurrentFrame];
 
 	VkSubmitInfo submitInfo{};
@@ -281,7 +280,7 @@ void VulkanRHI::EndFrame()
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuf;
 
-	// Signal when render finished
+	// Signal when render finished (per-image)
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &signalSem;
 
@@ -289,45 +288,7 @@ void VulkanRHI::EndFrame()
 		throw std::runtime_error("Failed to submit draw command buffer");
 	}
 }
-void VulkanRHI::Present()
-{
-	if (m_Device == VK_NULL_HANDLE || m_Swapchain == VK_NULL_HANDLE) {
-		return;
-	}
-	if (m_CurrentImageIndex == UINT32_MAX) {
-		// Nothing to present
-		return;
-	}
 
-	VkSemaphore waitSem = m_RenderFinishedSemaphores[m_CurrentFrame];
-
-	VkPresentInfoKHR presentInfo{};
-	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = &waitSem;
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &m_Swapchain;
-	presentInfo.pImageIndices = &m_CurrentImageIndex;
-	presentInfo.pResults = nullptr;
-
-	VkResult presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
-	if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
-		// Present did not complete successfully and therefore the render-finished semaphore
-		// MAY not have been consumed by the presentation operation. Recreate the swapchain
-		// and do NOT advance the frame index — keep the current semaphores/fences intact so
-		// they are not reused while still signaled.
-		RecreateSwapchainAndResources();
-		m_CurrentImageIndex = UINT32_MAX;
-		return;
-	}
-	else if (presentResult != VK_SUCCESS) {
-		throw std::runtime_error("Failed to present swapchain image");
-	}
-
-	// Advance frame index only after a successful present (so semaphores were consumed).
-	m_CurrentFrame = (m_CurrentFrame + 1) % std::max<size_t>(1, m_InFlightFences.size());
-	m_CurrentImageIndex = UINT32_MAX;
-}
 
 void VulkanRHI::HandleWindowResize()
 {
@@ -360,6 +321,19 @@ void VulkanRHI::RecreateSwapchainAndResources()
 	// Ensure images-in-flight mapping matches the new swapchain image count
 	m_ImagesInFlight.assign(m_SwapchainImages.size(), VK_NULL_HANDLE);
 
+	// Recreate per-image render-finished semaphores to match new image count
+	for (auto sem : m_RenderFinishedSemaphores) {
+		if (sem != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, sem, nullptr);
+	}
+	m_RenderFinishedSemaphores.clear();
+	m_RenderFinishedSemaphores.resize(std::max<size_t>(1, m_SwapchainImages.size()));
+	VkSemaphoreCreateInfo semaphoreInfo{};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	for (size_t i = 0; i < m_RenderFinishedSemaphores.size(); ++i) {
+		if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create render-finished semaphore during swapchain recreation");
+		}
+	}
 	// Recreate descriptor / pipeline related objects if applicable.
 	// These calls are safe no-ops if implementations decide not to recreate.
 	CreateDescriptorSetLayout();
@@ -388,6 +362,45 @@ void VulkanRHI::EnableValidationLayers(bool enabled)
 bool VulkanRHI::AreValidationLayersEnabled() const
 {
 	return m_EnableValidationLayers;
+}
+void VulkanRHI::Present()
+{
+	if (m_Device == VK_NULL_HANDLE || m_Swapchain == VK_NULL_HANDLE) {
+		return;
+	}
+	if (m_CurrentImageIndex == UINT32_MAX) {
+		// Nothing to present
+		return;
+	}
+
+	// Wait on the render-finished semaphore associated with the image we just rendered.
+	VkSemaphore waitSem = m_RenderFinishedSemaphores[m_CurrentImageIndex];
+
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = &waitSem;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &m_Swapchain;
+	presentInfo.pImageIndices = &m_CurrentImageIndex;
+	presentInfo.pResults = nullptr;
+	VkResult presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+	if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
+		// Present did not complete successfully and therefore the render-finished semaphore
+		// MAY not have been consumed by the presentation operation. Recreate the swapchain
+		// and do NOT advance the frame index — keep the current semaphores/fences intact so
+		// they are not reused while still signaled.
+		RecreateSwapchainAndResources();
+		m_CurrentImageIndex = UINT32_MAX;
+		return;
+	}
+	else if (presentResult != VK_SUCCESS) {
+		throw std::runtime_error("Failed to present swapchain image");
+	}
+
+	// Advance frame index only after a successful present (so semaphores were consumed).
+	m_CurrentFrame = (m_CurrentFrame + 1) % std::max<size_t>(1, m_InFlightFences.size());
+	m_CurrentImageIndex = UINT32_MAX;
 }
 
 // private methods
@@ -442,7 +455,6 @@ void VulkanRHI::CreateInstance() {
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 		debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 		debugCreateInfo.messageSeverity =
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
 			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
 			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		debugCreateInfo.messageType =
@@ -648,8 +660,15 @@ void VulkanRHI::CreateSyncObjects() {
 	// Use a small fixed number of frames-in-flight (classic pattern).
 	constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
 
+	// Destroy any previously-created render-finished semaphores (recreate path safety)
+	for (auto sem : m_RenderFinishedSemaphores) {
+		if (sem != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, sem, nullptr);
+	}
+	m_RenderFinishedSemaphores.clear();
+
 	m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-	m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+	// One render-finished semaphore per swapchain image to avoid reuse while still in use by presentation
+	m_RenderFinishedSemaphores.resize(std::max<size_t>(1, m_SwapchainImages.size()));
 	m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
 	VkSemaphoreCreateInfo semaphoreInfo{};
@@ -659,18 +678,24 @@ void VulkanRHI::CreateSyncObjects() {
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
+	// Create per-frame image-available semaphores + in-flight fences
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
 		if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]) != VK_SUCCESS ||
-			vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) != VK_SUCCESS ||
 			vkCreateFence(m_Device, &fenceInfo, nullptr, &m_InFlightFences[i]) != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create synchronization objects for a frame");
+		}
+	}
+
+	// Create one render-finished semaphore per swapchain image
+	for (size_t i = 0; i < m_RenderFinishedSemaphores.size(); ++i) {
+		if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create render-finished semaphore");
 		}
 	}
 
 	// Ensure current frame index valid
 	m_CurrentFrame = 0;
 }
-
 void VulkanRHI::CreateSwapchain()
 {
 	// Query surface capabilities
