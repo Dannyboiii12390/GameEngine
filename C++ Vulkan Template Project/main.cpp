@@ -8,6 +8,8 @@
 #include "Renderer/VulkanRHI.h"
 #include "Renderer/Window.h"
 
+#include "Core/Entity.h"
+
 int main()
 {
     try
@@ -26,6 +28,10 @@ int main()
         const int height = 720;
         Window window(glfwCreateWindow(width, height, "Vulkan Window", nullptr, nullptr));
 		VulkanRHI vulkanRHI;
+		Entity entity;
+		entity.AddComponent(EComponentType::Component_Translation, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(1.0f), glm::vec3(0.0f));
+        
 
         if (!window.GetGLFWwindow())
         {

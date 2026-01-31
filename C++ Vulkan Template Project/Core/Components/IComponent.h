@@ -20,7 +20,10 @@ enum class EComponentType : uint32_t
 	Component_Geometry = 1u << 2,
 	Component_Audio = 1u << 3
 };
-
+inline const uint32_t to_mask(EComponentType type) noexcept
+{
+	return static_cast<std::underlying_type_t<EComponentType>>(type);
+}
 // Bitwise operators for EComponentType
 // OR
 inline constexpr EComponentType operator|(EComponentType a, EComponentType b) noexcept
