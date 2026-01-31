@@ -39,25 +39,7 @@
     <ClCompile Include="IMGUI\imgui_widgets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Renderer\IRenderer.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer\RHI\IRHI.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer\IBuffer.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer\IShader.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer\RenderQueue.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer\RenderMeshProxy.h">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer\RHI\VulkanRHI.cpp">
+    <ClCompile Include="Renderer\VulkanRHI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -86,9 +68,6 @@
     <ClInclude Include="IMGUI\imstb_truetype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\RenderGraph.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Renderer\RenderPass\DeferredLightingPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -104,31 +83,25 @@
     <ClInclude Include="Renderer\RenderPass\ShadowPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\RHI\IRHICommandBuffer.h">
+    <ClInclude Include="Renderer\Window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\RHI\IRHICommandQueue.h">
+    <ClInclude Include="Renderer\VulkanRHI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\ITexture.h">
+    <ClInclude Include="Core\Components\ComponentTranslation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\IPipelineState.h">
+    <ClInclude Include="Core\Components\IComponent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\IDescriptorSet.h">
+    <ClInclude Include="Core\Components\ComponentVelocity.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\LightProxy.h">
+    <ClInclude Include="Core\Systems\SystemVelocity.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\RHI\VulkanRHI.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics\Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Renderer\ResourcesDescriptors.h">
+    <ClInclude Include="Core\Systems\ISystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

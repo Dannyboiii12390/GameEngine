@@ -159,6 +159,11 @@
     <ClCompile Include="Renderer\VulkanRHI.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Core\Components\ComponentTranslation.h" />
+    <ClInclude Include="Core\Components\ComponentVelocity.h" />
+    <ClInclude Include="Core\Components\IComponent.h" />
+    <ClInclude Include="Core\Systems\ISystem.h" />
+    <ClInclude Include="Core\Systems\SystemVelocity.h" />
     <ClInclude Include="Renderer\Window.h" />
     <ClInclude Include="IMGUI\imconfig.h" />
     <ClInclude Include="IMGUI\imgui.h" />
