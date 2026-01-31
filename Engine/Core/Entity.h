@@ -1,0 +1,91 @@
+#pragma once
+#include <vector>
+#include <memory>
+#include <type_traits>
+#include <glm/glm.hpp>
+#include "Components/IComponent.h"
+#include "Components/ComponentTranslation.h"
+#include "Components/ComponentVelocity.h"
+#include "Components/ComponentGeometry.h"
+
+class Entity {
+
+public:
+	Entity() = default;
+	// Make Entity non-copyable to avoid implicit copy that tries to copy unique_ptrs
+	Entity(const Entity&) = delete;
+	Entity& operator=(const Entity&) = delete;
+
+	// Movable
+	Entity(Entity&&) noexcept = default;
+	Entity& operator=(Entity&&) noexcept = default;
+
+	// Explicit add functions to avoid template/construct_at instantiation issues on MSVC
+	void AddTranslation(const glm::vec3& position = glm::vec3(0.0f),
+	                    const glm::vec3& rotation = glm::vec3(0.0f),
+	                    const glm::vec3& scale    = glm::vec3(1.0f))
+	{
+		auto component = std::make_unique<ComponentTranslation>(position, rotation, scale);
+		m_Components.push_back(std::move(component));
+		m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Translation));
+	}
+
+	void AddVelocity(const glm::vec3& posVel = glm::vec3(0.0f),
+	                 const glm::vec3& rotVel = glm::vec3(0.0f),
+	                 const glm::vec3& scalarVel = glm::vec3(1.0f))
+	{
+		auto component = std::make_unique<ComponentVelocity>(posVel, rotVel, scalarVel);
+		m_Components.push_back(std::move(component));
+		m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Velocity));
+	}
+
+	// Simple geometry component add; GPU resources are initialized later (after RHI exists).
+	void AddGeometry()
+	{
+		auto component = std::make_unique<ComponentGeometry>();
+		m_Components.push_back(std::move(component));
+		m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Geometry));
+	}
+
+	// Retrieve first component with matching type (non-template)
+	IComponent* GetComponent(EComponentType type)
+	{
+		for (const auto& comp : m_Components)
+		{
+			if (comp->GetType() == type)
+				return comp.get();
+		}
+		return nullptr;
+	}
+
+	// Typed getter using runtime dynamic_cast (IComponent is polymorphic)
+	template<typename T>
+	T* GetComponent(EComponentType type)
+	{
+		IComponent* comp = GetComponent(type);
+		return dynamic_cast<T*>(comp);
+	}
+
+	void RemoveComponent(EComponentType type)
+	{
+		for (auto it = m_Components.begin(); it != m_Components.end(); ++it)
+		{
+			if ((*it)->GetType() == type)
+			{
+				m_Components.erase(it);
+				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) & ~to_mask(type));
+				return;
+			}
+		}
+	}
+
+	// returns true if ALL bits in `type` are present in m_EntityType
+	bool HasComponent(EComponentType type) const noexcept
+	{
+		return (to_mask(m_EntityType) & to_mask(type)) == to_mask(type);
+	}
+
+private:
+	std::vector<std::unique_ptr<IComponent>> m_Components;
+	EComponentType m_EntityType = EComponentType::Component_None;
+};

@@ -32,7 +32,7 @@ namespace {
 	}
 
 	VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-	                                      const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+		const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
 		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 		if (func != nullptr) {
 			return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -49,11 +49,21 @@ namespace {
 }
 // Descriptor and pipeline related static variables
 namespace {
-	constexpr uint32_t s_MaxDescriptorFrames = 2;
+	constexpr uint32_t s_MaxDescriptorFrames =2;
 	VkDescriptorSetLayout s_DescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> s_DescriptorSets;
 	VkPipelineLayout s_PipelineLayout = VK_NULL_HANDLE;
+}
+
+// Add getter implementation
+VkCommandBuffer VulkanRHI::GetCurrentCommandBuffer() const
+{
+	if (m_CurrentImageIndex == UINT32_MAX)
+		return VK_NULL_HANDLE;
+	if (m_CurrentImageIndex >= m_CommandBuffers.size())
+		return VK_NULL_HANDLE;
+	return m_CommandBuffers[m_CurrentImageIndex];
 }
 
 void VulkanRHI::Initialise(Window* window)
@@ -92,7 +102,7 @@ void VulkanRHI::Initialise(Window* window)
 
 	// Ensure CurrentFrame index valid
 	if (!m_InFlightFences.empty())
-		m_CurrentFrame = 0;
+		m_CurrentFrame =0;
 	m_CurrentImageIndex = UINT32_MAX;
 }
 void VulkanRHI::Shutdown()
@@ -261,6 +271,23 @@ void VulkanRHI::EndFrame()
 		return;
 	}
 
+	// Before submitting, ensure the command buffer has its render pass ended and recording finished.
+	VkCommandBuffer cmdBuf = VK_NULL_HANDLE;
+	if (m_CurrentImageIndex < m_CommandBuffers.size()) {
+		cmdBuf = m_CommandBuffers[m_CurrentImageIndex];
+	}
+	if (cmdBuf == VK_NULL_HANDLE) {
+		throw std::runtime_error("EndFrame: current command buffer is VK_NULL_HANDLE");
+	}
+
+	// End render pass and end command buffer if still open.
+	// It's safe to call vkCmdEndRenderPass even if no draw calls were recorded.
+	vkCmdEndRenderPass(cmdBuf);
+
+	if (vkEndCommandBuffer(cmdBuf) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to record command buffer");
+	}
+
 	VkSemaphore waitSem = m_ImageAvailableSemaphores[m_CurrentFrame];
 	// Use the semaphore specific to the currently acquired image to avoid reuse while presentation may still hold it
 	VkSemaphore signalSem = m_RenderFinishedSemaphores[m_CurrentImageIndex];
@@ -270,21 +297,20 @@ void VulkanRHI::EndFrame()
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
 	// Wait on image available
-	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.waitSemaphoreCount =1;
 	submitInfo.pWaitSemaphores = &waitSem;
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	submitInfo.pWaitDstStageMask = waitStages;
 
 	// Command buffer to submit
-	VkCommandBuffer cmdBuf = m_CommandBuffers[m_CurrentImageIndex];
-	submitInfo.commandBufferCount = 1;
+	submitInfo.commandBufferCount =1;
 	submitInfo.pCommandBuffers = &cmdBuf;
 
 	// Signal when render finished (per-image)
-	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.signalSemaphoreCount =1;
 	submitInfo.pSignalSemaphores = &signalSem;
 
-	if (vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS) {
+	if (vkQueueSubmit(m_GraphicsQueue,1, &submitInfo, inFlightFence) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to submit draw command buffer");
 	}
 }
@@ -1013,28 +1039,23 @@ void VulkanRHI::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
 	}
 
 	VkClearValue clearColor{};
-	clearColor.color = { {0.2f, 0.2f, 0.2f, 1.0f} };
+	clearColor.color = { {0.2f,0.2f,0.2f,1.0f} };
 
 	VkRenderPassBeginInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassInfo.renderPass = m_RenderPass;
 	renderPassInfo.framebuffer = m_SwapchainFramebuffers[imageIndex];
-	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.offset = {0,0 };
 	renderPassInfo.renderArea.extent = m_SwapchainExtent;
-	renderPassInfo.clearValueCount = 1;
+	renderPassInfo.clearValueCount =1;
 	renderPassInfo.pClearValues = &clearColor;
 
+	// Begin the render pass but DO NOT end it here. Higher-level code should record draw commands
+	// using the command buffer returned by GetCurrentCommandBuffer(), and EndFrame() will end
+	// the render pass and finish recording before submitting.
 	vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	// Note: actual drawing (binding pipelines, vertex/index buffers, descriptors, draw calls) should
-	// be done by higher-level code that has access to pipeline/mesh state. RHI here provides a simple
-	// renderpass wrapper so callers can record draw commands between Begin/End render pass.
-
-	vkCmdEndRenderPass(cmd);
-
-	if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to record command buffer");
-	}
+	// Do not call vkCmdEndRenderPass or vkEndCommandBuffer here to allow the caller to record draws.
 }
 
 VkCommandBuffer VulkanRHI::BeginSingleTimeCommands() {
@@ -1559,7 +1580,7 @@ bool VulkanRHI::IsDeviceSuitable(VkPhysicalDevice device) const
 	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 	if (queueFamilyCount > 0) {
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-		for (uint32_t i = 0; i < queueFamilyCount; ++i) {
+		for ( uint32_t i = 0; i < queueFamilyCount; ++i) {
 			if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 				graphicsFamily = static_cast<int>(i);
 			}

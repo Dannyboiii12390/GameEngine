@@ -10,10 +10,11 @@ enum class ESystemType
 
 class ISystem
 {
+public:
 
 	ESystemType GetSystemType() const { return m_SystemType; }
 
-private:
+protected:
 	ESystemType m_SystemType = ESystemType::System_Invalid;
 
 };

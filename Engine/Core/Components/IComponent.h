@@ -57,7 +57,11 @@ public:
 		: m_Type(type)
 	{
 	}
-	EComponentType GetType() const { return m_Type; }
+	// Make the base polymorphic so dynamic_cast works.
+	// Also ensure proper cleanup via virtual dtor.
+	virtual ~IComponent() = default;
+
+	EComponentType GetType() const noexcept { return m_Type; }
 
 private:
 	EComponentType m_Type = EComponentType::Component_None;

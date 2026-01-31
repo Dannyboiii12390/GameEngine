@@ -33,12 +33,19 @@ public:
 	VkCommandPool GetCommandPool() const { return m_CommandPool; }
 	VkExtent2D GetSwapchainExtent() const { return m_SwapchainExtent; }
 	VkFormat GetSwapchainFormat() const { return m_SwapchainImageFormat; }
+    // Expose the RHI-owned render pass so systems/pipelines can use it.
+    VkRenderPass GetRenderPass() const { return m_RenderPass; }
 
 	void HandleWindowResize();
 	void RecreateSwapchainAndResources();
 	void ToggleVSync(bool enabled);
 	void EnableValidationLayers(bool enabled);
 	bool AreValidationLayersEnabled() const;
+
+	// Return the command buffer associated with the currently-acquired swapchain image
+	// or VK_NULL_HANDLE if no image is currently acquired. Useful for recording
+	// draw commands after calling BeginFrame().
+	VkCommandBuffer GetCurrentCommandBuffer() const;
 
 private:
 
