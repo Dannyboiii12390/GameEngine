@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 #include <tuple>
+#include <cstdint>
 
 class Window;
 class Mesh;
@@ -23,29 +24,15 @@ public:
 	void BeginFrame(const Scene& scene);
 	void EndFrame();
 	void Present();
-
-	Mesh CreateMesh(std::string_view obj_path);
-	Mesh CreateMesh(std::function < std::tuple <std::vector<float>, std::vector<uint64_t>>()> generator);
-
-	Pipeline CreatePipeline(const std::string_view vertex_shader_path, const std::string_view fragment_shader_path);
-	Pipeline CreatePipeline(const Shader& vertex_shader, const Shader& fragment_shader);
-	Pipeline CreatePipeline();
-
-
-	Texture CreateTexture(const std::string_view texture_path);
-	Texture CreateTexture(int width, int height, int channels, const void* data);
-	Texture CreateTexture(VkImage image, int width, int height, VkFormat format);
-	Texture CreateTexture(VkImageView imageView, int width, int height, VkFormat format);
-	Texture CreateTexture(float r, float g, float b, float a);
 	
 	// --- Useful getters for other systems ---
-	VkDevice GetDevice() const;
-	VkPhysicalDevice GetPhysicalDevice() const;
-	VkQueue GetGraphicsQueue() const;
-	VkQueue GetPresentQueue() const;
-	VkCommandPool GetCommandPool() const;
-	VkExtent2D GetSwapchainExtent() const;
-	VkFormat GetSwapchainFormat() const;
+	VkDevice GetDevice() const { return m_Device; }
+	VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
+	VkQueue GetGraphicsQueue() const { return m_GraphicsQueue; }
+	VkQueue GetPresentQueue() const { return m_PresentQueue; }
+	VkCommandPool GetCommandPool() const { return m_CommandPool; }
+	VkExtent2D GetSwapchainExtent() const { return m_SwapchainExtent; }
+	VkFormat GetSwapchainFormat() const { return m_SwapchainImageFormat; }
 
 	void HandleWindowResize();
 	void RecreateSwapchainAndResources();
@@ -96,16 +83,7 @@ private:
 	void CreateDescriptorSetLayout();
 	void CreateDescriptorPool();
 	void AllocateDescriptorSets();
-	void UpdateDescriptorSetsForFrame(uint32_t frameIndex);
-
 	void CreatePipelineLayout();
-	void DestroyPipeline(const Pipeline& pipeline);
-	void RecreatePipelines();
-
-	// Cleanup helpers
-	void DestroyResourceMesh(const Mesh& mesh);
-	void DestroyResourceTexture(const Texture& texture);
-	void DestroyResourcePipeline(const Pipeline& pipeline);
 
 	// Utility / queries
 	bool IsDeviceSuitable(VkPhysicalDevice device) const;
@@ -133,7 +111,7 @@ private:
 	std::vector<VkImageView> m_SwapchainImageViews;
 	std::vector<VkFramebuffer> m_SwapchainFramebuffers;
 
-	// Render pass owned by RHI (optional)
+	// Render pass owned by RHI
 	VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 
 	// Command & sync
@@ -143,8 +121,14 @@ private:
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores;
 	std::vector<VkFence> m_InFlightFences;
 
+	// Track which fence is using each swapchain image (prevents acquiring an image still in use)
+	std::vector<VkFence> m_ImagesInFlight;
+
 	// Runtime flags / bookkeeping
 	bool m_EnableValidationLayers = true;
 	bool m_VSyncEnabled = false;
 	size_t m_CurrentFrame = 0;
+
+	// Track currently acquired swapchain image index between Begin/End/Present
+	uint32_t m_CurrentImageIndex = UINT32_MAX;
 };

@@ -6,70 +6,53 @@
 #include <array>
 
 #include "Renderer/VulkanRHI.h"
-#include "Graphics/Window.h"
-
+#include "Renderer/Window.h"
 
 int main()
 {
-    // ---- GLFW init ----
-    if (!glfwInit())
-    {
-        std::cerr << "Failed to init GLFW\n";
-        return -1;
-    }
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* w = glfwCreateWindow(1280, 720, "Vulkan RHI Test", nullptr, nullptr);
-
-    if (!w)
-    {
-        std::cerr << "Failed to create GLFW window\n";
-        glfwTerminate();
-        return -1;
-    }
-
-    Window window(w);
-
-    // ---- Vulkan RHI ----
-	std::unique_ptr<VulkanRHI> rhi = std::make_unique<VulkanRHI>();
-
     try
     {
-        // RHI::Initialise expects a Window* per project signatures
-        rhi->Initialise(&window);
+        if (!glfwInit())
+        {
+            throw std::runtime_error("Failed to initialize GLFW");
+        }
+
+        // Do not create an OpenGL context; we'll use Vulkan.
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        // Optional: make the window not resizable if desired.
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+        const int width = 1280;
+        const int height = 720;
+        Window window(glfwCreateWindow(width, height, "Vulkan Window", nullptr, nullptr));
+		VulkanRHI vulkanRHI;
+
+        if (!window.GetGLFWwindow())
+        {
+            glfwTerminate();
+            throw std::runtime_error("Failed to create GLFW window");
+		}
+
+		vulkanRHI.Initialise(&window);
+        // Main loop: keep running until the user closes the window.
+        while (!glfwWindowShouldClose(window.GetGLFWwindow()))
+        {
+            glfwPollEvents();
+            // Placeholder: render or integrate with VulkanRHI here.
+			vulkanRHI.BeginFrame();
+			vulkanRHI.EndFrame();
+			vulkanRHI.Present();
+
+        }
+
+        glfwDestroyWindow(window.GetGLFWwindow());
+        glfwTerminate();
+        return 0;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Failed to initialize VulkanRHI: " << e.what() << "\n";
-        glfwDestroyWindow(window.GetGLFWwindow());
-        glfwTerminate();
-        return -1;
+        std::cerr << "Fatal error: " << e.what() << std::endl;
+        return EXIT_FAILURE;
     }
-
-	const std::array<float, 3> bg_color = { 0.2f, 0.2f, 0.2f};
-
-    // ---- Main loop ----
-    while (!glfwWindowShouldClose(window.GetGLFWwindow()))
-    {
-        glfwPollEvents();
-
-        rhi->BeginFrame();
-
-        // NOTE:
-        // Here you would normally record rendering commands into your command buffer.
-        // For a minimal test, we just begin/end and present.
-
-        rhi->EndFrame();
-        rhi->Present();
-    }
-
-    // ---- Cleanup ----
-    rhi->WaitIdle();
-    rhi->Shutdown();
-
-    glfwDestroyWindow(window.GetGLFWwindow());
-    glfwTerminate();
-
-    return 0;
 }
 
