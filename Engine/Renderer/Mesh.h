@@ -58,6 +58,8 @@ public:
 
     bool IsValid() const { return m_Device != VK_NULL_HANDLE && m_VertexBuffer != VK_NULL_HANDLE; }
     uint32_t GetIndexCount() const { return m_IndexCount; }
+	static void FlipWinding(std::vector<uint32_t>& indices);
+
 
 private:
     // helpers

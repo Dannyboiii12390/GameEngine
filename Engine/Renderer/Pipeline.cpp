@@ -154,7 +154,7 @@ bool Pipeline::CreateGraphicsPipeline(const std::vector<char>& vertCode, const s
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -182,8 +182,19 @@ bool Pipeline::CreateGraphicsPipeline(const std::vector<char>& vertCode, const s
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    // If the pipeline is created with an RHI that provides a descriptor set layout (e.g. camera UBO),
+    // include it here so shaders can access descriptors at set=0.
+    VkDescriptorSetLayout rhiLayout = VK_NULL_HANDLE;
+    if (m_RHI) {
+        rhiLayout = m_RHI->GetDescriptorSetLayout();
+    }
+    if (rhiLayout != VK_NULL_HANDLE) {
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &rhiLayout;
+    } else {
     pipelineLayoutInfo.setLayoutCount = 0;
     pipelineLayoutInfo.pSetLayouts = nullptr;
+    }
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 

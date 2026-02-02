@@ -13,6 +13,7 @@ class Entity;
 class Texture;
 class Scene;
 class Shader;
+class Camera; // forward
 
 class VulkanRHI 
 {
@@ -46,6 +47,15 @@ public:
 	// or VK_NULL_HANDLE if no image is currently acquired. Useful for recording
 	// draw commands after calling BeginFrame().
 	VkCommandBuffer GetCurrentCommandBuffer() const;
+
+    // Camera integration
+    // VulkanRHI does not take ownership. Caller must ensure camera lifetime > VulkanRHI usage.
+    void SetActiveCamera(Camera* camera);
+    Camera* GetActiveCamera() const;
+
+    // Descriptor helpers (expose RHI-owned descriptor set layout + descriptor sets so pipelines/systems can bind them)
+    VkDescriptorSetLayout GetDescriptorSetLayout() const;
+    const std::vector<VkDescriptorSet>& GetDescriptorSets() const;
 
 private:
 
@@ -91,6 +101,10 @@ private:
 	void CreateDescriptorPool();
 	void AllocateDescriptorSets();
 	void CreatePipelineLayout();
+
+    // Camera UBO helpers
+    void CreateCameraUniformBufferAndWriteDescriptors();
+    void UpdateCameraBuffer(); // called each frame before submit
 
 	// Utility / queries
 	bool IsDeviceSuitable(VkPhysicalDevice device) const;
@@ -138,4 +152,12 @@ private:
 
 	// Track currently acquired swapchain image index between Begin/End/Present
 	uint32_t m_CurrentImageIndex = UINT32_MAX;
+
+    // Active camera (not owned)
+    Camera* m_ActiveCamera = nullptr;
+
+    // Camera uniform buffer (single buffer used by descriptor sets). Size: view + proj (two mat4)
+    VkBuffer m_CameraUniformBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_CameraUniformBufferMemory = VK_NULL_HANDLE;
+    size_t m_CameraUniformBufferSize = sizeof(float) * 16 * 2; // two mat4s
 };

@@ -79,6 +79,17 @@ void SystemRenderer::Render(VkCommandBuffer cmd, const std::vector<Entity*>& ent
 		pipeline->Bind(cmd);
 		OutputDebugStringA("SystemRenderer: pipeline bound\n");
 
+		// Bind descriptor sets (camera UBO etc.) if RHI provides them.
+		if (m_RHI)
+		{
+			const auto& sets = m_RHI->GetDescriptorSets();
+			if (!sets.empty())
+			{
+				// bind only the first set (set 0) which contains the camera UBO in this implementation
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetLayout(), 0, 1, &sets[0], 0, nullptr);
+			}
+		}
+
 		// Always push a model matrix because the vertex shader expects a push-constant mat4.
 		glm::mat4 transform = glm::mat4(1.0f);
 		if (e->HasComponent(EComponentType::Component_Translation))

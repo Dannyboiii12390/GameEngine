@@ -141,6 +141,7 @@ void Mesh::Destroy()
     if (m_Device == VK_NULL_HANDLE)
         return;
 
+    m_RHI->WaitIdle();
     if (m_IndexBuffer != VK_NULL_HANDLE)
     {
         vkDestroyBuffer(m_Device, m_IndexBuffer, nullptr);
@@ -298,6 +299,13 @@ void Mesh::CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
     EndSingleTimeCommands(commandBuffer);
+}
+void Mesh::FlipWinding(std::vector<uint32_t>& indices)
+{
+    for (size_t i = 0; i + 2 < indices.size(); i += 3)
+    {
+        std::swap(indices[i + 0], indices[i + 1]);
+    }
 }
 
 uint32_t Mesh::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const

@@ -1,5 +1,6 @@
 #include "VulkanRHI.h"
 #include "Window.h"
+#include "Camera.h"
 
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
@@ -11,6 +12,8 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+
+#include <glm/gtc/type_ptr.hpp>
 
 namespace {
 	const std::vector<const char*> validationLayers = {
@@ -124,6 +127,16 @@ void VulkanRHI::Shutdown()
 		s_DescriptorSetLayout = VK_NULL_HANDLE;
 	}
 	s_DescriptorSets.clear();
+
+	// Destroy camera UBO
+	if (m_CameraUniformBuffer != VK_NULL_HANDLE) {
+		vkDestroyBuffer(m_Device, m_CameraUniformBuffer, nullptr);
+		m_CameraUniformBuffer = VK_NULL_HANDLE;
+	}
+	if (m_CameraUniformBufferMemory != VK_NULL_HANDLE) {
+		vkFreeMemory(m_Device, m_CameraUniformBufferMemory, nullptr);
+		m_CameraUniformBufferMemory = VK_NULL_HANDLE;
+	}
 
 	// Cleanup swapchain related resources
 	CleanupSwapchain();
@@ -288,6 +301,9 @@ void VulkanRHI::EndFrame()
 		throw std::runtime_error("Failed to record command buffer");
 	}
 
+	// Update camera uniform buffer with latest camera matrices before submission
+	UpdateCameraBuffer();
+
 	VkSemaphore waitSem = m_ImageAvailableSemaphores[m_CurrentFrame];
 	// Use the semaphore specific to the currently acquired image to avoid reuse while presentation may still hold it
 	VkSemaphore signalSem = m_RenderFinishedSemaphores[m_CurrentImageIndex];
@@ -366,6 +382,12 @@ void VulkanRHI::RecreateSwapchainAndResources()
 	CreateDescriptorPool();
 	AllocateDescriptorSets();
 	CreatePipelineLayout();
+
+	// Update camera aspect ratio after swapchain recreation
+	if (m_ActiveCamera != nullptr && m_SwapchainExtent.height != 0) {
+		float aspect = static_cast<float>(m_SwapchainExtent.width) / static_cast<float>(m_SwapchainExtent.height);
+		m_ActiveCamera->SetAspect(aspect);
+	}
 }
 void VulkanRHI::ToggleVSync(bool enabled)
 {
@@ -427,6 +449,16 @@ void VulkanRHI::Present()
 	// Advance frame index only after a successful present (so semaphores were consumed).
 	m_CurrentFrame = (m_CurrentFrame + 1) % std::max<size_t>(1, m_InFlightFences.size());
 	m_CurrentImageIndex = UINT32_MAX;
+}
+
+// --- Expose descriptor layout & sets to other translation units via member functions ---
+VkDescriptorSetLayout VulkanRHI::GetDescriptorSetLayout() const
+{
+	return s_DescriptorSetLayout;
+}
+const std::vector<VkDescriptorSet>& VulkanRHI::GetDescriptorSets() const
+{
+	return s_DescriptorSets;
 }
 
 // private methods
@@ -839,6 +871,12 @@ void VulkanRHI::CreateSwapchain()
 
 	// Ensure the per-image "in-flight" fence tracking matches the number of swapchain images
 	m_ImagesInFlight.resize(m_SwapchainImages.size(), VK_NULL_HANDLE);
+
+	// If a camera is active, update its aspect ratio to match the swapchain extent.
+	if (m_ActiveCamera != nullptr && m_SwapchainExtent.height != 0) {
+		float aspect = static_cast<float>(m_SwapchainExtent.width) / static_cast<float>(m_SwapchainExtent.height);
+		m_ActiveCamera->SetAspect(aspect);
+	}
 }
 void VulkanRHI::CreateImageViews()
 {
@@ -975,7 +1013,6 @@ void VulkanRHI::CleanupSwapchain()
 		m_RenderPass = VK_NULL_HANDLE;
 	}
 }
-
 void VulkanRHI::AllocateCommandBuffers()
 {
 	if (m_CommandPool == VK_NULL_HANDLE) {
@@ -1057,7 +1094,6 @@ void VulkanRHI::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
 
 	// Do not call vkCmdEndRenderPass or vkEndCommandBuffer here to allow the caller to record draws.
 }
-
 VkCommandBuffer VulkanRHI::BeginSingleTimeCommands() {
 	if (m_CommandPool == VK_NULL_HANDLE || m_Device == VK_NULL_HANDLE) {
 		throw std::runtime_error("BeginSingleTimeCommands called but command pool or device is not initialized");
@@ -1114,7 +1150,6 @@ void VulkanRHI::EndSingleTimeCommands(VkCommandBuffer commandBuffer) {
 	vkQueueWaitIdle(m_GraphicsQueue);
 	vkFreeCommandBuffers(m_Device, m_CommandPool, 1, &commandBuffer);
 }
-
 void VulkanRHI::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
 	if (m_Device == VK_NULL_HANDLE)
@@ -1346,7 +1381,6 @@ VkSampler VulkanRHI::CreateSampler()
 	}
 	return sampler;
 }
-
 uint32_t VulkanRHI::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
@@ -1453,43 +1487,120 @@ void VulkanRHI::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t tex
 	EndSingleTimeCommands(commandBuffer);
 }
 
+// --- Camera integration methods ---
+void VulkanRHI::SetActiveCamera(Camera* camera)
+{
+    m_ActiveCamera = camera;
+    if (m_ActiveCamera != nullptr && m_SwapchainExtent.height != 0) {
+        float aspect = static_cast<float>(m_SwapchainExtent.width) / static_cast<float>(m_SwapchainExtent.height);
+        m_ActiveCamera->SetAspect(aspect);
+    }
+}
+Camera* VulkanRHI::GetActiveCamera() const
+{
+    return m_ActiveCamera;
+}
+void VulkanRHI::CreateCameraUniformBufferAndWriteDescriptors()
+{
+    // Create a single host-visible uniform buffer large enough for view+proj matrices.
+    if (m_Device == VK_NULL_HANDLE) return;
+
+    if (m_CameraUniformBuffer == VK_NULL_HANDLE)
+    {
+        CreateBuffer(static_cast<VkDeviceSize>(m_CameraUniformBufferSize),
+                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     m_CameraUniformBuffer,
+                     m_CameraUniformBufferMemory);
+    }
+
+    // Update each allocated descriptor set to reference the camera uniform buffer at binding 0.
+    for (size_t i = 0; i < s_DescriptorSets.size(); ++i)
+    {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = m_CameraUniformBuffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = static_cast<VkDeviceSize>(m_CameraUniformBufferSize);
+
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = s_DescriptorSets[i];
+        descriptorWrite.dstBinding = 0; // binding 0 is the UBO in CreateDescriptorSetLayout
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+        descriptorWrite.pImageInfo = nullptr;
+        descriptorWrite.pTexelBufferView = nullptr;
+
+        vkUpdateDescriptorSets(m_Device, 1, &descriptorWrite, 0, nullptr);
+    }
+}
+void VulkanRHI::UpdateCameraBuffer()
+{
+    if (m_Device == VK_NULL_HANDLE || m_CameraUniformBuffer == VK_NULL_HANDLE) return;
+
+    // Prepare two mat4's: view followed by projection (in column-major order as glm)
+    glm::mat4 view = glm::mat4(1.0f);
+    glm::mat4 proj = glm::mat4(1.0f);
+
+    if (m_ActiveCamera != nullptr) {
+        view = m_ActiveCamera->GetViewMatrix();
+        proj = m_ActiveCamera->GetProjectionMatrix();
+
+        // GLM's perspective uses OpenGL clip-space by default; for Vulkan flip Y.
+        proj[1][1] *= -1.0f;
+    }
+
+    // Map, copy, and unmap
+    void* data;
+    if (vkMapMemory(m_Device, m_CameraUniformBufferMemory, 0, m_CameraUniformBufferSize, 0, &data) == VK_SUCCESS)
+    {
+        // copy view then proj
+        std::memcpy(data, glm::value_ptr(view), sizeof(float) * 16);
+        std::memcpy(static_cast<uint8_t*>(data) + sizeof(float) * 16, glm::value_ptr(proj), sizeof(float) * 16);
+        vkUnmapMemory(m_Device, m_CameraUniformBufferMemory);
+    }
+}
 void VulkanRHI::CreateDescriptorSetLayout()
 {
-	if (m_Device == VK_NULL_HANDLE) throw std::runtime_error("CreateDescriptorSetLayout called but device is not initialized");
+    if (m_Device == VK_NULL_HANDLE) throw std::runtime_error("CreateDescriptorSetLayout called but device is not initialized");
 
-	VkDescriptorSetLayoutBinding uboBinding{};
-	uboBinding.binding = 0;
-	uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboBinding.descriptorCount = 1;
-	uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	uboBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding uboBinding{};
+    uboBinding.binding = 0;
+    uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboBinding.descriptorCount = 1;
+    uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboBinding.pImmutableSamplers = nullptr;
 
-	VkDescriptorSetLayoutBinding samplerBinding{};
-	samplerBinding.binding = 1;
-	samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerBinding.descriptorCount = 1;
-	samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	samplerBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding samplerBinding{};
+    samplerBinding.binding = 1;
+    samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerBinding.descriptorCount = 1;
+    samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerBinding.pImmutableSamplers = nullptr;
 
-	std::vector<VkDescriptorSetLayoutBinding> bindings = { uboBinding, samplerBinding };
+    std::vector<VkDescriptorSetLayoutBinding> bindings = { uboBinding, samplerBinding };
 
-	VkDescriptorSetLayoutCreateInfo layoutInfo{};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-	layoutInfo.pBindings = bindings.data();
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
 
-	if (vkCreateDescriptorSetLayout(m_Device, &layoutInfo, nullptr, &s_DescriptorSetLayout) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create descriptor set layout");
-	}
+    if (s_DescriptorSetLayout != VK_NULL_HANDLE) {
+        // reuse/avoid double-create in recreate path
+        return;
+    }
+
+    if (vkCreateDescriptorSetLayout(m_Device, &layoutInfo, nullptr, &s_DescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create descriptor set layout");
+    }
 }
 void VulkanRHI::CreateDescriptorPool()
 {
 	if (m_Device == VK_NULL_HANDLE) throw std::runtime_error("CreateDescriptorPool called but device is not initialized");
 
-	// Determine how many descriptor sets we must support:
-	// - Prefer the number of in-flight fences (frames-in-flight) if available.
-	// - Fall back to s_MaxDescriptorFrames.
-	// - Also ensure we support at least as many sets as swapchain images if those are present.
+	// Determine count similarly to AllocateDescriptorSets logic so pool sizes match expected allocations.
 	uint32_t count = static_cast<uint32_t>(m_InFlightFences.size());
 	if (count == 0) count = s_MaxDescriptorFrames;
 	if (!m_SwapchainImages.empty()) {
@@ -1545,10 +1656,19 @@ void VulkanRHI::AllocateDescriptorSets()
 	if (vkAllocateDescriptorSets(m_Device, &allocInfo, s_DescriptorSets.data()) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to allocate descriptor sets");
 	}
+
+	// Create and bind camera uniform buffer and write descriptors to point at it.
+	CreateCameraUniformBufferAndWriteDescriptors();
 }
 void VulkanRHI::CreatePipelineLayout()
 {
 	if (m_Device == VK_NULL_HANDLE) throw std::runtime_error("CreatePipelineLayout called but device is not initialized");
+
+	// If a pipeline layout already exists, destroy it first (recreate path)
+	if (s_PipelineLayout != VK_NULL_HANDLE) {
+		vkDestroyPipelineLayout(m_Device, s_PipelineLayout, nullptr);
+		s_PipelineLayout = VK_NULL_HANDLE;
+	}
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1561,99 +1681,14 @@ void VulkanRHI::CreatePipelineLayout()
 		pipelineLayoutInfo.setLayoutCount = 0;
 		pipelineLayoutInfo.pSetLayouts = nullptr;
 	}
+
+	// No push constants from RHI-level layout here; individual pipelines may add their own push-constant ranges.
 	pipelineLayoutInfo.pushConstantRangeCount = 0;
 	pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
 	if (vkCreatePipelineLayout(m_Device, &pipelineLayoutInfo, nullptr, &s_PipelineLayout) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create pipeline layout");
 	}
-}
-
-bool VulkanRHI::IsDeviceSuitable(VkPhysicalDevice device) const
-{
-	// Check for required queue families (graphics + present)
-	int graphicsFamily = -1;
-	int presentFamily = -1;
-
-	uint32_t queueFamilyCount = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-	if (queueFamilyCount > 0) {
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-		for ( uint32_t i = 0; i < queueFamilyCount; ++i) {
-			if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-				graphicsFamily = static_cast<int>(i);
-			}
-			VkBool32 presentSupport = VK_FALSE;
-			if (m_Surface != VK_NULL_HANDLE) {
-				vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
-			}
-			if (presentSupport) {
-				presentFamily = static_cast<int>(i);
-			}
-			if (graphicsFamily >= 0 && presentFamily >= 0) break;
-		}
-	}
-
-	// Device extensions
-	bool extensionsSupported = CheckDeviceExtensionSupport(device);
-
-	// If extensions supported, ensure swapchain is adequate (formats & present modes)
-	bool swapchainAdequate = false;
-	if (extensionsSupported && m_Surface != VK_NULL_HANDLE) {
-		uint32_t formatCount = 0;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_Surface, &formatCount, nullptr);
-		uint32_t presentModeCount = 0;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_Surface, &presentModeCount, nullptr);
-		swapchainAdequate = (formatCount > 0) && (presentModeCount > 0);
-	}
-	else if (extensionsSupported && m_Surface == VK_NULL_HANDLE) {
-		// If no surface created yet, be permissive and just require extensions + queue families.
-		swapchainAdequate = true;
-	}
-
-	// Optional feature checks (e.g. anisotropy)
-	VkPhysicalDeviceFeatures supportedFeatures{};
-	vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
-
-	return (graphicsFamily >= 0) && (presentFamily >= 0) && extensionsSupported && swapchainAdequate && supportedFeatures.samplerAnisotropy;
-}
-bool VulkanRHI::CheckDeviceExtensionSupport(VkPhysicalDevice device) const
-{
-	uint32_t extensionCount = 0;
-	if (vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr) != VK_SUCCESS) {
-		return false;
-	}
-	std::vector<VkExtensionProperties> available(extensionCount);
-	if (extensionCount > 0) {
-		if (vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, available.data()) != VK_SUCCESS) {
-			return false;
-		}
-	}
-	std::set<std::string> required(deviceExtensions.begin(), deviceExtensions.end());
-	for (const auto& ext : available) {
-		required.erase(ext.extensionName);
-	}
-	return required.empty();
-}
-VkFormat VulkanRHI::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) const
-{
-	for (VkFormat format : candidates) {
-		VkFormatProperties props;
-		vkGetPhysicalDeviceFormatProperties(m_PhysicalDevice, format, &props);
-
-		if (tiling == VK_IMAGE_TILING_LINEAR) {
-			if ((props.linearTilingFeatures & features) == features) {
-				return format;
-			}
-		}
-		else if (tiling == VK_IMAGE_TILING_OPTIMAL) {
-			if ((props.optimalTilingFeatures & features) == features) {
-				return format;
-			}
-		}
-	}
-	throw std::runtime_error("Failed to find supported format from candidates");
 }
 bool VulkanRHI::HasStencilComponent(VkFormat format) const
 {

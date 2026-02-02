@@ -20,33 +20,34 @@ public:
 	Entity(Entity&&) noexcept = default;
 	Entity& operator=(Entity&&) noexcept = default;
 
-	// Explicit add functions to avoid template/construct_at instantiation issues on MSVC
-	void AddTranslation(const glm::vec3& position = glm::vec3(0.0f),
-	                    const glm::vec3& rotation = glm::vec3(0.0f),
-	                    const glm::vec3& scale    = glm::vec3(1.0f))
+	template<typename... Args>
+	void AddComponent(EComponentType type, Args... args) 
 	{
-		auto component = std::make_unique<ComponentTranslation>(position, rotation, scale);
-		m_Components.push_back(std::move(component));
-		m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Translation));
+		switch (type)
+		{
+			case EComponentType::Component_Translation:
+			{
+				auto component = std::make_unique<ComponentTranslation>(args...);
+				m_Components.push_back(std::move(component));
+				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Translation));
+				break;
+			}
+			case EComponentType::Component_Velocity:
+			{
+				auto component = std::make_unique<ComponentVelocity>(args...);
+				m_Components.push_back(std::move(component));
+				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Velocity));
+				break;
+			}
+			case EComponentType::Component_Geometry:
+			{
+				auto component = std::make_unique<ComponentGeometry>();
+				m_Components.push_back(std::move(component));
+				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Geometry));
+				break;
+			}
+		}
 	}
-
-	void AddVelocity(const glm::vec3& posVel = glm::vec3(0.0f),
-	                 const glm::vec3& rotVel = glm::vec3(0.0f),
-	                 const glm::vec3& scalarVel = glm::vec3(1.0f))
-	{
-		auto component = std::make_unique<ComponentVelocity>(posVel, rotVel, scalarVel);
-		m_Components.push_back(std::move(component));
-		m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Velocity));
-	}
-
-	// Simple geometry component add; GPU resources are initialized later (after RHI exists).
-	void AddGeometry()
-	{
-		auto component = std::make_unique<ComponentGeometry>();
-		m_Components.push_back(std::move(component));
-		m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Geometry));
-	}
-
 	// Retrieve first component with matching type (non-template)
 	IComponent* GetComponent(EComponentType type)
 	{

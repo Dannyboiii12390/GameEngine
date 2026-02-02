@@ -15,18 +15,25 @@
 
 #include "Core/Entity.h"
 #include "Core/Systems/SystemRenderer.h"
+#include "Renderer/Camera.h"
+
+#ifdef _DEBUG
+#define LOG_DEBUG(msg) std::cout << msg << std::endl;
+#else
+#define LOG_DEBUG(msg)
+#endif
 
 int main()
 {
     try
     {
-        std::cout << "[MAIN] start\n" << std::flush;
+        LOG_DEBUG("[MAIN] start");
 
         if (!glfwInit())
         {
             throw std::runtime_error("Failed to initialize GLFW");
         }
-        std::cout << "[MAIN] glfwInit OK\n" << std::flush;
+        LOG_DEBUG("[MAIN] glfwInit OK");
 
         // Do not create an OpenGL context; we'll use Vulkan.
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -35,14 +42,19 @@ int main()
         const int width = 1280;
         const int height = 720;
         GLFWwindow* raw = glfwCreateWindow(width, height, "Vulkan Window", nullptr, nullptr);
-        std::cout << "[MAIN] glfwCreateWindow returned " << static_cast<void*>(raw) << "\n" << std::flush;
+        LOG_DEBUG("[MAIN] glfwCreateWindow returned " << static_cast<void*>(raw));
         Window window(raw);
 
         VulkanRHI vulkanRHI;
         Entity entity;
-        entity.AddTranslation(glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
-        entity.AddVelocity(glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
-        entity.AddGeometry();
+        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
+		entity.AddComponent(EComponentType::Component_Geometry);
+        
+		Camera camera(90, 16.0f / 9.0f, 0.1f, 100.0f);
+		vulkanRHI.SetActiveCamera(&camera);
+		camera.SetPosition(glm::vec3(0.0f, 0.0f, 2.0f));
+		camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
 
         SystemRenderer renderer;
 
@@ -52,21 +64,21 @@ int main()
             glfwTerminate();
             throw std::runtime_error("Failed to create GLFW window");
         }
-        std::cout << "[MAIN] window valid\n" << std::flush;
+        LOG_DEBUG("[MAIN] window valid");
 
-        std::cout << "[MAIN] calling vulkanRHI.Initialise\n" << std::flush;
+        LOG_DEBUG("[MAIN] calling vulkanRHI.Initialise");
         vulkanRHI.Initialise(&window);
-        std::cout << "[MAIN] vulkanRHI.Initialise returned\n" << std::flush;
+        LOG_DEBUG("[MAIN] vulkanRHI.Initialise returned");
 
-        std::cout << "[MAIN] initializing renderer\n" << std::flush;
+        LOG_DEBUG("[MAIN] initializing renderer");
         renderer.Initialize(&vulkanRHI);
-        std::cout << "[MAIN] renderer.Initialize returned\n" << std::flush;
+        LOG_DEBUG("[MAIN] renderer.Initialize returned");
 
         // Create the rotating triangle mesh + pipeline after RHI initialised
         ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
         if (geom)
         {
-            std::cout << "[MAIN] got ComponentGeometry\n" << std::flush;
+            LOG_DEBUG("[MAIN] got ComponentGeometry");
             std::vector<Mesh::Vertex> verts(3);
             verts[0].position[0] = 0.0f; verts[0].position[1] =  0.5f; verts[0].position[2] = 0.0f;
             verts[1].position[0] = 0.5f; verts[1].position[1] = -0.5f; verts[1].position[2] = 0.0f;
@@ -77,31 +89,31 @@ int main()
 
             if (!geom->InitializeMesh(&vulkanRHI, verts, indices))
                 throw std::runtime_error("Failed to initialize triangle mesh");
-            std::cout << "[MAIN] InitializeMesh OK\n" << std::flush;
+            LOG_DEBUG("[MAIN] InitializeMesh OK");
 
             namespace fs = std::filesystem;
             fs::path shaderDir = fs::path(__FILE__).parent_path() / "SHADERS";
             std::string vertSpv = (shaderDir / "triangle.vert.spv").string();
             std::string fragSpv = (shaderDir / "triangle.frag.spv").string();
 
-            std::cout << "[MAIN] looking for shaders:\n  " << vertSpv << "\n  " << fragSpv << "\n" << std::flush;
+            LOG_DEBUG("[MAIN] looking for shaders:\n  " << vertSpv << "\n  " << fragSpv);
             if (!fs::exists(vertSpv) || !fs::exists(fragSpv))
             {
-                std::cerr << "[MAIN] Shader files not found.\nExpected:\n  " << vertSpv << "\n  " << fragSpv << std::endl;
-                std::cerr << "[MAIN] Check your custom build step or move the .spv files to the SHADERS folder." << std::endl;
+                LOG_DEBUG("[MAIN] Shader files not found.\nExpected:\n  " << vertSpv << "\n  " << fragSpv);
+				LOG_DEBUG("[MAIN] Check your custom build step or move the .spv files to the SHADERS folder.");
                 throw std::runtime_error("Missing SPIR-V shader files");
             }
 
             if (!geom->InitializePipeline(&vulkanRHI, vulkanRHI.GetRenderPass(), vulkanRHI.GetSwapchainExtent(), vertSpv, fragSpv))
                 throw std::runtime_error("Failed to create triangle pipeline");
-            std::cout << "[MAIN] InitializePipeline OK\n" << std::flush;
+            LOG_DEBUG("[MAIN] InitializePipeline OK");
         }
         else
         {
-            std::cout << "[MAIN] no geometry component\n" << std::flush;
+            LOG_DEBUG("[MAIN] no geometry component");
         }
 
-        std::cout << "[MAIN] entering main loop\n" << std::flush;
+        LOG_DEBUG("[MAIN] entering main loop");
         double lastTime = glfwGetTime();
         int loopCount = 0;
         while (!glfwWindowShouldClose(window.GetGLFWwindow()))
@@ -138,21 +150,26 @@ int main()
             ++loopCount;
             if ((loopCount % 60) == 0)
             {
-                std::cout << "[MAIN] loop iterations: " << loopCount << "\n" << std::flush;
-            }
-
-            // safety: if loop runs too long during debugging, let it exit after many iterations
-            if (loopCount > 10000)
-            {
-                std::cout << "[MAIN] safety exit after " << loopCount << " iterations\n" << std::flush;
-                break;
+                LOG_DEBUG("[MAIN] loop iterations : " << loopCount);
             }
         }
 
-        std::cout << "[MAIN] leaving main loop\n" << std::flush;
+        LOG_DEBUG("[MAIN] leaving main loop");
+
+        // --- Ensure GPU work is finished and free per-object GPU resources before tearing down the RHI ---
+        if (geom)
+        {
+			LOG_DEBUG("[MAIN] Destroying ComponentGeometry GPU resources");
+            geom->Destroy(); // ensure mesh & pipeline free their VkBuffers/VkPipeline while device is still valid and idle
+        }
+
+        LOG_DEBUG("[MAIN] calling vulkanRHI.Shutdown");
+        vulkanRHI.Shutdown(); // Shutdown waits for device idle internally
+        LOG_DEBUG("[MAIN] vulkanRHI.Shutdown returned");
+
         glfwDestroyWindow(window.GetGLFWwindow());
         glfwTerminate();
-        std::cout << "[MAIN] shutdown complete\n" << std::flush;
+        LOG_DEBUG("[MAIN] shutdown complete");
         return 0;
     }
     catch (const std::exception& e)
