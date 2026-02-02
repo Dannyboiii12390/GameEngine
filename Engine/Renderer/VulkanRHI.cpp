@@ -312,6 +312,8 @@ void VulkanRHI::Shutdown()
 		vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 		m_CommandPool = VK_NULL_HANDLE;
 	}
+	DestroyDefaultTexture();
+
 	// Destroy device
 	if (m_Device != VK_NULL_HANDLE) {
 		vkDestroyDevice(m_Device, nullptr);
@@ -1873,4 +1875,41 @@ void VulkanRHI::CreatePipelineLayout()
 bool VulkanRHI::HasStencilComponent(VkFormat format) const
 {
 	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+void VulkanRHI::DestroyDefaultTexture()
+{
+	// Only act if the default texture was created.
+	if (!s_DefaultTextureCreated) return;
+
+	// If device is invalid, just clear bookkeeping to avoid attempting Vulkan destroys.
+	if (m_Device == VK_NULL_HANDLE) {
+		s_DefaultTextureCreated = false;
+		s_DefaultImage = VK_NULL_HANDLE;
+		s_DefaultImageMemory = VK_NULL_HANDLE;
+		s_DefaultImageView = VK_NULL_HANDLE;
+		s_DefaultSampler = VK_NULL_HANDLE;
+		return;
+	}
+
+	if (s_DefaultSampler != VK_NULL_HANDLE) {
+		vkDestroySampler(m_Device, s_DefaultSampler, nullptr);
+		s_DefaultSampler = VK_NULL_HANDLE;
+	}
+
+	if (s_DefaultImageView != VK_NULL_HANDLE) {
+		vkDestroyImageView(m_Device, s_DefaultImageView, nullptr);
+		s_DefaultImageView = VK_NULL_HANDLE;
+	}
+
+	if (s_DefaultImage != VK_NULL_HANDLE) {
+		vkDestroyImage(m_Device, s_DefaultImage, nullptr);
+		s_DefaultImage = VK_NULL_HANDLE;
+	}
+
+	if (s_DefaultImageMemory != VK_NULL_HANDLE) {
+		vkFreeMemory(m_Device, s_DefaultImageMemory, nullptr);
+		s_DefaultImageMemory = VK_NULL_HANDLE;
+	}
+
+	s_DefaultTextureCreated = false;
 }
