@@ -4,6 +4,7 @@
 #include "../../Renderer/VulkanRHI.h"
 #include "../../Renderer/Mesh.h"
 #include "../../Renderer/Pipeline.h"
+#include "../../Renderer/Texture.h"
 
 #include <memory>
 #include <string>
@@ -31,6 +32,8 @@ public:
 	// Initialize pipeline resources. Returns false on failure.
 	bool InitializePipeline(VulkanRHI* rhi, VkRenderPass renderPass, VkExtent2D extent, const std::string& vertSpvPath, const std::string& fragSpvPath);
 
+	bool CreateTexture(VulkanRHI* rhi, const std::string& path, TextureType type, bool srgb);
+
 	// Bind pipeline and mesh and issue draw commands on the provided command buffer.
 	void BindAndDraw(VkCommandBuffer cmd) const;
 
@@ -49,4 +52,7 @@ public:
 private:
 	std::unique_ptr<Mesh> m_Mesh;
 	std::unique_ptr<Pipeline> m_Pipeline;
+	std::unique_ptr<Texture> m_Texture;
+
+	VulkanRHI* m_RHI = nullptr;
 };

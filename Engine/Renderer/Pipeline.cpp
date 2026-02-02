@@ -288,5 +288,19 @@ void Pipeline::Bind(VkCommandBuffer cmd) const
     if (m_Pipeline != VK_NULL_HANDLE && cmd != VK_NULL_HANDLE)
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+
+        // Bind descriptor sets (if any)
+        const auto& descSets = m_RHI->GetDescriptorSets();
+        if (!descSets.empty())
+        {
+            vkCmdBindDescriptorSets(cmd,
+                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    m_PipelineLayout,
+                                    0,
+                                    1,
+                                    &descSets[0],
+                                    0,
+                                    nullptr);
+        }
     }
 }

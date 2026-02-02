@@ -1,6 +1,7 @@
 #include "VulkanRHI.h"
 #include "Window.h"
 #include "Camera.h"
+#include "Texture.h"
 
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
@@ -12,8 +13,11 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <unordered_set>
+#include <mutex>
 
 #include <glm/gtc/type_ptr.hpp>
+
 
 namespace {
 	const std::vector<const char*> validationLayers = {
@@ -24,13 +28,31 @@ namespace {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
+	// Debug message dedupe helpers
+	static std::mutex s_DebugMsgMutex;
+	static std::unordered_set<std::string> s_SeenDebugMessages;
+
 	VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT messageType,
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* /*pUserData*/)
 	{
-		std::cerr << "Vulkan validation: " << (pCallbackData->pMessage ? pCallbackData->pMessage : "") << std::endl;
+		// Build a stable key for this message: use messageIdNumber + message text.
+		const char* text = (pCallbackData && pCallbackData->pMessage) ? pCallbackData->pMessage : "";
+		std::string key = std::to_string(pCallbackData ? pCallbackData->messageIdNumber : 0) + ":" + text;
+
+		{
+			std::lock_guard<std::mutex> lock(s_DebugMsgMutex);
+			// If we've already printed this exact message, suppress subsequent prints.
+			if (s_SeenDebugMessages.find(key) != s_SeenDebugMessages.end()) {
+				return VK_FALSE;
+			}
+			s_SeenDebugMessages.insert(key);
+		}
+
+		// Print once (format severity/type as you prefer)
+		std::cerr << "Vulkan validation: " << text << std::endl;
 		return VK_FALSE;
 	}
 
@@ -57,6 +79,130 @@ namespace {
 	VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> s_DescriptorSets;
 	VkPipelineLayout s_PipelineLayout = VK_NULL_HANDLE;
+
+	static std::vector<Texture*> s_RegisteredTextures;
+
+	// Default/fallback 1x1 white texture used to populate binding 1 if no textures are registered.
+	VkImage s_DefaultImage = VK_NULL_HANDLE;
+	VkDeviceMemory s_DefaultImageMemory = VK_NULL_HANDLE;
+	VkImageView s_DefaultImageView = VK_NULL_HANDLE;
+	VkSampler s_DefaultSampler = VK_NULL_HANDLE;
+	bool s_DefaultTextureCreated = false;
+
+	void CreateDefaultTextureForDescriptorSets(VulkanRHI* rhi)
+	{
+		if (!rhi || s_DefaultTextureCreated) return;
+
+		VkDevice device = rhi->GetDevice();
+		VkPhysicalDevice physical = rhi->GetPhysicalDevice();
+		VkQueue graphicsQueue = rhi->GetGraphicsQueue();
+		VkCommandPool commandPool = rhi->GetCommandPool();
+		if (device == VK_NULL_HANDLE || physical == VK_NULL_HANDLE || graphicsQueue == VK_NULL_HANDLE || commandPool == VK_NULL_HANDLE)
+			return;
+
+		// 1x1 RGBA white pixel
+		const uint8_t pixel[4] = { 255, 255, 255, 255 };
+		VkDeviceSize imageSize = 4;
+
+		// Create staging buffer
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
+
+		VkBufferCreateInfo bufInfo{};
+		bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufInfo.size = imageSize;
+		bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		if (vkCreateBuffer(device, &bufInfo, nullptr, &stagingBuffer) != VK_SUCCESS) {
+			return;
+		}
+
+		VkMemoryRequirements memReq{};
+		vkGetBufferMemoryRequirements(device, stagingBuffer, &memReq);
+
+		// find memory type locally
+		VkPhysicalDeviceMemoryProperties memProps{};
+		vkGetPhysicalDeviceMemoryProperties(physical, &memProps);
+		uint32_t memoryTypeIndex = UINT32_MAX;
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
+			if ((memReq.memoryTypeBits & (1u << i)) && (memProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) == (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+				memoryTypeIndex = i;
+				break;
+			}
+		}
+		if (memoryTypeIndex == UINT32_MAX) {
+			vkDestroyBuffer(device, stagingBuffer, nullptr);
+			return;
+		}
+
+		VkMemoryAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memReq.size;
+		allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+		if (vkAllocateMemory(device, &allocInfo, nullptr, &stagingBufferMemory) != VK_SUCCESS) {
+			vkDestroyBuffer(device, stagingBuffer, nullptr);
+			return;
+		}
+		vkBindBufferMemory(device, stagingBuffer, stagingBufferMemory, 0);
+
+		// copy pixel to staging buffer
+		void* data = nullptr;
+		vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+		std::memcpy(data, pixel, static_cast<size_t>(imageSize));
+		vkUnmapMemory(device, stagingBufferMemory);
+
+		// Create optimal image via VulkanRHI helper
+		const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+		rhi->CreateImage(1, 1, format, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			s_DefaultImage, s_DefaultImageMemory);
+
+		// Transition, copy and transition to shader read (uses RHI helpers)
+		rhi->TransitionImageLayout(s_DefaultImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		rhi->CopyBufferToImage(stagingBuffer, s_DefaultImage, 1, 1);
+		rhi->TransitionImageLayout(s_DefaultImage, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		// cleanup staging buffer
+		vkDestroyBuffer(device, stagingBuffer, nullptr);
+		vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+		// Create image view and sampler
+		s_DefaultImageView = rhi->CreateImageView(s_DefaultImage, format, VK_IMAGE_ASPECT_COLOR_BIT);
+		s_DefaultSampler = rhi->CreateSampler();
+
+		// Write this default image/sampler into every allocated descriptor set at binding 1.
+		if (!s_DescriptorSets.empty()) {
+			std::vector<VkWriteDescriptorSet> descriptorWrites;
+			std::vector<VkDescriptorImageInfo> imageInfos;
+			descriptorWrites.reserve(s_DescriptorSets.size());
+			imageInfos.reserve(s_DescriptorSets.size());
+
+			for (size_t i = 0; i < s_DescriptorSets.size(); ++i) {
+				VkDescriptorImageInfo imgInfo{};
+				imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				imgInfo.imageView = s_DefaultImageView;
+				imgInfo.sampler = s_DefaultSampler;
+				imageInfos.push_back(imgInfo);
+
+				VkWriteDescriptorSet w{};
+				w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				w.dstSet = s_DescriptorSets[i];
+				w.dstBinding = 1;
+				w.dstArrayElement = 0;
+				w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				w.descriptorCount = 1;
+				w.pImageInfo = &imageInfos.back();
+				descriptorWrites.push_back(w);
+			}
+
+			vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+		}
+
+		s_DefaultTextureCreated = true;
+	}
 }
 
 // Add getter implementation
@@ -112,6 +258,9 @@ void VulkanRHI::Shutdown()
 {
 	// Wait for device idle before tearing down
 	WaitIdle();
+
+    // Clear registered texture list (non-owning)
+    s_RegisteredTextures.clear();
 
 	// Destroy descriptor / pipeline static objects
 	if (s_PipelineLayout != VK_NULL_HANDLE) {
@@ -1375,12 +1524,13 @@ VkSampler VulkanRHI::CreateSampler()
 	samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 	samplerInfo.mipLodBias = 0.0f;
 
-	VkSampler sampler;
+	VkSampler sampler = nullptr;
 	if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create texture sampler");
 	}
 	return sampler;
 }
+
 uint32_t VulkanRHI::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
@@ -1657,8 +1807,38 @@ void VulkanRHI::AllocateDescriptorSets()
 		throw std::runtime_error("Failed to allocate descriptor sets");
 	}
 
-	// Create and bind camera uniform buffer and write descriptors to point at it.
+	// Write camera UBO into each descriptor set (binding 0)
+	// This must happen whenever descriptor sets are (re)allocated so the UBO descriptor is valid.
 	CreateCameraUniformBufferAndWriteDescriptors();
+
+	// Re-apply writes for any registered textures so binding 1 is valid for all sets.
+	for (Texture* tex : s_RegisteredTextures) {
+		if (tex) {
+			tex->WriteToDescriptorSets(this);
+		}
+	}
+
+	// If no textures are registered, create a small default 1x1 white texture and write it into binding 1
+	if (s_RegisteredTextures.empty()) {
+		CreateDefaultTextureForDescriptorSets(this);
+	}
+}
+void VulkanRHI::RegisterTexture(Texture* texture)
+{
+	if (!texture) return;
+	if (std::find(s_RegisteredTextures.begin(), s_RegisteredTextures.end(), texture) == s_RegisteredTextures.end()) {
+		s_RegisteredTextures.push_back(texture);
+	}
+	// If descriptor sets already exist, immediately write descriptors for this texture
+	if (!s_DescriptorSets.empty()) {
+		texture->WriteToDescriptorSets(this);
+	}
+}
+void VulkanRHI::UnregisterTexture(Texture* texture)
+{
+	if (!texture) return;
+	auto it = std::find(s_RegisteredTextures.begin(), s_RegisteredTextures.end(), texture);
+	if (it != s_RegisteredTextures.end()) s_RegisteredTextures.erase(it);
 }
 void VulkanRHI::CreatePipelineLayout()
 {

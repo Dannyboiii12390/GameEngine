@@ -5,6 +5,7 @@
 #include <vector>
 #include <tuple>
 #include <cstdint>
+#include <algorithm>
 
 class Window;
 class Mesh;
@@ -57,6 +58,17 @@ public:
     VkDescriptorSetLayout GetDescriptorSetLayout() const;
     const std::vector<VkDescriptorSet>& GetDescriptorSets() const;
 
+	VkSampler CreateSampler();
+
+    // Register / unregister textures so RHI can keep descriptor sets valid
+    void RegisterTexture(class Texture* texture);
+    void UnregisterTexture(class Texture* texture);
+
+	void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+
 private:
 
 	// Initialization helpers
@@ -87,11 +99,6 @@ private:
 	// Resource creation & helpers
 	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void CopyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
-	void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
-	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-	VkSampler CreateSampler();
 
 	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
@@ -107,10 +114,15 @@ private:
     void UpdateCameraBuffer(); // called each frame before submit
 
 	// Utility / queries
-	bool IsDeviceSuitable(VkPhysicalDevice device) const;
+	/*bool IsDeviceSuitable(VkPhysicalDevice device) const;
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device) const;
-	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) const;
+	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) const;*/
 	bool HasStencilComponent(VkFormat format) const;
+
+	// Helpers to create/destroy the fallback texture. Call CreateDefaultTexture() after device and descriptor sets are ready.
+	void CreateDefaultTexture();
+	void DestroyDefaultTexture();
+
 private:
 	// Vulkan core objects
 	VkInstance m_Instance = VK_NULL_HANDLE;
@@ -160,4 +172,11 @@ private:
     VkBuffer m_CameraUniformBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_CameraUniformBufferMemory = VK_NULL_HANDLE;
     size_t m_CameraUniformBufferSize = sizeof(float) * 16 * 2; // two mat4s
+
+    // Fallback 1x1 white texture owned by RHI — used to replace descriptors when textures are destroyed
+    VkImage      m_DefaultImage = VK_NULL_HANDLE;
+    VkDeviceMemory m_DefaultImageMemory = VK_NULL_HANDLE;
+    VkImageView  m_DefaultImageView = VK_NULL_HANDLE;
+    VkSampler    m_DefaultSampler = VK_NULL_HANDLE;
+
 };
