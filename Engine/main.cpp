@@ -24,6 +24,131 @@
 #define LOG_DEBUG(msg)
 #endif
 
+std::tuple < std::vector<Mesh::Vertex>, std::vector<uint32_t> > CreateTriangleMesh()
+{
+    std::vector<Mesh::Vertex> verts(3);
+    verts[0].position[0] = 0.0f; verts[0].position[1] = 0.5f; verts[0].position[2] = 0.0f;
+    verts[1].position[0] = 0.5f; verts[1].position[1] = -0.5f; verts[1].position[2] = 0.0f;
+    verts[2].position[0] = -0.5f; verts[2].position[1] = -0.5f; verts[2].position[2] = 0.0f;
+
+    // Improve lighting by giving a normal pointing out of the screen
+    // and give each vertex sensible UVs. Increase `uvTile` to tile the
+    // brick texture across the triangle (makes bricks appear smaller / clearer).
+    const float uvTile = 1.0f; // tweak this (e.g. 2..8) to change brick density/clarity
+
+    // top vertex
+    verts[0].normal[0] = 0.0f; verts[0].normal[1] = 0.0f; verts[0].normal[2] = 1.0f;
+    verts[0].uv[0] = 0.5f * uvTile; verts[0].uv[1] = 1.0f * uvTile;
+
+    // bottom-right
+    verts[1].normal[0] = 0.0f; verts[1].normal[1] = 0.0f; verts[1].normal[2] = 1.0f;
+    verts[1].uv[0] = 1.0f * uvTile; verts[1].uv[1] = 0.0f * uvTile;
+
+    // bottom-left
+    verts[2].normal[0] = 0.0f; verts[2].normal[1] = 0.0f; verts[2].normal[2] = 1.0f;
+    verts[2].uv[0] = 0.0f * uvTile; verts[2].uv[1] = 0.0f * uvTile;
+
+    std::vector<uint32_t> indices = { 0, 1, 2 };
+    return { verts, indices };
+}
+std::tuple < std::vector<Mesh::Vertex>, std::vector<uint32_t> > CreateCubeMesh()
+{
+    // Unit cube centered at origin: extents [-0.5, 0.5]
+    std::vector<Mesh::Vertex> verts;
+    verts.resize(24);
+
+    const float s = 0.5f;
+
+    // Front (+Z)
+    verts[0].position[0] = -s; verts[0].position[1] = s; verts[0].position[2] = s; // top-left
+    verts[1].position[0] = s; verts[1].position[1] = s; verts[1].position[2] = s; // top-right
+    verts[2].position[0] = s; verts[2].position[1] = -s; verts[2].position[2] = s; // bottom-right
+    verts[3].position[0] = -s; verts[3].position[1] = -s; verts[3].position[2] = s; // bottom-left
+    for (int i = 0; i < 4; ++i) { verts[i].normal[0] = 0.0f; verts[i].normal[1] = 0.0f; verts[i].normal[2] = 1.0f; }
+    verts[0].uv[0] = 0.0f; verts[0].uv[1] = 1.0f;
+    verts[1].uv[0] = 1.0f; verts[1].uv[1] = 1.0f;
+    verts[2].uv[0] = 1.0f; verts[2].uv[1] = 0.0f;
+    verts[3].uv[0] = 0.0f; verts[3].uv[1] = 0.0f;
+
+    // Back (-Z)
+    verts[4].position[0] = s; verts[4].position[1] = s; verts[4].position[2] = -s; // top-left (viewed from back)
+    verts[5].position[0] = -s; verts[5].position[1] = s; verts[5].position[2] = -s; // top-right
+    verts[6].position[0] = -s; verts[6].position[1] = -s; verts[6].position[2] = -s; // bottom-right
+    verts[7].position[0] = s; verts[7].position[1] = -s; verts[7].position[2] = -s; // bottom-left
+    for (int i = 4; i < 8; ++i) { verts[i].normal[0] = 0.0f; verts[i].normal[1] = 0.0f; verts[i].normal[2] = -1.0f; }
+    verts[4].uv[0] = 0.0f; verts[4].uv[1] = 1.0f;
+    verts[5].uv[0] = 1.0f; verts[5].uv[1] = 1.0f;
+    verts[6].uv[0] = 1.0f; verts[6].uv[1] = 0.0f;
+    verts[7].uv[0] = 0.0f; verts[7].uv[1] = 0.0f;
+
+    // Right (+X)
+    verts[8].position[0] = s; verts[8].position[1] = s; verts[8].position[2] = s; // top-left
+    verts[9].position[0] = s; verts[9].position[1] = s; verts[9].position[2] = -s; // top-right
+    verts[10].position[0] = s; verts[10].position[1] = -s; verts[10].position[2] = -s; // bottom-right
+    verts[11].position[0] = s; verts[11].position[1] = -s; verts[11].position[2] = s; // bottom-left
+    for (int i = 8; i < 12; ++i) { verts[i].normal[0] = 1.0f; verts[i].normal[1] = 0.0f; verts[i].normal[2] = 0.0f; }
+    verts[8].uv[0] = 0.0f; verts[8].uv[1] = 1.0f;
+    verts[9].uv[0] = 1.0f; verts[9].uv[1] = 1.0f;
+    verts[10].uv[0] = 1.0f; verts[10].uv[1] = 0.0f;
+    verts[11].uv[0] = 0.0f; verts[11].uv[1] = 0.0f;
+
+    // Left (-X)
+    verts[12].position[0] = -s; verts[12].position[1] = s; verts[12].position[2] = -s; // top-left
+    verts[13].position[0] = -s; verts[13].position[1] = s; verts[13].position[2] = s; // top-right
+    verts[14].position[0] = -s; verts[14].position[1] = -s; verts[14].position[2] = s; // bottom-right
+    verts[15].position[0] = -s; verts[15].position[1] = -s; verts[15].position[2] = -s; // bottom-left
+    for (int i = 12; i < 16; ++i) { verts[i].normal[0] = -1.0f; verts[i].normal[1] = 0.0f; verts[i].normal[2] = 0.0f; }
+    verts[12].uv[0] = 0.0f; verts[12].uv[1] = 1.0f;
+    verts[13].uv[0] = 1.0f; verts[13].uv[1] = 1.0f;
+    verts[14].uv[0] = 1.0f; verts[14].uv[1] = 0.0f;
+    verts[15].uv[0] = 0.0f; verts[15].uv[1] = 0.0f;
+
+    // Top (+Y)
+    verts[16].position[0] = -s; verts[16].position[1] = s; verts[16].position[2] = -s; // top-left
+    verts[17].position[0] = s; verts[17].position[1] = s; verts[17].position[2] = -s; // top-right
+    verts[18].position[0] = s; verts[18].position[1] = s; verts[18].position[2] = s; // bottom-right
+    verts[19].position[0] = -s; verts[19].position[1] = s; verts[19].position[2] = s; // bottom-left
+    for (int i = 16; i < 20; ++i) { verts[i].normal[0] = 0.0f; verts[i].normal[1] = 1.0f; verts[i].normal[2] = 0.0f; }
+    verts[16].uv[0] = 0.0f; verts[16].uv[1] = 1.0f;
+    verts[17].uv[0] = 1.0f; verts[17].uv[1] = 1.0f;
+    verts[18].uv[0] = 1.0f; verts[18].uv[1] = 0.0f;
+    verts[19].uv[0] = 0.0f; verts[19].uv[1] = 0.0f;
+
+    // Bottom (-Y)
+    verts[20].position[0] = -s; verts[20].position[1] = -s; verts[20].position[2] = s; // top-left (viewed from below)
+    verts[21].position[0] = s; verts[21].position[1] = -s; verts[21].position[2] = s; // top-right
+    verts[22].position[0] = s; verts[22].position[1] = -s; verts[22].position[2] = -s; // bottom-right
+    verts[23].position[0] = -s; verts[23].position[1] = -s; verts[23].position[2] = -s; // bottom-left
+    for (int i = 20; i < 24; ++i) { verts[i].normal[0] = 0.0f; verts[i].normal[1] = -1.0f; verts[i].normal[2] = 0.0f; }
+    verts[20].uv[0] = 0.0f; verts[20].uv[1] = 1.0f;
+    verts[21].uv[0] = 1.0f; verts[21].uv[1] = 1.0f;
+    verts[22].uv[0] = 1.0f; verts[22].uv[1] = 0.0f;
+    verts[23].uv[0] = 0.0f; verts[23].uv[1] = 0.0f;
+
+    // Indices (6 faces * 2 triangles * 3 indices = 36)
+    std::vector<uint32_t> indices;
+    indices.reserve(36);
+    for (uint32_t face = 0; face < 6; ++face)
+    {
+        uint32_t base = face * 4;
+        // Two triangles: (0,1,2) and (2,3,0) using face-local indices
+        indices.push_back(base + 0);
+        indices.push_back(base + 1);
+        indices.push_back(base + 2);
+
+        indices.push_back(base + 2);
+        indices.push_back(base + 3);
+        indices.push_back(base + 0);
+    }
+
+    return { verts, indices };
+}
+/*
+- Depth Testing
+- Render Passes
+- Render Graph
+- Input Handler
+*/
 int main()
 {
     try
@@ -54,7 +179,7 @@ int main()
         
 		Camera camera(90, 16.0f / 9.0f, 0.1f, 100.0f);
 		vulkanRHI.SetActiveCamera(&camera);
-		camera.SetPosition(glm::vec3(0.0f, 0.0f, 2.0f));
+		camera.SetPosition(glm::vec3(2.0f, 2.0f, 2.0f));
 		camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
 
         SystemRenderer renderer;
@@ -80,30 +205,9 @@ int main()
         if (geom)
         {
             LOG_DEBUG("[MAIN] got ComponentGeometry");
-            std::vector<Mesh::Vertex> verts(3);
-            verts[0].position[0] = 0.0f; verts[0].position[1] = 0.5f; verts[0].position[2] = 0.0f;
-            verts[1].position[0] = 0.5f; verts[1].position[1] = -0.5f; verts[1].position[2] = 0.0f;
-            verts[2].position[0] = -0.5f; verts[2].position[1] = -0.5f; verts[2].position[2] = 0.0f;
+			auto [verts, indices] = CreateCubeMesh();
 
-            // Improve lighting by giving a normal pointing out of the screen
-            // and give each vertex sensible UVs. Increase `uvTile` to tile the
-            // brick texture across the triangle (makes bricks appear smaller / clearer).
-            const float uvTile = 1.0f; // tweak this (e.g. 2..8) to change brick density/clarity
-
-            // top vertex
-            verts[0].normal[0] = 0.0f; verts[0].normal[1] = 0.0f; verts[0].normal[2] = 1.0f;
-            verts[0].uv[0] = 0.5f * uvTile; verts[0].uv[1] = 1.0f * uvTile;
-
-            // bottom-right
-            verts[1].normal[0] = 0.0f; verts[1].normal[1] = 0.0f; verts[1].normal[2] = 1.0f;
-            verts[1].uv[0] = 1.0f * uvTile; verts[1].uv[1] = 0.0f * uvTile;
-
-            // bottom-left
-            verts[2].normal[0] = 0.0f; verts[2].normal[1] = 0.0f; verts[2].normal[2] = 1.0f;
-            verts[2].uv[0] = 0.0f * uvTile; verts[2].uv[1] = 0.0f * uvTile;
-
-            std::vector<uint32_t> indices = { 0, 1, 2 };
-
+            
             if (!geom->InitializeMesh(&vulkanRHI, verts, indices))
                 throw std::runtime_error("Failed to initialize triangle mesh");
             LOG_DEBUG("[MAIN] InitializeMesh OK");

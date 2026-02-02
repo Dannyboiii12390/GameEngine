@@ -161,6 +161,8 @@
     <ClCompile Include="Renderer\Camera.cpp" />
     <ClCompile Include="Renderer\Mesh.cpp" />
     <ClCompile Include="Renderer\Pipeline.cpp" />
+    <ClCompile Include="Renderer\RenderGraph.cpp" />
+    <ClCompile Include="Renderer\RenderPass\GBufferPass.cpp" />
     <ClCompile Include="Renderer\Texture.cpp" />
     <ClCompile Include="Renderer\VulkanRHI.cpp" />
   </ItemGroup>
@@ -176,6 +178,7 @@
     <ClInclude Include="Renderer\Camera.h" />
     <ClInclude Include="Renderer\Mesh.h" />
     <ClInclude Include="Renderer\Pipeline.h" />
+    <ClInclude Include="Renderer\RenderGraph.h" />
     <ClInclude Include="Renderer\Texture.h" />
     <ClInclude Include="Renderer\Window.h" />
     <ClInclude Include="IMGUI\imconfig.h" />

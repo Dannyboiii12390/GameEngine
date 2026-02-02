@@ -3,13 +3,13 @@
 #include <string>
 
 class RenderGraphBuilder;
-class IRHICommandBuffer;
+class RHICommandBuffer;
 
 class IRenderPass 
 {
 public:
 	virtual void Setup(RenderGraphBuilder& builder) = 0;
-	virtual void Execute(IRHICommandBuffer& cmd) = 0;
+	virtual void Execute(RHICommandBuffer& cmd) = 0;
 	virtual std::string GetName() const = 0;
 
 };

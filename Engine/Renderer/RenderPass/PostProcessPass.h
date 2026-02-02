@@ -10,7 +10,7 @@ class PostProcessPass : public IRenderPass
 {
 public:
 	void Setup(RenderGraphBuilder& builder) override;
-	void Execute(IRHICommandBuffer& cmd) override;
+	void Execute(RHICommandBuffer& cmd) override;
 	std::string GetName() const override;
 
 	void SetInputTexture(TextureHandle intex);
