@@ -225,6 +225,12 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).vert.spv;%(Outputs)</Outputs>
     </CustomBuild>
+    <None Include="red_brick_nor_gl_1k.exr" />
+    <None Include="red_brick_rough_1k.exr" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="red_brick_diff_1k.jpg" />
+    <Image Include="red_brick_disp_1k.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
