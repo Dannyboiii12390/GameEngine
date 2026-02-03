@@ -179,13 +179,13 @@ int main()
 
         VulkanRHI vulkanRHI;
         Entity entity;
-        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(-2.0f));
+        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(-5.0f), glm::vec3(0.0f), glm::vec3(5.0f));
 		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
         
 		Camera camera(90, 16.0f / 9.0f, 0.1f, 100.0f);
 		vulkanRHI.SetActiveCamera(&camera);
-		camera.SetPosition(glm::vec3(2.0f, 2.0f, 2.0f));
+		camera.SetPosition(glm::vec3(2.0f));
 		camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
 
         SystemRenderer renderer;
