@@ -6,6 +6,7 @@
 #include <array>
 #include <filesystem>
 #include <fstream>
+#include <omp.h>
 
 // GLM is used for vec3 / mat4 in this file and components
 #include <glm/glm.hpp>
@@ -143,6 +144,7 @@ std::tuple < std::vector<Mesh::Vertex>, std::vector<uint32_t> > CreateCubeMesh()
 
     return { verts, indices };
 }
+
 /*
 - Depth Testing
 - Render Passes
@@ -154,6 +156,10 @@ int main()
     try
     {
         LOG_DEBUG("[MAIN] start");
+
+        #ifdef _OPENMP
+        std::cout << "OpenMP is enabled! Max threads: " << omp_get_max_threads() << std::endl;
+        #endif
 
         if (!glfwInit())
         {
@@ -173,7 +179,7 @@ int main()
 
         VulkanRHI vulkanRHI;
         Entity entity;
-        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(-2.0f));
 		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
         
