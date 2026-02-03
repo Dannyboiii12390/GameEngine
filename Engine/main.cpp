@@ -179,7 +179,7 @@ int main()
 
         VulkanRHI vulkanRHI;
         Entity entity;
-        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(-5.0f), glm::vec3(0.0f), glm::vec3(5.0f));
+        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(-1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
 		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
         
