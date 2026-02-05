@@ -12,7 +12,7 @@ public:
 		: m_Window(window)
 	{
 	}
-	GLFWwindow* GetGLFWwindow() { return m_Window; }
+	GLFWwindow* getGLFWwindow() { return m_Window; }
 
 
 private:

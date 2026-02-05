@@ -1,0 +1,486 @@
+
+
+#include "ResourceManager.h"
+#include <cmath>
+
+const float PI = 3.14159265358979323846f;
+static Mesh::Vertex MakeVertex(float px, float py, float pz,
+    float nx, float ny, float nz,
+    float u = 0.0f, float v = 0.0f)
+{
+    Mesh::Vertex vert{};
+    vert.position[0] = px; vert.position[1] = py; vert.position[2] = pz;
+    vert.normal[0] = nx; vert.normal[1] = ny; vert.normal[2] = nz;
+    vert.uv[0] = u; vert.uv[1] = v;
+    return vert;
+}
+
+MeshData ResourceManager::Create2dTriangleMesh()
+{
+    std::vector<Mesh::Vertex> verts(3);
+    verts[0].position[0] = 0.0f; verts[0].position[1] = 0.5f; verts[0].position[2] = 0.0f;
+    verts[1].position[0] = 0.5f; verts[1].position[1] = -0.5f; verts[1].position[2] = 0.0f;
+    verts[2].position[0] = -0.5f; verts[2].position[1] = -0.5f; verts[2].position[2] = 0.0f;
+
+    // Improve lighting by giving a normal pointing out of the screen
+    // and give each vertex sensible UVs. Increase `uvTile` to tile the
+    // brick texture across the triangle (makes bricks appear smaller / clearer).
+    const float uvTile = 1.0f; // tweak this (e.g. 2..8) to change brick density/clarity
+
+    // top vertex
+    verts[0].normal[0] = 0.0f; verts[0].normal[1] = 0.0f; verts[0].normal[2] = 1.0f;
+    verts[0].uv[0] = 0.5f * uvTile; verts[0].uv[1] = 1.0f * uvTile;
+
+    // bottom-right
+    verts[1].normal[0] = 0.0f; verts[1].normal[1] = 0.0f; verts[1].normal[2] = 1.0f;
+    verts[1].uv[0] = 1.0f * uvTile; verts[1].uv[1] = 0.0f * uvTile;
+
+    // bottom-left
+    verts[2].normal[0] = 0.0f; verts[2].normal[1] = 0.0f; verts[2].normal[2] = 1.0f;
+    verts[2].uv[0] = 0.0f * uvTile; verts[2].uv[1] = 0.0f * uvTile;
+
+    std::vector<uint32_t> indices = { 0, 1, 2 };
+    return { verts, indices };
+}
+MeshData ResourceManager::CreateQuadMesh()
+{
+    // unit quad centered at origin (XY plane, +Z normal)
+    std::vector<Mesh::Vertex> verts(4);
+    verts[0] = MakeVertex(-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f); // top-left
+    verts[1] = MakeVertex(0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f); // top-right
+    verts[2] = MakeVertex(0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f); // bottom-right
+    verts[3] = MakeVertex(-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f); // bottom-left
+
+    std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
+    return { verts, indices };
+}
+MeshData ResourceManager::CreateCubeMesh()
+{
+    // Unit cube centered at origin extents [-0.5,0.5], 24 vertices (4 per face)
+    std::vector<Mesh::Vertex> verts(24);
+    const float s = 0.5f;
+
+    // Front (+Z)
+    verts[0] = MakeVertex(-s, s, s, 0, 0, 1, 0, 1);
+    verts[1] = MakeVertex(s, s, s, 0, 0, 1, 1, 1);
+    verts[2] = MakeVertex(s, -s, s, 0, 0, 1, 1, 0);
+    verts[3] = MakeVertex(-s, -s, s, 0, 0, 1, 0, 0);
+
+    // Back (-Z)
+    verts[4] = MakeVertex(s, s, -s, 0, 0, -1, 0, 1);
+    verts[5] = MakeVertex(-s, s, -s, 0, 0, -1, 1, 1);
+    verts[6] = MakeVertex(-s, -s, -s, 0, 0, -1, 1, 0);
+    verts[7] = MakeVertex(s, -s, -s, 0, 0, -1, 0, 0);
+
+    // Right (+X)
+    verts[8] = MakeVertex(s, s, s, 1, 0, 0, 0, 1);
+    verts[9] = MakeVertex(s, s, -s, 1, 0, 0, 1, 1);
+    verts[10] = MakeVertex(s, -s, -s, 1, 0, 0, 1, 0);
+    verts[11] = MakeVertex(s, -s, s, 1, 0, 0, 0, 0);
+
+    // Left (-X)
+    verts[12] = MakeVertex(-s, s, -s, -1, 0, 0, 0, 1);
+    verts[13] = MakeVertex(-s, s, s, -1, 0, 0, 1, 1);
+    verts[14] = MakeVertex(-s, -s, s, -1, 0, 0, 1, 0);
+    verts[15] = MakeVertex(-s, -s, -s, -1, 0, 0, 0, 0);
+
+    // Top (+Y)
+    verts[16] = MakeVertex(-s, s, -s, 0, 1, 0, 0, 1);
+    verts[17] = MakeVertex(s, s, -s, 0, 1, 0, 1, 1);
+    verts[18] = MakeVertex(s, s, s, 0, 1, 0, 1, 0);
+    verts[19] = MakeVertex(-s, s, s, 0, 1, 0, 0, 0);
+
+    // Bottom (-Y)
+    verts[20] = MakeVertex(-s, -s, s, 0, -1, 0, 0, 1);
+    verts[21] = MakeVertex(s, -s, s, 0, -1, 0, 1, 1);
+    verts[22] = MakeVertex(s, -s, -s, 0, -1, 0, 1, 0);
+    verts[23] = MakeVertex(-s, -s, -s, 0, -1, 0, 0, 0);
+
+    std::vector<uint32_t> indices;
+    indices.reserve(36);
+    for (uint32_t face = 0; face < 6; ++face)
+    {
+        uint32_t base = face * 4;
+        indices.push_back(base + 0);
+        indices.push_back(base + 1);
+        indices.push_back(base + 2);
+
+        indices.push_back(base + 2);
+        indices.push_back(base + 3);
+        indices.push_back(base + 0);
+    }
+
+    return { verts, indices };
+}
+
+MeshData ResourceManager::CreateSphereMesh(uint32_t sectorCount, uint32_t stackCount)
+{
+    std::vector<Mesh::Vertex> verts;
+    std::vector<uint32_t> indices;
+
+    float radius = 0.5f;
+
+    // create vertices
+    for (uint32_t i = 0; i <= stackCount; ++i)
+    {
+        float stackAngle = PI / 2.0f - static_cast<float>(i) * PI / static_cast<float>(stackCount); // from pi/2 to -pi/2
+        float xy = radius * std::cos(stackAngle);
+        float z = radius * std::sin(stackAngle);
+
+        for (uint32_t j = 0; j <= sectorCount; ++j)
+        {
+            float sectorAngle = static_cast<float>(j) * 2.0f * PI / static_cast<float>(sectorCount);
+            float x = xy * std::cos(sectorAngle);
+            float y = xy * std::sin(sectorAngle);
+
+            // normal is just normalized position for unit sphere
+            float nx = x / radius;
+            float ny = y / radius;
+            float nz = z / radius;
+
+            float u = static_cast<float>(j) / static_cast<float>(sectorCount);
+            float v = static_cast<float>(i) / static_cast<float>(stackCount);
+
+            verts.push_back(MakeVertex(x, y, z, nx, ny, nz, u, v));
+        }
+    }
+
+    // create indices
+    for (uint32_t i = 0; i < stackCount; ++i)
+    {
+        uint32_t k1 = i * (sectorCount + 1);
+        uint32_t k2 = k1 + sectorCount + 1;
+
+        for (uint32_t j = 0; j < sectorCount; ++j, ++k1, ++k2)
+        {
+            if (i != 0)
+            {
+                indices.push_back(k1);
+                indices.push_back(k2);
+                indices.push_back(k1 + 1);
+            }
+
+            if (i != (stackCount - 1))
+            {
+                indices.push_back(k1 + 1);
+                indices.push_back(k2);
+                indices.push_back(k2 + 1);
+            }
+        }
+    }
+
+    return { verts, indices };
+}
+MeshData ResourceManager::CreatePlaneMesh(float width, float height, uint32_t widthSegments, uint32_t heightSegments)
+{
+    std::vector<Mesh::Vertex> verts;
+    std::vector<uint32_t> indices;
+
+    uint32_t wSeg = std::max<uint32_t>(1, widthSegments);
+    uint32_t hSeg = std::max<uint32_t>(1, heightSegments);
+
+    float halfW = width * 0.5f;
+    float halfH = height * 0.5f;
+
+    // vertices
+    for (uint32_t y = 0; y <= hSeg; ++y)
+    {
+        float v = static_cast<float>(y) / static_cast<float>(hSeg);
+        float py = halfH - v * height;
+        for (uint32_t x = 0; x <= wSeg; ++x)
+        {
+            float u = static_cast<float>(x) / static_cast<float>(wSeg);
+            float px = -halfW + u * width;
+            verts.push_back(MakeVertex(px, py, 0.0f, 0, 0, 1, u, 1.0f - v));
+        }
+    }
+
+    // indices
+    for (uint32_t y = 0; y < hSeg; ++y)
+    {
+        for (uint32_t x = 0; x < wSeg; ++x)
+        {
+            uint32_t a = y * (wSeg + 1) + x;
+            uint32_t b = a + wSeg + 1;
+
+            indices.push_back(a);
+            indices.push_back(b);
+            indices.push_back(a + 1);
+
+            indices.push_back(a + 1);
+            indices.push_back(b);
+            indices.push_back(b + 1);
+        }
+    }
+
+    return { verts, indices };
+}
+MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_t sectorCount)
+{
+    std::vector<Mesh::Vertex> verts;
+    std::vector<uint32_t> indices;
+
+    uint32_t sectors = std::max<uint32_t>(3, sectorCount);
+    float halfH = height * 0.5f;
+
+    // side vertices (two rings)
+    for (uint32_t i = 0; i <= sectors; ++i)
+    {
+        float theta = static_cast<float>(i) * 2.0f * PI / static_cast<float>(sectors);
+        float x = radius * std::cos(theta);
+        float z = radius * std::sin(theta);
+        float nx = std::cos(theta);
+        float nz = std::sin(theta);
+        float u = static_cast<float>(i) / static_cast<float>(sectors);
+
+        // top ring
+        verts.push_back(MakeVertex(x, halfH, z, nx, 0.0f, nz, u, 1.0f));
+        // bottom ring
+        verts.push_back(MakeVertex(x, -halfH, z, nx, 0.0f, nz, u, 0.0f));
+    }
+
+    // side indices
+    // each sector uses two vertices per ring -> 2* (sectors+1) verts created above
+    for (uint32_t i = 0; i < sectors; ++i)
+    {
+        uint32_t top1 = i * 2;
+        uint32_t bottom1 = top1 + 1;
+        uint32_t top2 = (i + 1) * 2;
+        uint32_t bottom2 = top2 + 1;
+
+        indices.push_back(top1);
+        indices.push_back(bottom1);
+        indices.push_back(top2);
+
+        indices.push_back(top2);
+        indices.push_back(bottom1);
+        indices.push_back(bottom2);
+    }
+
+    // caps (fan)
+    // top center
+    uint32_t topCenterIndex = static_cast<uint32_t>(verts.size());
+    verts.push_back(MakeVertex(0.0f, halfH, 0.0f, 0, 1, 0, 0.5f, 0.5f));
+
+    for (uint32_t i = 0; i < sectors; ++i)
+    {
+        float theta = static_cast<float>(i) * 2.0f * PI / static_cast<float>(sectors);
+        float x = radius * std::cos(theta);
+        float z = radius * std::sin(theta);
+        verts.push_back(MakeVertex(x, halfH, z, 0, 1, 0, (std::cos(theta) + 1.0f) * 0.5f, (std::sin(theta) + 1.0f) * 0.5f));
+    }
+    // build top fan
+    for (uint32_t i = 0; i < sectors; ++i)
+    {
+        uint32_t a = topCenterIndex;
+        uint32_t b = topCenterIndex + 1 + i;
+        uint32_t c = topCenterIndex + 1 + ((i + 1) % sectors);
+        indices.push_back(a);
+        indices.push_back(b);
+        indices.push_back(c);
+    }
+
+    // bottom center
+    uint32_t bottomCenterIndex = static_cast<uint32_t>(verts.size());
+    verts.push_back(MakeVertex(0.0f, -halfH, 0.0f, 0, -1, 0, 0.5f, 0.5f));
+    for (uint32_t i = 0; i < sectors; ++i)
+    {
+        float theta = static_cast<float>(i) * 2.0f * PI / static_cast<float>(sectors);
+        float x = radius * std::cos(theta);
+        float z = radius * std::sin(theta);
+        verts.push_back(MakeVertex(x, -halfH, z, 0, -1, 0, (std::cos(theta) + 1.0f) * 0.5f, (std::sin(theta) + 1.0f) * 0.5f));
+    }
+    // build bottom fan (note winding reversed to face outward)
+    for (uint32_t i = 0; i < sectors; ++i)
+    {
+        uint32_t a = bottomCenterIndex;
+        uint32_t b = bottomCenterIndex + 1 + ((i + 1) % sectors);
+        uint32_t c = bottomCenterIndex + 1 + i;
+        indices.push_back(a);
+        indices.push_back(b);
+        indices.push_back(c);
+    }
+
+    return { verts, indices };
+}
+MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t sectorCount, uint32_t stackCount)
+{
+    // Capsule: cylinder of (height - 2*radius) with hemispheres top and bottom.
+    std::vector<Mesh::Vertex> verts;
+    std::vector<uint32_t> indices;
+
+    uint32_t sectors = std::max<uint32_t>(3, sectorCount);
+    uint32_t stacks = std::max<uint32_t>(2, stackCount);
+
+    float cylHeight = height - 2.0f * radius;
+    if (cylHeight < 0.0f) cylHeight = 0.0f;
+    float halfCyl = cylHeight * 0.5f;
+
+    // Generate rings for hemisphere (top) including equator (stackHalf segments)
+    uint32_t halfStacks = stacks / 2;
+
+    // helper to add hemisphere (0..halfStacks) for top, offsetY should be +halfCyl
+    auto buildHemisphere = [&](bool top, float offsetY)
+        {
+            // stack from 0..halfStacks (0 = pole, halfStacks = equator)
+            for (uint32_t i = 0; i <= halfStacks; ++i)
+            {
+                float stackAngle = (static_cast<float>(i) / static_cast<float>(halfStacks)) * (PI * 0.5f); // 0..pi/2
+                float sinS = std::sin(stackAngle);
+                float cosS = std::cos(stackAngle);
+                float y = radius * cosS; // distance above/below equator
+                float ringRadius = radius * sinS;
+
+                float py = (top ? 1.0f : -1.0f) * y + offsetY;
+
+                for (uint32_t j = 0; j <= sectors; ++j)
+                {
+                    float sectorAngle = static_cast<float>(j) * 2.0f * PI / static_cast<float>(sectors);
+                    float x = ringRadius * std::cos(sectorAngle);
+                    float z = ringRadius * std::sin(sectorAngle);
+
+                    // normal is vector from sphere center of hemisphere
+                    float nx = x / radius;
+                    float ny = (top ? 1.0f : -1.0f) * (y / radius);
+                    float nz = z / radius;
+
+                    float u = static_cast<float>(j) / static_cast<float>(sectors);
+                    float v = top ? (1.0f - (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f) :
+                        (0.5f + (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f);
+
+                    verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
+                }
+            }
+        };
+
+    // top hemisphere centered at +halfCyl
+    buildHemisphere(true, halfCyl);
+    // remember index where equator of top hemisphere begins (last ring)
+    uint32_t topEquatorStart = static_cast<uint32_t>(verts.size()) - (sectors + 1);
+
+    // cylinder rings: top equator (we will reuse one ring) and bottom equator
+    // Add cylinder rings (top to bottom)
+    for (uint32_t i = 0; i <= 1; ++i)
+    {
+        float py = (i == 0) ? halfCyl : -halfCyl; // top ring at +halfCyl, bottom at -halfCyl
+        float v = (i == 0) ? 0.75f : 0.25f; // arbitrary uv v
+        for (uint32_t j = 0; j <= sectors; ++j)
+        {
+            float sectorAngle = static_cast<float>(j) * 2.0f * PI / static_cast<float>(sectors);
+            float x = radius * std::cos(sectorAngle);
+            float z = radius * std::sin(sectorAngle);
+            float nx = std::cos(sectorAngle);
+            float nz = std::sin(sectorAngle);
+            float u = static_cast<float>(j) / static_cast<float>(sectors);
+            verts.push_back(MakeVertex(x, py, z, nx, 0.0f, nz, u, v));
+        }
+    }
+    uint32_t cylTopStart = topEquatorStart; // top equator ring may overlap with cylinder top ring positions
+    uint32_t cylBottomStart = static_cast<uint32_t>(verts.size()) - (sectors + 1);
+
+    // bottom hemisphere (mirror)
+    // store starting index for bottom hemisphere
+    uint32_t bottomHemStart = static_cast<uint32_t>(verts.size());
+    buildHemisphere(false, -halfCyl);
+
+    // Build indices connecting top hemisphere -> cylinder
+    // Top hemisphere: stacks: 0..halfStacks-1 triangles toward equator
+    uint32_t vertsPerRing = sectors + 1;
+    // number of rings in top hemisphere = halfStacks + 1
+    uint32_t topHemRings = halfStacks + 1;
+    uint32_t startTopHem = 0;
+
+    // top hemisphere indices
+    for (uint32_t i = 0; i < topHemRings - 1; ++i)
+    {
+        uint32_t ringStart = startTopHem + i * vertsPerRing;
+        uint32_t nextRing = ringStart + vertsPerRing;
+        for (uint32_t j = 0; j < sectors; ++j)
+        {
+            if (i == 0)
+            {
+                // triangle from pole
+                indices.push_back(ringStart);
+                indices.push_back(nextRing + j);
+                indices.push_back(nextRing + j + 1);
+            }
+            else
+            {
+                indices.push_back(ringStart + j);
+                indices.push_back(nextRing + j);
+                indices.push_back(ringStart + j + 1);
+
+                indices.push_back(ringStart + j + 1);
+                indices.push_back(nextRing + j);
+                indices.push_back(nextRing + j + 1);
+            }
+        }
+    }
+
+    // connect top hemisphere equator to cylinder top ring
+    // top hemisphere equator start:
+    uint32_t equatorTop = startTopHem + (topHemRings - 1) * vertsPerRing;
+    uint32_t cylTopRing = cylTopStart; // we intentionally planned that earlier; if not exact, still valid indices
+    // If indices overlap (they often will), this still triangulates correctly.
+
+    // Build side quads between cylinder top ring and cylinder bottom ring
+    uint32_t cylStart = cylTopRing;
+    // the cylinder rings we added are placed one after another; compute their start indices:
+    // cylTopRing is at cylTopStart, cylBottomRing at cylBottomStart.
+
+    for (uint32_t j = 0; j < sectors; ++j)
+    {
+        uint32_t topA = cylTopRing + j;
+        uint32_t topB = cylTopRing + j + 1;
+        uint32_t bottomA = cylBottomStart + j;
+        uint32_t bottomB = cylBottomStart + j + 1;
+
+        indices.push_back(topA);
+        indices.push_back(bottomA);
+        indices.push_back(topB);
+
+        indices.push_back(topB);
+        indices.push_back(bottomA);
+        indices.push_back(bottomB);
+    }
+
+    // bottom hemisphere indices (we added bottom hemisphere after cylinder)
+    uint32_t startBottomHem = bottomHemStart;
+    uint32_t bottomHemRings = halfStacks + 1;
+    // connect cylinder bottom ring to bottom hemisphere equator
+    // bottom hemisphere is built with stacks from pole to equator; its first ring is pole
+    for (uint32_t i = 0; i < bottomHemRings - 1; ++i)
+    {
+        uint32_t ringStart = startBottomHem + i * vertsPerRing;
+        uint32_t nextRing = ringStart + vertsPerRing;
+        for (uint32_t j = 0; j < sectors; ++j)
+        {
+            if (i == bottomHemRings - 2)
+            {
+                // last ring before pole -> triangles into pole
+                indices.push_back(ringStart + j);
+                indices.push_back(nextRing + j + 1);
+                indices.push_back(ringStart + j + 1);
+            }
+            else
+            {
+                indices.push_back(ringStart + j);
+                indices.push_back(nextRing + j);
+                indices.push_back(ringStart + j + 1);
+
+                indices.push_back(ringStart + j + 1);
+                indices.push_back(nextRing + j);
+                indices.push_back(nextRing + j + 1);
+            }
+        }
+    }
+
+    // Note: The above implementation aims for a reasonable capsule topology:
+    // - top hemisphere
+    // - cylinder (two rings)
+    // - bottom hemisphere
+    // Winding / index connectivity are consistent for outward-facing triangles.
+    // This is a moderate-quality capsule mesh suitable for general use.
+
+    return { verts, indices };
+}

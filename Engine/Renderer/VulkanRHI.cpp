@@ -705,7 +705,7 @@ void VulkanRHI::SetupDebugMessenger() {
 void VulkanRHI::CreateSurface(Window* window) {
 	if (!window) throw std::invalid_argument("window is null in CreateSurface");
 
-	GLFWwindow* glfwWin = window->GetGLFWwindow();
+	GLFWwindow* glfwWin = window->getGLFWwindow();
 	if (!glfwWin) throw std::runtime_error("Window has no GLFWwindow");
 
 	if (glfwCreateWindowSurface(m_Instance, glfwWin, nullptr, &m_Surface) != VK_SUCCESS) {
