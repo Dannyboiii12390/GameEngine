@@ -154,7 +154,8 @@
   <ItemGroup>
     <ClCompile Include="Core\Components\ComponentGeometry.cpp" />
     <ClCompile Include="Core\InputHandler.cpp" />
-    <ClCompile Include="Core\ResourceManager.cpp" />
+    <ClCompile Include="Core\Managers\ResourceManager.cpp" />
+    <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
     <ClCompile Include="Core\Systems\SystemRenderer.cpp" />
     <ClCompile Include="IMGUI\imgui.cpp" />
     <ClCompile Include="IMGUI\imgui_demo.cpp" />
@@ -171,6 +172,7 @@
     <ClCompile Include="Renderer\RenderPass\GBufferPass.cpp" />
     <ClCompile Include="Renderer\Texture.cpp" />
     <ClCompile Include="Renderer\VulkanRHI.cpp" />
+    <ClCompile Include="Core\Managers\SceneManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Components\ComponentGeometry.h" />
@@ -179,7 +181,9 @@
     <ClInclude Include="Core\Components\IComponent.h" />
     <ClInclude Include="Core\Entity.h" />
     <ClInclude Include="Core\InputHandler.h" />
-    <ClInclude Include="Core\ResourceManager.h" />
+    <ClInclude Include="Core\Managers\ResourceManager.h" />
+    <ClInclude Include="Core\Scenes\IScene.h" />
+    <ClInclude Include="Core\Scenes\TemplateScene.h" />
     <ClInclude Include="Core\Systems\ISystem.h" />
     <ClInclude Include="Core\Systems\SystemRenderer.h" />
     <ClInclude Include="Core\Systems\SystemVelocity.h" />
@@ -203,6 +207,7 @@
     <ClInclude Include="Renderer\RenderPass\PostProcessPass.h" />
     <ClInclude Include="Renderer\RenderPass\ShadowPass.h" />
     <ClInclude Include="Renderer\VulkanRHI.h" />
+    <ClInclude Include="Core\Managers\SceneManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

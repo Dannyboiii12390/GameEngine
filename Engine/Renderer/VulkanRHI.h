@@ -23,7 +23,6 @@ public:
 	void Shutdown();
 	void WaitIdle();
 	void BeginFrame();
-	void BeginFrame(const Scene& scene);
 	void EndFrame();
 	void Present();
 	

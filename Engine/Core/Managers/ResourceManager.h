@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
 #include <vector>
-#include "../Renderer/Mesh.h"
+#include "../../Renderer/Mesh.h"
 
 typedef std::tuple<std::vector<Mesh::Vertex>, std::vector<uint32_t>> MeshData;
 

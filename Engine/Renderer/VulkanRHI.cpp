@@ -413,12 +413,6 @@ void VulkanRHI::BeginFrame()
 	// Store current image index for EndFrame/Present
 	m_CurrentImageIndex = imageIndex;
 }
-void VulkanRHI::BeginFrame(const Scene& /*scene*/)
-{
-	// Minimal: reuse basic BeginFrame for now.
-	BeginFrame();
-	// Future: integrate scene recording here.
-}
 void VulkanRHI::EndFrame()
 {
 	if (m_Device == VK_NULL_HANDLE || m_Swapchain == VK_NULL_HANDLE) {
