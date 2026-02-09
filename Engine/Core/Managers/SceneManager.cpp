@@ -1,4 +1,5 @@
 #include "SceneManager.h"
+#include <iostream>
 
 void SceneManager::AddScene(std::unique_ptr<IScene>&& scene)
 {
@@ -21,6 +22,7 @@ IScene* SceneManager::GetCurrentScene() const
 
 void SceneManager::Shutdown()
 {
+	std::cout << "Number of scenes to shutdown: " << m_scenes.size() << std::endl;
 	while (!m_scenes.empty())
 	{
 		m_scenes.pop();

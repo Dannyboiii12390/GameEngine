@@ -1751,7 +1751,7 @@ void VulkanRHI::UpdateCameraBuffer()
 		proj = m_ActiveCamera->GetProjectionMatrix();
 
 		// GLM's perspective uses OpenGL clip-space by default; for Vulkan flip Y.
-		proj[1][1] *= -1.0f;
+		//proj[1][1] *= 1.0f;
 	}
 
 	// Choose which descriptor-slot / region to update:

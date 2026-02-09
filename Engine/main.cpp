@@ -23,7 +23,6 @@
 #define LOG_DEBUG(msg)
 #endif
 
-// issue with camera class when moving the location of the camera, the rendered objects disappear
 
 /*
 - Render Passes
