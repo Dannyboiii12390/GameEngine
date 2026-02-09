@@ -61,6 +61,7 @@ int main()
 
         VulkanRHI vulkanRHI;
 		vulkanRHI.Initialise(&window);
+        vulkanRHI.ToggleVSync(true);    
 
 		sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI));
 
@@ -85,8 +86,8 @@ int main()
         }
 
         sceneManager.Shutdown();
-		window.Shutdown();
         vulkanRHI.Shutdown();
+        window.Shutdown();
     }
 
 

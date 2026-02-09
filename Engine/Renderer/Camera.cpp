@@ -38,31 +38,45 @@ void Camera::LookAt(const glm::vec3& target, const glm::vec3& up)
     // derive Euler from look direction (optional, keep consistent)
     glm::vec3 forward = glm::normalize(target - m_Position);
     float pitch = glm::degrees(std::asin(glm::clamp(forward.y, -1.0f, 1.0f)));
-    float yaw = glm::degrees(std::atan2(forward.x, forward.z)); // note: +X to the right, +Z forward
+    // yaw: rotation around Y to point toward forward.xz (note coordinate convention)
+    float yaw = glm::degrees(std::atan2(forward.x, forward.z));
     m_RotationDeg = glm::vec3(pitch, yaw, 0.0f);
     m_ViewDirty = false;
 }
 
+static glm::quat OrientationFromEulerDegrees(const glm::vec3& eulerDeg)
+{
+    // We want a deterministic convention: yaw (Y) then pitch (X) then roll (Z).
+    // Build rotation matrix explicitly and convert to quaternion to avoid missing helper functions.
+    float pitchRad = glm::radians(eulerDeg.x);
+    float yawRad   = glm::radians(eulerDeg.y);
+    float rollRad  = glm::radians(eulerDeg.z);
+
+    glm::mat4 rot(1.0f);
+    // Apply yaw (Y), then pitch (X), then roll (Z)
+    rot = glm::rotate(rot, yawRad, glm::vec3(0.0f, 1.0f, 0.0f));
+    rot = glm::rotate(rot, pitchRad, glm::vec3(1.0f, 0.0f, 0.0f));
+    rot = glm::rotate(rot, rollRad, glm::vec3(0.0f, 0.0f, 1.0f));
+
+    return glm::quat_cast(rot);
+}
+
 glm::vec3 Camera::Forward() const
 {
-    // Build orientation quaternion from Euler (degrees -> radians)
-    glm::vec3 rad = glm::radians(m_RotationDeg);
-    glm::quat q = glm::quat(rad);
-    // In this convention, camera looks down -Z in local space
+    glm::quat q = OrientationFromEulerDegrees(m_RotationDeg);
+    // Camera looks down -Z in its local space
     return glm::normalize(q * glm::vec3(0.0f, 0.0f, -1.0f));
 }
 
 glm::vec3 Camera::Right() const
 {
-    glm::vec3 rad = glm::radians(m_RotationDeg);
-    glm::quat q = glm::quat(rad);
+    glm::quat q = OrientationFromEulerDegrees(m_RotationDeg);
     return glm::normalize(q * glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 glm::vec3 Camera::Up() const
 {
-    glm::vec3 rad = glm::radians(m_RotationDeg);
-    glm::quat q = glm::quat(rad);
+    glm::quat q = OrientationFromEulerDegrees(m_RotationDeg);
     return glm::normalize(q * glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
@@ -97,14 +111,13 @@ void Camera::RecomputeMatrices() const
     }
 
     if (m_ViewDirty) {
-        // Convert Euler (pitch, yaw, roll) in degrees to quaternion orientation
-        glm::vec3 rad = glm::radians(m_RotationDeg);
-        // Note: glm::quat expects (w,x,y,z) when constructed from euler via glm::quat(rad)
-        glm::quat orientation = glm::quat(rad);
-        // Build view matrix: translate then rotate (camera space)
-        glm::mat4 rotMat = glm::toMat4(orientation);
+        // Build orientation deterministically from Euler angles and use its inverse for view.
+        glm::quat orientation = OrientationFromEulerDegrees(m_RotationDeg);
+
+        // view = inverse(rotation) * translate(-position)
+        glm::mat4 rotMat = glm::toMat4(glm::conjugate(orientation)); // inverse of rotation
         glm::mat4 trans = glm::translate(glm::mat4(1.0f), -m_Position);
-        // view = R^T * T  (since orientation rotates world opposite to camera)
+
         m_View = rotMat * trans;
         m_ViewDirty = false;
     }

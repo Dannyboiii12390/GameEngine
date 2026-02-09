@@ -1279,6 +1279,7 @@ void VulkanRHI::CreateInstance() {
 	std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
 	if (m_EnableValidationLayers) {
+		// Ensure debug utils extension is requested so SetupDebugMessenger can succeed later.
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	}
 
@@ -1288,21 +1289,12 @@ void VulkanRHI::CreateInstance() {
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 	createInfo.ppEnabledExtensionNames = extensions.data();
 
+	// Do NOT put a VkDebugUtilsMessengerCreateInfoEXT (or other non-allowed structs) directly into pNext here.
+	// We'll create the debug messenger after the instance is created via SetupDebugMessenger().
 	if (m_EnableValidationLayers) {
 		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 		createInfo.ppEnabledLayerNames = validationLayers.data();
-
-		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-		debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		debugCreateInfo.messageSeverity =
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		debugCreateInfo.messageType =
-			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-		debugCreateInfo.pfnUserCallback = (PFN_vkDebugUtilsMessengerCallbackEXT)DebugCallback;
-		createInfo.pNext = &debugCreateInfo; // so messenger can be created during instance creation if desired
+		createInfo.pNext = nullptr;
 	}
 	else {
 		createInfo.enabledLayerCount = 0;
@@ -1744,67 +1736,45 @@ Camera* VulkanRHI::GetActiveCamera() const
 {
     return m_ActiveCamera;
 }
-void VulkanRHI::CreateCameraUniformBufferAndWriteDescriptors()
-{
-    // Create a single host-visible uniform buffer large enough for view+proj matrices.
-    if (m_Device == VK_NULL_HANDLE) return;
 
-    if (m_CameraUniformBuffer == VK_NULL_HANDLE)
-    {
-        CreateBuffer(static_cast<VkDeviceSize>(m_CameraUniformBufferSize),
-                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     m_CameraUniformBuffer,
-                     m_CameraUniformBufferMemory);
-    }
-
-    // Update each allocated descriptor set to reference the camera uniform buffer at binding 0.
-    for (size_t i = 0; i < s_DescriptorSets.size(); ++i)
-    {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = m_CameraUniformBuffer;
-        bufferInfo.offset = 0;
-        bufferInfo.range = static_cast<VkDeviceSize>(m_CameraUniformBufferSize);
-
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = s_DescriptorSets[i];
-        descriptorWrite.dstBinding = 0; // binding 0 is the UBO in CreateDescriptorSetLayout
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
-        descriptorWrite.pImageInfo = nullptr;
-        descriptorWrite.pTexelBufferView = nullptr;
-
-        vkUpdateDescriptorSets(m_Device, 1, &descriptorWrite, 0, nullptr);
-    }
-}
 void VulkanRHI::UpdateCameraBuffer()
 {
-    if (m_Device == VK_NULL_HANDLE || m_CameraUniformBuffer == VK_NULL_HANDLE) return;
+	if (m_Device == VK_NULL_HANDLE || m_CameraUniformBuffer == VK_NULL_HANDLE) return;
 
-    // Prepare two mat4's: view followed by projection (in column-major order as glm)
-    glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 proj = glm::mat4(1.0f);
+	// Prepare two mat4's: view followed by projection (in column-major order as glm)
+	glm::mat4 view = glm::mat4(1.0f);
+	glm::mat4 proj = glm::mat4(1.0f);
 
-    if (m_ActiveCamera != nullptr) {
-        view = m_ActiveCamera->GetViewMatrix();
-        proj = m_ActiveCamera->GetProjectionMatrix();
+	if (m_ActiveCamera != nullptr) {
+		// Ensure camera matrices are up-to-date
+		view = m_ActiveCamera->GetViewMatrix();
+		proj = m_ActiveCamera->GetProjectionMatrix();
 
-        // GLM's perspective uses OpenGL clip-space by default; for Vulkan flip Y.
-        proj[1][1] *= -1.0f;
-    }
+		// GLM's perspective uses OpenGL clip-space by default; for Vulkan flip Y.
+		proj[1][1] *= -1.0f;
+	}
 
-    // Map, copy, and unmap
-    void* data;
-    if (vkMapMemory(m_Device, m_CameraUniformBufferMemory, 0, m_CameraUniformBufferSize, 0, &data) == VK_SUCCESS)
-    {
-        // copy view then proj
-        std::memcpy(data, glm::value_ptr(view), sizeof(float) * 16);
-        std::memcpy(static_cast<uint8_t*>(data) + sizeof(float) * 16, glm::value_ptr(proj), sizeof(float) * 16);
-        vkUnmapMemory(m_Device, m_CameraUniformBufferMemory);
-    }
+	// Choose which descriptor-slot / region to update:
+	// Prefer the currently-acquired swapchain image index (safe mapping). If not available, fall back to current frame index.
+	uint32_t targetIndex = 0;
+	if (m_CurrentImageIndex != UINT32_MAX && m_CurrentImageIndex < s_DescriptorSets.size()) {
+		targetIndex = m_CurrentImageIndex;
+	}
+	else if (!s_DescriptorSets.empty()) {
+		targetIndex = static_cast<uint32_t>(m_CurrentFrame % s_DescriptorSets.size());
+	}
+
+	VkDeviceSize writeOffset = static_cast<VkDeviceSize>(targetIndex) * static_cast<VkDeviceSize>(m_CameraUniformBufferSize);
+
+	// Map and write only into the per-descriptor region to avoid stomping data used by other in-flight frames.
+	void* data = nullptr;
+	if (vkMapMemory(m_Device, m_CameraUniformBufferMemory, writeOffset, m_CameraUniformBufferSize, 0, &data) == VK_SUCCESS)
+	{
+		// copy view then proj (each mat4 is 16 floats)
+		std::memcpy(data, glm::value_ptr(view), sizeof(float) * 16);
+		std::memcpy(static_cast<uint8_t*>(data) + sizeof(float) * 16, glm::value_ptr(proj), sizeof(float) * 16);
+		vkUnmapMemory(m_Device, m_CameraUniformBufferMemory);
+	}
 }
 void VulkanRHI::CreateDescriptorSetLayout()
 {
@@ -1916,6 +1886,59 @@ void VulkanRHI::AllocateDescriptorSets()
 	if (s_RegisteredTextures.empty()) {
 		CreateDefaultTextureForDescriptorSets(this);
 	}
+}
+void VulkanRHI::CreateCameraUniformBufferAndWriteDescriptors()
+{
+    if (m_Device == VK_NULL_HANDLE) return;
+
+    // number of descriptor sets (one per frame/image)
+    uint32_t count = static_cast<uint32_t>(s_DescriptorSets.size());
+    if (count == 0) count = 1;
+
+    // compute alignment for uniform buffer offsets
+    VkPhysicalDeviceProperties props{};
+    vkGetPhysicalDeviceProperties(m_PhysicalDevice, &props);
+    VkDeviceSize minAlign = props.limits.minUniformBufferOffsetAlignment;
+    VkDeviceSize entrySize = static_cast<VkDeviceSize>(m_CameraUniformBufferSize);
+    if (minAlign > 0) entrySize = (entrySize + minAlign - 1) & ~(minAlign - 1);
+
+    VkDeviceSize totalSize = entrySize * count;
+
+    // recreate buffer if it already exists (ensures correct size/alignment)
+    if (m_CameraUniformBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(m_Device, m_CameraUniformBuffer, nullptr);
+        m_CameraUniformBuffer = VK_NULL_HANDLE;
+    }
+    if (m_CameraUniformBufferMemory != VK_NULL_HANDLE) {
+        vkFreeMemory(m_Device, m_CameraUniformBufferMemory, nullptr);
+        m_CameraUniformBufferMemory = VK_NULL_HANDLE;
+    }
+
+    CreateBuffer(totalSize,
+                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 m_CameraUniformBuffer,
+                 m_CameraUniformBufferMemory);
+
+    // write each descriptor set to point to its own region (offset = i * entrySize)
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = m_CameraUniformBuffer;
+        bufferInfo.offset = static_cast<VkDeviceSize>(i) * entrySize;
+        bufferInfo.range = static_cast<VkDeviceSize>(m_CameraUniformBufferSize); // actual data size
+
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = s_DescriptorSets[i];
+        descriptorWrite.dstBinding = 0;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(m_Device, 1, &descriptorWrite, 0, nullptr);
+    }
 }
 void VulkanRHI::RegisterTexture(Texture* texture)
 {

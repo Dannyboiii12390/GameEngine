@@ -48,6 +48,8 @@ public:
 	// draw commands after calling BeginFrame().
 	VkCommandBuffer GetCurrentCommandBuffer() const;
 
+	void CreateCameraUniformBufferAndWriteDescriptors();
+
     // Camera integration
     // VulkanRHI does not take ownership. Caller must ensure camera lifetime > VulkanRHI usage.
     void SetActiveCamera(Camera* camera);
@@ -109,7 +111,6 @@ private:
 	void CreatePipelineLayout();
 
     // Camera UBO helpers
-    void CreateCameraUniformBufferAndWriteDescriptors();
     void UpdateCameraBuffer(); // called each frame before submit
 
 	// Utility / queries
@@ -120,7 +121,7 @@ private:
 	void CreateDepthResources();
 
 	// Helpers to create/destroy the fallback texture. Call CreateDefaultTexture() after device and descriptor sets are ready.
-	void CreateDefaultTexture();
+	//void CreateDefaultTexture();
 	void DestroyDefaultTexture();
 
 private:
