@@ -118,6 +118,7 @@ private:
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device) const;
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) const;*/
 	bool HasStencilComponent(VkFormat format) const;
+	void CreateDepthResources();
 
 	// Helpers to create/destroy the fallback texture. Call CreateDefaultTexture() after device and descriptor sets are ready.
 	void CreateDefaultTexture();
@@ -177,6 +178,11 @@ private:
     VkImage      m_DefaultImage = VK_NULL_HANDLE;
     VkDeviceMemory m_DefaultImageMemory = VK_NULL_HANDLE;
     VkImageView  m_DefaultImageView = VK_NULL_HANDLE;
-    VkSampler    m_DefaultSampler = VK_NULL_HANDLE;
+
+	// Depth resources
+	VkImage m_DepthImage = VK_NULL_HANDLE;
+	VkDeviceMemory m_DepthImageMemory = VK_NULL_HANDLE;
+	VkImageView m_DepthImageView = VK_NULL_HANDLE;
+
 
 };
