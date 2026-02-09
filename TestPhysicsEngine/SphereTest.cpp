@@ -4,6 +4,8 @@
 
 namespace Shapes 
 {
+    using namespace Physics;
+
     TEST(SphereTest, NoIntersection_CentreAtOrigin)
     {
         Sphere a(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);

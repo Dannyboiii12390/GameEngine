@@ -6,14 +6,7 @@
 #include <chrono>
 #include <omp.h>
 
-// GLM is used for vec3 / mat4 in this file and components
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 #include "Renderer/Window.h"
-
-#include "Core/Systems/SystemRenderer.h"
-#include "Core/Managers/ResourceManager.h"
 #include "Core/Managers/SceneManager.h"
 #include "Core/Scenes/TemplateScene.h"
 
@@ -23,6 +16,7 @@
 #define LOG_DEBUG(msg)
 #endif
 
+#include "../Physics Engine/Shapes/Sphere.h"
 
 /*
 - Render Passes
@@ -63,6 +57,14 @@ int main()
         vulkanRHI.ToggleVSync(true);    
 
 		sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI));
+
+		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
+		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
+
+		std::cout << "Colling? " << (testSphere.isCollidingWith(testSphere2) ? "Yes" : "No") << std::endl;
+
+
+        
 
 
         while (window.getGLFWwindow() && !glfwWindowShouldClose(window.getGLFWwindow()))

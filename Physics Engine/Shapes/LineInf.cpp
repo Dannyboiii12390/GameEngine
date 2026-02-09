@@ -3,6 +3,8 @@
 #include "Sphere.h"
 #include <glm/glm.hpp>
 
+using namespace Physics;
+
 LineInf::LineInf(const glm::vec3& a, const glm::vec3& b)
     : m_a(a), m_b(b)
 {

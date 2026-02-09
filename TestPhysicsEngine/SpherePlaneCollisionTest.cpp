@@ -5,6 +5,8 @@
 
 namespace Shapes
 {
+    using namespace Physics;
+
     TEST(SpherePlaneTest, NoIntersection_DistanceGreaterThanRadius)
     {
         Plane plane(glm::vec3(0.0f, 0.0f, 0.0f),

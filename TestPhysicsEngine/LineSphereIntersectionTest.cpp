@@ -4,6 +4,7 @@
 
 namespace Shapes
 {
+	using namespace Physics;
     TEST(LineSphereIntersectionTest, NoIntersection_CentreAtOrigin)
     {
         glm::vec3 linePoint(5.0f, 5.0f, 5.0f);

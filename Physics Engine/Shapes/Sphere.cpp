@@ -4,6 +4,8 @@
 #include "Plane.h"
 #include <glm/glm.hpp>
 
+using namespace Physics;
+
 Sphere::Sphere(const glm::vec3& pos, float radius)
     : m_pos(pos), m_radius(radius)
 {

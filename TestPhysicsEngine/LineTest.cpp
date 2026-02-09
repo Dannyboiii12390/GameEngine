@@ -5,6 +5,8 @@
 
 namespace Shapes
 {
+    using namespace Physics;
+
     TEST(LineTest, ClosestPointOnLine)
     {
         glm::vec3 a(0.0f, 0.0f, 0.0f);

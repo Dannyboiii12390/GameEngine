@@ -2,6 +2,8 @@
 #include "Plane.h"
 #include "Sphere.h"
 
+using namespace Physics;
+
 Plane::Plane(const glm::vec3& point, const glm::vec3& u, const glm::vec3& v) : m_point(point), m_u(u), m_v(v) 
 {
 	m_normal = glm::cross(m_u, m_v);

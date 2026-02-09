@@ -5,6 +5,8 @@
 
 namespace Shapes
 {
+    using namespace Physics;
+
     // Helper to construct a Plane from a point+normal by choosing two orthogonal in-plane vectors.
     static Plane BuildPlaneFromPointNormal(const glm::vec3& point, const glm::vec3& normal)
     {
