@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="test.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="LineSphereIntersectionTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
+    <ClCompile Include="LineTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
+    <ClCompile Include="SphereTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="ShapeTests">
+      <UniqueIdentifier>{a748e660-269f-43de-bd3b-9f8885845451}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
