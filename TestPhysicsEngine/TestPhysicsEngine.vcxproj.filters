@@ -12,6 +12,9 @@
     <ClCompile Include="SphereTest.cpp">
       <Filter>ShapeTests</Filter>
     </ClCompile>
+    <ClCompile Include="PlaneTests.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

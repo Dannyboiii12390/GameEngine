@@ -21,12 +21,18 @@
     <ClInclude Include="Shapes\LineInf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Shapes\Plane.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Shapes\LineInf.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Shapes\Sphere.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Shapes\Plane.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

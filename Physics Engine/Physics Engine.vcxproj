@@ -20,10 +20,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shapes\LineInf.h" />
+    <ClInclude Include="Shapes\Plane.h" />
     <ClInclude Include="Shapes\Sphere.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Shapes\LineInf.cpp" />
+    <ClCompile Include="Shapes\Plane.cpp" />
     <ClCompile Include="Shapes\Sphere.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
