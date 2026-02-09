@@ -176,13 +176,21 @@ MeshData ResourceManager::CreatePlaneMesh(float width, float height, uint32_t wi
     std::vector<Mesh::Vertex> verts;
     std::vector<uint32_t> indices;
 
-    uint32_t wSeg = std::max<uint32_t>(1, widthSegments);
-    uint32_t hSeg = std::max<uint32_t>(1, heightSegments);
+    // guard against non-positive dimensions
+    if (width <= 0.0f || height <= 0.0f)
+        return { verts, indices };
+
+    uint32_t wSeg = std::max<uint32_t>(1u, widthSegments);
+    uint32_t hSeg = std::max<uint32_t>(1u, heightSegments);
+
+    // reserve to avoid reallocations
+    verts.reserve(static_cast<size_t>(wSeg + 1) * static_cast<size_t>(hSeg + 1));
+    indices.reserve(static_cast<size_t>(wSeg) * static_cast<size_t>(hSeg) * 6u);
 
     float halfW = width * 0.5f;
     float halfH = height * 0.5f;
 
-    // vertices
+    // vertices (row-major: y then x)
     for (uint32_t y = 0; y <= hSeg; ++y)
     {
         float v = static_cast<float>(y) / static_cast<float>(hSeg);
@@ -191,28 +199,33 @@ MeshData ResourceManager::CreatePlaneMesh(float width, float height, uint32_t wi
         {
             float u = static_cast<float>(x) / static_cast<float>(wSeg);
             float px = -halfW + u * width;
-            verts.push_back(MakeVertex(px, py, 0.0f, 0, 0, 1, u, 1.0f - v));
+            verts.push_back(MakeVertex(px, py, 0.0f, 0.0f, 0.0f, 1.0f, u, 1.0f - v));
         }
     }
 
-    // indices
+    // indices (two triangles per quad)
     for (uint32_t y = 0; y < hSeg; ++y)
     {
         for (uint32_t x = 0; x < wSeg; ++x)
         {
-            uint32_t a = y * (wSeg + 1) + x;
-            uint32_t b = a + wSeg + 1;
+            uint32_t a = y * (wSeg + 1) + x;           // top-left
+            uint32_t b = a + (wSeg + 1);               // bottom-left
+            uint32_t tl = a;
+            uint32_t bl = b;
+            uint32_t tr = a + 1;
+            uint32_t br = b + 1;
 
-            indices.push_back(a);
-            indices.push_back(b);
-            indices.push_back(a + 1);
+            // triangle 1: top-left, bottom-left, top-right  (CCW for +Z)
+            indices.push_back(tl);
+            indices.push_back(bl);
+            indices.push_back(tr);
 
-            indices.push_back(a + 1);
-            indices.push_back(b);
-            indices.push_back(b + 1);
+            // triangle 2: top-right, bottom-left, bottom-right (CCW for +Z)
+            indices.push_back(tr);
+            indices.push_back(bl);
+            indices.push_back(br);
         }
     }
-
     return { verts, indices };
 }
 MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_t sectorCount)

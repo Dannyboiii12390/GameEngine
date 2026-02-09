@@ -33,6 +33,56 @@
 - Render Graph
 - Input Handler
 */
+
+void createEntity(VulkanRHI* rhi, Entity& entity, glm::vec3 pos) {
+    entity.AddComponent(EComponentType::Component_Translation, pos, glm::vec3(0.0f), glm::vec3(1.0f));
+    entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
+    entity.AddComponent(EComponentType::Component_Geometry);
+
+	static int entityCount = 0;
+    ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+    if (geom)
+    {
+
+        LOG_DEBUG("[MAIN] got ComponentGeometry");
+		auto [verts, indices] = entityCount ? ResourceManager::CreateCubeMesh() : ResourceManager::CreatePlaneMesh();
+
+
+        if (!geom->InitializeMesh(rhi, verts, indices))
+            throw std::runtime_error("Failed to initialize triangle mesh");
+        LOG_DEBUG("[MAIN] InitializeMesh OK");
+
+        namespace fs = std::filesystem;
+        fs::path shaderDir = fs::path(__FILE__).parent_path() / "SHADERS";
+        std::string vertSpv = (shaderDir / "triangle.vert.spv").string();
+        std::string fragSpv = (shaderDir / "triangle.frag.spv").string();
+
+        LOG_DEBUG("[MAIN] looking for shaders:\n  " << vertSpv << "\n  " << fragSpv);
+        if (!fs::exists(vertSpv) || !fs::exists(fragSpv))
+        {
+            LOG_DEBUG("[MAIN] Shader files not found.\nExpected:\n  " << vertSpv << "\n  " << fragSpv);
+            LOG_DEBUG("[MAIN] Check your custom build step or move the .spv files to the SHADERS folder.");
+            throw std::runtime_error("Missing SPIR-V shader files");
+        }
+
+        if (!geom->InitializePipeline(rhi, rhi->GetRenderPass(), rhi->GetSwapchainExtent(), vertSpv, fragSpv))
+            throw std::runtime_error("Failed to create triangle pipeline");
+
+        std::string texturePath = "red_brick_diff_1k.jpg";
+        if (!geom->CreateTexture(rhi, texturePath, TextureType::Albedo, true))
+        {
+            LOG_DEBUG("[MAIN] Warning: failed to create texture from " << texturePath);
+        }
+
+        LOG_DEBUG("[MAIN] InitializePipeline OK");
+    }
+    else
+    {
+        LOG_DEBUG("[MAIN] no geometry component");
+    }
+	entityCount++;
+}
+
 int main()
 {
     try
@@ -61,9 +111,7 @@ int main()
 
         VulkanRHI vulkanRHI;
         Entity entity;
-        entity.AddComponent(EComponentType::Component_Translation, glm::vec3(-1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
-		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
-		entity.AddComponent(EComponentType::Component_Geometry);
+		Entity entity2;
         
 		Camera camera(90, 16.0f / 9.0f, 0.1f, 100.0f);
 		vulkanRHI.SetActiveCamera(&camera);
@@ -90,47 +138,9 @@ int main()
         renderer.Initialize(&vulkanRHI);
         LOG_DEBUG("[MAIN] renderer.Initialize returned");
 
-        // Create the rotating triangle mesh + pipeline after RHI initialised
-        ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
-        if (geom)
-        {
-			
-            LOG_DEBUG("[MAIN] got ComponentGeometry");
-			auto [verts, indices] = ResourceManager::CreateSphereMesh();
+        createEntity(&vulkanRHI, entity, glm::vec3(-1.0f));
+        createEntity(&vulkanRHI, entity2, glm::vec3(1.0, 0.0, 0.0));
 
-            
-            if (!geom->InitializeMesh(&vulkanRHI, verts, indices))
-                throw std::runtime_error("Failed to initialize triangle mesh");
-            LOG_DEBUG("[MAIN] InitializeMesh OK");
-
-            namespace fs = std::filesystem;
-            fs::path shaderDir = fs::path(__FILE__).parent_path() / "SHADERS";
-            std::string vertSpv = (shaderDir / "triangle.vert.spv").string();
-            std::string fragSpv = (shaderDir / "triangle.frag.spv").string();
-
-            LOG_DEBUG("[MAIN] looking for shaders:\n  " << vertSpv << "\n  " << fragSpv);
-            if (!fs::exists(vertSpv) || !fs::exists(fragSpv))
-            {
-                LOG_DEBUG("[MAIN] Shader files not found.\nExpected:\n  " << vertSpv << "\n  " << fragSpv);
-				LOG_DEBUG("[MAIN] Check your custom build step or move the .spv files to the SHADERS folder.");
-                throw std::runtime_error("Missing SPIR-V shader files");
-            }
-
-            if (!geom->InitializePipeline(&vulkanRHI, vulkanRHI.GetRenderPass(), vulkanRHI.GetSwapchainExtent(), vertSpv, fragSpv))
-                throw std::runtime_error("Failed to create triangle pipeline");
-
-            std::string texturePath = "red_brick_diff_1k.jpg";
-            if (!geom->CreateTexture(&vulkanRHI, texturePath, TextureType::Albedo, true))
-            {
-                LOG_DEBUG("[MAIN] Warning: failed to create texture from " << texturePath);
-			}
-
-            LOG_DEBUG("[MAIN] InitializePipeline OK");
-        }
-        else
-        {
-            LOG_DEBUG("[MAIN] no geometry component");
-        }
 
         LOG_DEBUG("[MAIN] entering main loop");
         double lastTime = glfwGetTime();
@@ -154,7 +164,7 @@ int main()
                 }
             }
 
-            std::vector<Entity*> entities = { &entity };
+            std::vector<Entity*> entities = { &entity, &entity2 };
 
             // Record draw commands into the currently-acquired command buffer
             VkCommandBuffer cmd = vulkanRHI.GetCurrentCommandBuffer();
@@ -184,10 +194,17 @@ int main()
         LOG_DEBUG("[MAIN] leaving main loop");
 
         // --- Ensure GPU work is finished and free per-object GPU resources before tearing down the RHI ---
+		auto geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+		auto geom2 = entity2.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
         if (geom)
         {
 			LOG_DEBUG("[MAIN] Destroying ComponentGeometry GPU resources");
             geom->Destroy(); // ensure mesh & pipeline free their VkBuffers/VkPipeline while device is still valid and idle
+        }
+        if (geom2)
+        {
+            LOG_DEBUG("[MAIN] Destroying ComponentGeometry GPU resources");
+            geom2->Destroy(); // ensure mesh & pipeline free their VkBuffers/VkPipeline while device is still valid and idle
         }
 
         LOG_DEBUG("[MAIN] calling vulkanRHI.Shutdown");
