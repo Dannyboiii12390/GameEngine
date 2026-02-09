@@ -1,6 +1,7 @@
 
 #include "Sphere.h"
 #include "LineInf.h"
+#include "Plane.h"
 #include <glm/glm.hpp>
 
 Sphere::Sphere(const glm::vec3& pos, float radius)
@@ -33,4 +34,9 @@ bool Sphere::isCollidingWith(const LineInf& line) const
     glm::vec3 diff = m_pos - closest;
     float distSq = glm::dot(diff, diff);
     return distSq <= m_radius * m_radius;
+}
+bool Sphere::isCollidingWith(const Plane& plane) const
+{
+    float dist = plane.getShortestDistance(m_pos);
+    return dist <= m_radius;
 }

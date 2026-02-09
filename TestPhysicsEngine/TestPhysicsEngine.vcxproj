@@ -106,6 +106,7 @@
     <ClCompile Include="LineSphereIntersectionTest.cpp" />
     <ClCompile Include="LineTest.cpp" />
     <ClCompile Include="PlaneTests.cpp" />
+    <ClCompile Include="SpherePlaneCollisionTest.cpp" />
     <ClCompile Include="SphereTest.cpp" />
     <ClCompile Include="test.cpp" />
     <ClCompile Include="pch.cpp">

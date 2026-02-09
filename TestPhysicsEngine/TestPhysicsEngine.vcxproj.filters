@@ -15,6 +15,9 @@
     <ClCompile Include="PlaneTests.cpp">
       <Filter>ShapeTests</Filter>
     </ClCompile>
+    <ClCompile Include="SpherePlaneCollisionTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

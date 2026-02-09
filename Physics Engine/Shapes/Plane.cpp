@@ -1,5 +1,6 @@
 
 #include "Plane.h"
+#include "Sphere.h"
 
 Plane::Plane(const glm::vec3& point, const glm::vec3& u, const glm::vec3& v) : m_point(point), m_u(u), m_v(v) 
 {
@@ -32,4 +33,10 @@ bool Plane::containsPoint(const glm::vec3& p, float epsilon) const
 float Plane::getShortestDistance(const glm::vec3& p) const
 {
 	return glm::abs(signedDistance(p));
+}
+
+bool Plane::isCollidingWith(const Sphere& sphere) const
+{
+	float dist = getShortestDistance(sphere.getPos());
+	return dist <= sphere.getRadius();
 }
