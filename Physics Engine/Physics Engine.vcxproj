@@ -22,13 +22,15 @@
     <ClInclude Include="Shapes\LineInf.h" />
     <ClInclude Include="Shapes\Plane.h" />
     <ClInclude Include="Shapes\Sphere.h" />
-    <ClInclude Include="ThreadPool.h" />
+    <ClInclude Include="Threading\Thread.h" />
+    <ClInclude Include="Threading\ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Shapes\LineInf.cpp" />
     <ClCompile Include="Shapes\Plane.cpp" />
     <ClCompile Include="Shapes\Sphere.cpp" />
-    <ClCompile Include="ThreadPool.cpp" />
+    <ClCompile Include="Threading\Thread.cpp" />
+    <ClCompile Include="Threading\ThreadPool.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

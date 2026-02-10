@@ -18,7 +18,12 @@
     <ClCompile Include="SpherePlaneCollisionTest.cpp">
       <Filter>ShapeTests</Filter>
     </ClCompile>
-    <ClCompile Include="ThreadPoolTest.cpp" />
+    <ClCompile Include="ThreadPoolTest.cpp">
+      <Filter>ThreadTests</Filter>
+    </ClCompile>
+    <ClCompile Include="ThreadTest.cpp">
+      <Filter>ThreadTests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -26,6 +31,9 @@
   <ItemGroup>
     <Filter Include="ShapeTests">
       <UniqueIdentifier>{a748e660-269f-43de-bd3b-9f8885845451}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThreadTests">
+      <UniqueIdentifier>{87e6a764-c6c8-4230-93c8-b21174d5d20f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
