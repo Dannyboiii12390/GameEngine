@@ -2,7 +2,7 @@
 #include "../Physics Engine/Shapes/Sphere.h"
 #include "../Physics Engine/Shapes/LineInf.h"
 
-namespace Shapes
+namespace ShapeTests
 {
 	using namespace Physics;
     TEST(LineSphereIntersectionTest, NoIntersection_CentreAtOrigin)

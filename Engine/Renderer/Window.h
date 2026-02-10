@@ -24,7 +24,7 @@ public:
 	GLFWwindow* getGLFWwindow() { return m_Window; }
 
 	void Shutdown()
-			{
+	{
 		if (m_Window)
 		{
 			glfwDestroyWindow(m_Window);

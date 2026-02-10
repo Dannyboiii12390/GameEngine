@@ -18,6 +18,7 @@
     <ClCompile Include="SpherePlaneCollisionTest.cpp">
       <Filter>ShapeTests</Filter>
     </ClCompile>
+    <ClCompile Include="ThreadPoolTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -26,5 +27,8 @@
     <Filter Include="ShapeTests">
       <UniqueIdentifier>{a748e660-269f-43de-bd3b-9f8885845451}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

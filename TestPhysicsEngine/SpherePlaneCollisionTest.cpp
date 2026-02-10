@@ -3,7 +3,7 @@
 #include "../Physics Engine/Shapes/Sphere.h"
 #include "../Physics Engine/Shapes/Plane.h"
 
-namespace Shapes
+namespace ShapeTests
 {
     using namespace Physics;
 

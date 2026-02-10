@@ -3,7 +3,7 @@
 #include "../Physics Engine/Shapes/LineInf.h"
 #include <glm/glm.hpp>
 
-namespace Shapes
+namespace ShapeTests
 {
     using namespace Physics;
 

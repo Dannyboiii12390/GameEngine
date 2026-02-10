@@ -23,7 +23,78 @@
 - Render Graph
 */
 
-int main()
+#include <iostream>
+#include <thread>
+using namespace std;
+
+class SharedObject {
+    int _objectCounter;
+    static int _classCounter;
+    thread_local static int _threadLocalCounter;
+
+public:
+    SharedObject() : _objectCounter(0) {}
+
+    void update() {
+        _objectCounter++;
+        _classCounter++;
+        _threadLocalCounter++;
+
+        output();
+    }
+
+    void output() const {
+        cout << "objectCounter= " << _objectCounter <<
+            "\nclassCounter= " << _classCounter <<
+            "\nthreadLocalCounter= " << _threadLocalCounter << endl;
+    }
+};
+
+int SharedObject::_classCounter = 0;
+thread_local int SharedObject::_threadLocalCounter = 0;
+
+auto threadMain = [](SharedObject& shareObject) {
+    for (auto i = 0; i < 2; i++)
+        shareObject.update();
+    return 0;
+    };
+
+int main(int, char**) {
+    cout << "Start program" << endl;
+
+    {
+        SharedObject shareObject;
+        shareObject.output();
+
+        thread t1(threadMain, ref(shareObject));
+        this_thread::sleep_for(chrono::milliseconds(500));
+        thread t2(threadMain, ref(shareObject));
+        t1.join();
+        t2.join();
+
+        shareObject.output();
+    }
+
+    cout << "Part 2" << endl;
+
+    {
+        SharedObject shareObject;
+        shareObject.output();
+
+        thread t1(threadMain, ref(shareObject));
+        this_thread::sleep_for(chrono::milliseconds(500));
+        thread t2(threadMain, ref(shareObject));
+        t1.join();
+        t2.join();
+
+        shareObject.output();
+    }
+
+    cout << "End program" << endl;
+    return 0;
+}
+
+int GameMain()
 {
     try
     {

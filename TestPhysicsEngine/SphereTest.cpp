@@ -2,7 +2,7 @@
 #include <glm/glm.hpp>
 #include "../Physics Engine/Shapes/Sphere.h"
 
-namespace Shapes 
+namespace ShapeTests
 {
     using namespace Physics;
 

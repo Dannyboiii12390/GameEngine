@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 #include "../Physics Engine/Shapes/Plane.h"
 
-namespace Shapes
+namespace ShapeTests
 {
     using namespace Physics;
 
