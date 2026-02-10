@@ -1,34 +1,4 @@
 ﻿
-#include <iostream>
-#include <string>
-#include <future>
-
-std::string functionA() {
-    return "Hello ";
-}
-
-std::string functionB() {
-    return "World\n";
-}
-
-int main(int, char**) {
-    //Sync
-    std::cout << "Sync Message= ";
-    std::cout << functionA();
-    std::cout << functionB() << std::endl;
-
-    //Async
-    {
-        auto f1 = async(std::launch::deferred, functionA);
-        auto f2 = async(std::launch::deferred, functionB);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        std::cout << "Deferred ASync Message= ";
-        std::cout << f1.get();
-        std::cout << f2.get() << std::endl;
-    }
-    return 0;
-}
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -49,11 +19,12 @@ int main(int, char**) {
 #include "../Physics Engine/Shapes/Sphere.h"
 
 /*
+- ImGui integration
 - Render Passes
 - Render Graph
 */
 
-int GameMain()
+int main()
 {
     try
     {

@@ -166,6 +166,7 @@
     <ClCompile Include="IMGUI\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Renderer\Camera.cpp" />
+    <ClCompile Include="Renderer\GUI.cpp" />
     <ClCompile Include="Renderer\Mesh.cpp" />
     <ClCompile Include="Renderer\Pipeline.cpp" />
     <ClCompile Include="Renderer\RenderGraph.cpp" />
@@ -188,6 +189,7 @@
     <ClInclude Include="Core\Systems\SystemRenderer.h" />
     <ClInclude Include="Core\Systems\SystemVelocity.h" />
     <ClInclude Include="Renderer\Camera.h" />
+    <ClInclude Include="Renderer\GUI.h" />
     <ClInclude Include="Renderer\Mesh.h" />
     <ClInclude Include="Renderer\Pipeline.h" />
     <ClInclude Include="Renderer\RenderGraph.h" />
