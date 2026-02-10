@@ -1,4 +1,34 @@
 ﻿
+#include <iostream>
+#include <string>
+#include <future>
+
+std::string functionA() {
+    return "Hello ";
+}
+
+std::string functionB() {
+    return "World\n";
+}
+
+int main(int, char**) {
+    //Sync
+    std::cout << "Sync Message= ";
+    std::cout << functionA();
+    std::cout << functionB() << std::endl;
+
+    //Async
+    {
+        auto f1 = async(std::launch::deferred, functionA);
+        auto f2 = async(std::launch::deferred, functionB);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::cout << "Deferred ASync Message= ";
+        std::cout << f1.get();
+        std::cout << f2.get() << std::endl;
+    }
+    return 0;
+}
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -22,77 +52,6 @@
 - Render Passes
 - Render Graph
 */
-
-#include <iostream>
-#include <thread>
-using namespace std;
-
-class SharedObject {
-    int _objectCounter;
-    static int _classCounter;
-    thread_local static int _threadLocalCounter;
-
-public:
-    SharedObject() : _objectCounter(0) {}
-
-    void update() {
-        _objectCounter++;
-        _classCounter++;
-        _threadLocalCounter++;
-
-        output();
-    }
-
-    void output() const {
-        cout << "objectCounter= " << _objectCounter <<
-            "\nclassCounter= " << _classCounter <<
-            "\nthreadLocalCounter= " << _threadLocalCounter << endl;
-    }
-};
-
-int SharedObject::_classCounter = 0;
-thread_local int SharedObject::_threadLocalCounter = 0;
-
-auto threadMain = [](SharedObject& shareObject) {
-    for (auto i = 0; i < 2; i++)
-        shareObject.update();
-    return 0;
-    };
-
-int main(int, char**) {
-    cout << "Start program" << endl;
-
-    {
-        SharedObject shareObject;
-        shareObject.output();
-
-        thread t1(threadMain, ref(shareObject));
-        this_thread::sleep_for(chrono::milliseconds(500));
-        thread t2(threadMain, ref(shareObject));
-        t1.join();
-        t2.join();
-
-        shareObject.output();
-    }
-
-    cout << "Part 2" << endl;
-
-    {
-        SharedObject shareObject;
-        shareObject.output();
-
-        thread t1(threadMain, ref(shareObject));
-        this_thread::sleep_for(chrono::milliseconds(500));
-        thread t2(threadMain, ref(shareObject));
-        t1.join();
-        t2.join();
-
-        shareObject.output();
-    }
-
-    cout << "End program" << endl;
-    return 0;
-}
 
 int GameMain()
 {
