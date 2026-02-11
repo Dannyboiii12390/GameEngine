@@ -28,7 +28,7 @@ jobs:
       - name: Build Physics Engine
         shell: pwsh
         run: |
-          $projPath = "GameEngine\Physics Engine\Physics Engine.vcxproj"
+          $projPath = "GameEngine\PhysicsEngine\PhysicsEngine.vcxproj"
           Write-Host "Building project at $projPath"
           msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /m
 
