@@ -1,0 +1,32 @@
+name: Build and Run GoogleTest (Visual Studio)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore GameEngine.sln
+
+      - name: Build solution
+        run: |
+          msbuild GameEngine.sln `
+            /p:Configuration=Release `
+            /p:Platform="x64" `
+            /m
+
+      - name: Run GoogleTest executable
+        run: |
+          .\x64\Release\Engine.exe --gtest_color=yes
