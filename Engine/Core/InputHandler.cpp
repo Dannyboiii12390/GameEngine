@@ -12,6 +12,7 @@ InputHandler::InputHandler(Window& window) : m_window(&window) {
     GLFWwindow* win = m_window->getGLFWwindow();
     if (!win) {
         std::cerr << "ERROR: Null GLFW window in InputHandler constructor" << std::endl;
+
         return;
     }
 
