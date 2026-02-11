@@ -9,33 +9,47 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 1️⃣ Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup MSBuild
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      # 3️⃣ Setup NuGet
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v2
 
+      # 4️⃣ Restore NuGet packages
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
-      - name: Build Test Project via Solution
-        run: |
-          msbuild GameEngine.sln `
-            /t:TestPhysicsEngine `
-            /p:Configuration=Release `
-            /p:Platform="x64" `
-            /m
-            
+      # 5️⃣ Build Physics Engine project only
+      - name: Build Physics Engine
+        run: msbuild "GameEngine/Physics Engine/Physics Engine.vcxproj" `
+              /p:Configuration=Release `
+              /p:Platform=x64 `
+              /m
+
+      # 6️⃣ Build TestPhysicsEngine project only
+      - name: Build TestPhysicsEngine
+        run: msbuild "GameEngine/TestPhysicsEngine/TestPhysicsEngine.vcxproj" `
+              /p:Configuration=Release `
+              /p:Platform=x64 `
+              /m
+
+      # 7️⃣ Run GoogleTest
       - name: Run GoogleTest
+        shell: pwsh
         run: |
-          # Ensure the exe exists
-          if (-Not (Test-Path ".\GameEngine\x64\Release\TestPhysicsEngine.exe")) {
-            Write-Error "TestPhysicsEngine.exe not found!"
-            exit 1
+          $exePath = "GameEngine\x64\Release\TestPhysicsEngine.exe"
+
+          if (-Not (Test-Path $exePath)) {
+              Write-Error "❌ TestPhysicsEngine.exe not found at $exePath"
+              exit 1
           }
 
-          # Run the test executable
-          & .\GameEngine\x64\Release\TestPhysicsEngine.exe --gtest_color=yes
+          Write-Host "✅ Found TestPhysicsEngine.exe at $exePath"
+          Write-Host "Running tests..."
+          & $exePath --gtest_color=yes
