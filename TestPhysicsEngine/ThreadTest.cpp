@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../Physics Engine/Threading/Thread.h"
+#include "../PhysicsEngine/Threading/Thread.h"
 
 #include <atomic>
 #include <future>

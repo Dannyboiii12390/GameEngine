@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics Engine/Shapes/Sphere.h"
-#include "../Physics Engine/Shapes/LineInf.h"
+#include "../PhysicsEngine/Shapes/Sphere.h"
+#include "../PhysicsEngine/Shapes/LineInf.h"
 
 namespace ShapeTests
 {

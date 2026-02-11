@@ -1,7 +1,7 @@
 
 #include "pch.h"
 #include <glm/glm.hpp>
-#include "../Physics Engine/Shapes/Plane.h"
+#include "../PhysicsEngine/Shapes/Plane.h"
 
 namespace ShapeTests
 {

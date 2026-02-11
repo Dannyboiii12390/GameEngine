@@ -5,7 +5,7 @@ VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Engine", "Engine\Engine.vcxproj", "{9686341C-B5D3-4DA0-A3E4-FB789B8FD6F8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Physics Engine", "Physics Engine\Physics Engine.vcxproj", "{7C638CB6-7803-46F8-9D78-47A6C14110AE}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PhysicsEngine", "PhysicsEngine\PhysicsEngine.vcxproj", "{7C638CB6-7803-46F8-9D78-47A6C14110AE}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestPhysicsEngine", "TestPhysicsEngine\TestPhysicsEngine.vcxproj", "{13DA5AB0-BB24-44F8-9BCC-D6B53B903D46}"
 EndProject

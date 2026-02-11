@@ -1,6 +1,6 @@
 #include "pch.h"
 #include <glm/glm.hpp>
-#include "../Physics Engine/Shapes/Sphere.h"
+#include "../PhysicsEngine/Shapes/Sphere.h"
 
 namespace ShapeTests
 {
