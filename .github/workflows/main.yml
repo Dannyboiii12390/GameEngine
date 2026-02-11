@@ -25,12 +25,13 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
-      # 5️⃣ Build Physics Engine project only
       - name: Build Physics Engine
-        run: msbuild "GameEngine/Physics Engine/Physics Engine.vcxproj" `
-              /p:Configuration=Release `
-              /p:Platform=x64 `
-              /m
+        shell: pwsh
+        run: |
+          msbuild "GameEngine/Physics Engine/Physics Engine.vcxproj" `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /m
 
       # 6️⃣ Build TestPhysicsEngine project only
       - name: Build TestPhysicsEngine
