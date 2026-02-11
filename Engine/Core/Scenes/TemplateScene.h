@@ -1,11 +1,13 @@
 #pragma once
 #include "IScene.h"
 #include <vector>
+#include <memory>
 #include "../InputHandler.h"
 #include "../Systems/SystemRenderer.h"
 #include "../../Renderer/Window.h"
 #include "../../Renderer/VulkanRHI.h"
 #include "../../Renderer/Camera.h"
+#include "../../Renderer/GUI.h"
 
 class Entity;
 
@@ -45,6 +47,8 @@ private:
 
 
 	SystemRenderer m_renderer; // temporary for testing, should be owned by system manager, not scene
+
+	std::unique_ptr<GUI> m_gui;
 
 
 

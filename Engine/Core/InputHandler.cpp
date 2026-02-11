@@ -3,6 +3,8 @@
 #include <iostream>
 
 
+static constexpr bool CURSOR_CAPTURE_ENABLED = false;
+
 // Initialize static member
 std::unordered_map<GLFWwindow*, InputHandler*> InputHandler::s_instances;
 
@@ -28,7 +30,7 @@ InputHandler::InputHandler(Window& window) : m_window(&window) {
     m_lastMouseY = m_mouseY;
 
     // Enable cursor capture for reliable mouse movement
-    glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(win, GLFW_CURSOR, (CURSOR_CAPTURE_ENABLED)? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 InputHandler::~InputHandler() {
     if (m_window && m_window->getGLFWwindow()) {

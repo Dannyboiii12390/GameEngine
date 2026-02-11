@@ -7,6 +7,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include "../../IMGUI/imgui.h"
 
 
 TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi) : m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi)
@@ -14,6 +15,9 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi) : m_window(&p_win
 	// Initialize VulkanRHI and Renderer here if needed
 	m_renderer.Initialize(m_vulkanRHI);
 	m_vulkanRHI->SetActiveCamera(&m_camera);
+
+	m_gui = std::make_unique<GUI>();
+	m_gui->Create(*m_vulkanRHI, *m_window);
 
 	//temporary entity creation for testing, should be done in a scene setup function or via a scene editor in the future
 	auto createEntity = [this](Entity& entity, glm::vec3 pos)
@@ -59,13 +63,22 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi) : m_window(&p_win
 }
 TemplateScene::~TemplateScene()
 {
-	for(auto& entity : m_entities)
+	if (m_gui)
 	{
-		auto geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
-		if (geom) geom->Destroy(); // ensure mesh & pipeline free their VkBuffers/VkPipeline while device is still valid and idle
+		m_vulkanRHI->WaitIdle(); // ensure device idle before destroying GUI resources
+
+		m_gui->Shutdown();
+		m_gui.reset();
+
+		for(auto& entity : m_entities)
+		{
+			auto geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+			if (geom) geom->Destroy(); // ensure mesh & pipeline free their VkBuffers/VkPipeline while device is still valid and idle
+		}
+
+		m_renderer.Shutdown();
 	}
 
-	m_renderer.Shutdown();
 }
 void TemplateScene::Start(float deltaTime)
 {
@@ -106,6 +119,16 @@ void TemplateScene::Draw()
 		for (auto& entity : m_entities)
 			entityPtrs.push_back(&entity);
 		m_renderer.Render(cmd, entityPtrs);
+
+
+		if (m_gui)
+		{
+			m_gui->NewFrame();
+			ImGui::Begin("Hello, ImGui!");
+			ImGui::Text("This is a simple GUI overlay.");
+			ImGui::End();
+			m_gui->Render(cmd);
+		}
 	}
 	m_vulkanRHI->EndFrame();
 	m_vulkanRHI->Present();

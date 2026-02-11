@@ -36,6 +36,7 @@ public:
 	VkFormat GetSwapchainFormat() const { return m_SwapchainImageFormat; }
     // Expose the RHI-owned render pass so systems/pipelines can use it.
     VkRenderPass GetRenderPass() const { return m_RenderPass; }
+	VkInstance GetInstance() const { return m_Instance; }
 
 	void HandleWindowResize();
 	void RecreateSwapchainAndResources();

@@ -2,42 +2,41 @@
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
-#include "../IMGUI/imgui.h"
-#include "../IMGUI/imgui_impl_glfw.h"
-#include "../IMGUI/imgui_impl_vulkan.h"
 #include <cstdint>
 
-namespace Engine
+class VulkanRHI;
+class Window;
+
+class GUI final
 {
-    class GUI final
-    {
-    public:
-        GUI() = default;
-        ~GUI() { shutdown(); }
+public:
+    GUI() = default;
+    ~GUI() { Shutdown(); }
 
-        bool create(GLFWwindow* window,
-            VkInstance instance,
-            VkPhysicalDevice physicalDevice,
-            VkDevice device,
-            uint32_t queueFamily,
-            VkQueue queue,
-            VkPipelineCache pipelineCache,
-            VkRenderPass renderPass,
-            uint32_t imageCount,
-            VkAllocationCallbacks* allocator = nullptr);
+    bool Create(GLFWwindow* window,
+        VkInstance instance,
+        VkPhysicalDevice physicalDevice,
+        VkDevice device,
+        uint32_t queueFamily,
+        VkQueue queue,
+        VkPipelineCache pipelineCache,
+        VkRenderPass renderPass,
+        uint32_t imageCount,
+        VkAllocationCallbacks* allocator = nullptr);
 
-        void newFrame() const;
-        void render(VkCommandBuffer commandBuffer) const;
-        void shutdown() noexcept;
+    bool Create(VulkanRHI& rhi, Window& window);
 
-        // Prevent copying
-        GUI(const GUI&) = delete;
-        GUI& operator=(const GUI&) = delete;
+    void NewFrame() const;
+    void Render(VkCommandBuffer commandBuffer) const;
+    void Shutdown() noexcept;
 
-    private:
-        VkDevice m_device = VK_NULL_HANDLE;
-        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
-        VkAllocationCallbacks* m_allocator = nullptr;
-        bool m_initialized = false;
-    };
-}
+    // Prevent copying
+    GUI(const GUI&) = delete;
+    GUI& operator=(const GUI&) = delete;
+
+private:
+    VkDevice m_device = VK_NULL_HANDLE;
+    VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+    VkAllocationCallbacks* m_allocator = nullptr;
+    bool m_initialized = false;
+};
