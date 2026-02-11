@@ -21,9 +21,10 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
-      - name: Build Test Project Only
+      - name: Build Test Project via Solution
         run: |
-          msbuild TestPhysicsEngine\TestPhysicsEngine.vcxproj `
+          msbuild GameEngine.sln `
+            /t:TestPhysicsEngine `
             /p:Configuration=Release `
             /p:Platform="x64" `
             /m
