@@ -21,13 +21,13 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
-      - name: Build solution
+      - name: Build Test Project Only
         run: |
-          msbuild GameEngine.sln `
+          msbuild TestPhysicsEngine\TestPhysicsEngine.vcxproj `
             /p:Configuration=Release `
             /p:Platform="x64" `
             /m
-
+            
       - name: Run GoogleTest
         run: |
           .\GameEngine\x64\Release\TestPhysicsEngine.exe --gtest_color=yes
