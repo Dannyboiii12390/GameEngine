@@ -31,4 +31,11 @@ jobs:
             
       - name: Run GoogleTest
         run: |
-          .\GameEngine\x64\Release\TestPhysicsEngine.exe --gtest_color=yes
+          # Ensure the exe exists
+          if (-Not (Test-Path ".\GameEngine\x64\Release\TestPhysicsEngine.exe")) {
+            Write-Error "TestPhysicsEngine.exe not found!"
+            exit 1
+          }
+
+          # Run the test executable
+          & .\GameEngine\x64\Release\TestPhysicsEngine.exe --gtest_color=yes
