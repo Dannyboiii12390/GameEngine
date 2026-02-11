@@ -1,10 +1,8 @@
-name: Build and Run GoogleTest (Visual Studio)
+name: Build and Run GoogleTest
 
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
 
 jobs:
   build-and-test:
@@ -17,6 +15,9 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
@@ -27,6 +28,6 @@ jobs:
             /p:Platform="x64" `
             /m
 
-      - name: Run GoogleTest executable
+      - name: Run GoogleTest
         run: |
-          .\x64\Release\Engine.exe --gtest_color=yes
+          .\GameEngine\x64\Release\TestPhysicsEngine.exe --gtest_color=yes
