@@ -28,17 +28,16 @@ jobs:
       - name: Build Physics Engine
         shell: pwsh
         run: |
-          msbuild "GameEngine/Physics Engine/Physics Engine.vcxproj" `
-            /p:Configuration=Release `
-            /p:Platform=x64 `
-            /m
+          $projPath = "GameEngine\Physics Engine\Physics Engine.vcxproj"
+          Write-Host "Building project at $projPath"
+          msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /m
 
-      # 6️⃣ Build TestPhysicsEngine project only
       - name: Build TestPhysicsEngine
-        run: msbuild "GameEngine/TestPhysicsEngine/TestPhysicsEngine.vcxproj" `
-              /p:Configuration=Release `
-              /p:Platform=x64 `
-              /m
+        shell: pwsh
+        run: |
+          $projPath = "GameEngine\TestPhysicsEngine\TestPhysicsEngine.vcxproj"
+          Write-Host "Building project at $projPath"
+          msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /m
 
       # 7️⃣ Run GoogleTest
       - name: Run GoogleTest
