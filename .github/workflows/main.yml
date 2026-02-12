@@ -30,7 +30,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Building GameEngine.sln (includes PhysicsEngine and TestPhysicsEngine)"
-          msbuild "GameEngine.sln" /p:Configuration=Release /p:Platform=x64 /m /t:PhysicsEngine;TestPhysicsEngine
+          msbuild "GameEngine.sln" /p:Configuration=Release /p:Platform=x64 /m /t:"PhysicsEngine;TestPhysicsEngine"
 
       # 6️⃣ Run GoogleTest
       - name: Run GoogleTest
