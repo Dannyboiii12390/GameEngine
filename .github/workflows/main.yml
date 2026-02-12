@@ -25,6 +25,12 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
+      - name: Show repo root and contents
+        shell: pwsh
+        run: |
+          Write-Host "Current directory: $PWD"
+          Get-ChildItem -Recurse -Name
+
       - name: Build Physics Engine
         shell: pwsh
         run: |
