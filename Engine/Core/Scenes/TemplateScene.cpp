@@ -10,14 +10,11 @@
 #include "../../IMGUI/imgui.h"
 
 
-TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi) : m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi)
+TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi), m_gui(p_gui)
 {
 	// Initialize VulkanRHI and Renderer here if needed
 	m_renderer.Initialize(m_vulkanRHI);
 	m_vulkanRHI->SetActiveCamera(&m_camera);
-
-	m_gui = std::make_unique<GUI>();
-	m_gui->Create(*m_vulkanRHI, *m_window);
 
 	//temporary entity creation for testing, should be done in a scene setup function or via a scene editor in the future
 	auto createEntity = [this](Entity& entity, glm::vec3 pos)
@@ -63,12 +60,9 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi) : m_window(&p_win
 }
 TemplateScene::~TemplateScene()
 {
-	if (m_gui)
+	if (m_vulkanRHI)
 	{
 		m_vulkanRHI->WaitIdle(); // ensure device idle before destroying GUI resources
-
-		m_gui->Shutdown();
-		m_gui.reset();
 
 		for(auto& entity : m_entities)
 		{

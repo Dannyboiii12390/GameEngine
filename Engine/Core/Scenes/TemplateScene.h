@@ -17,7 +17,7 @@ class TemplateScene : public IScene
 public:
 	
 	
-	TemplateScene(Window& p_window, VulkanRHI* rhi);
+	TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
 	~TemplateScene() override;
 
 	void Start(float deltaTime) override;
@@ -48,7 +48,7 @@ private:
 
 	SystemRenderer m_renderer; // temporary for testing, should be owned by system manager, not scene
 
-	std::unique_ptr<GUI> m_gui;
+	GUI* m_gui;
 
 
 

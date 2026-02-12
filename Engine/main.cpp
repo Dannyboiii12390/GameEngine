@@ -57,7 +57,10 @@ int main()
 		vulkanRHI.Initialise(&window);
         vulkanRHI.ToggleVSync(true);    
 
-		sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI));
+        GUI gui;
+        gui.Create(vulkanRHI, window);
+
+		sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI, &gui));
 
 		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
 		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
@@ -82,10 +85,13 @@ int main()
 			timeAccumulator += deltaTime;
             if (timeAccumulator > 5.0f)
             {
-                sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI));
+                sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI, &gui));
                 timeAccumulator = 0.0f;
             }
         }
+
+		vulkanRHI.WaitIdle();
+        gui.Shutdown();
 
         sceneManager.Shutdown();
         vulkanRHI.Shutdown();
