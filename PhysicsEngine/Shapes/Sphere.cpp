@@ -119,3 +119,25 @@ bool Sphere::Intersects(const Capsule& cap) const
 {
 	return cap.Intersects(*this);
 }
+/*
+bool Sphere::isColliding(const Sphere& other) 
+{ 
+    glm::vec3 diff = m_pos - other.m_pos;
+    float distanceSquared = glm::dot(diff, diff);
+    float radiusSum = m_radius + other.m_radius;
+    return distanceSquared <= radiusSum * radiusSum;
+} 
+bool Sphere::isColliding(const LineInf& other) 
+{ 
+    // Closest point on line to sphere center
+    glm::vec3 closest = other.getShortestPathToPoint(m_pos);
+    glm::vec3 diff = m_pos - closest;
+    float distSq = glm::dot(diff, diff);
+    return distSq <= m_radius * m_radius;
+} 
+bool Sphere::isColliding(const Capsule& other) 
+{ 
+    return other.isColliding(*this);
+}
+bool Sphere::isColliding(const Cylinder& other) { return Intersects(other); } 
+bool Sphere::isColliding(const Plane& other) { return Intersects(other); }*/

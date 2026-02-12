@@ -1,15 +1,19 @@
 #pragma once
 #include <glm/glm.hpp>
 
+
+
 namespace Physics
 {
     // Forward-declare LineInf to avoid circular includes in headers.
+    class Collider;
+
     class LineInf;
     class Plane;
 	class Cylinder;
     class Capsule;
 
-    class Sphere
+	class Sphere
     {
     public:
         Sphere(const glm::vec3& pos, float radius);
@@ -23,6 +27,14 @@ namespace Physics
         bool Intersects(const Plane& plane) const;
 		bool Intersects(const Cylinder& cyl) const;
 		bool Intersects(const Capsule& cap) const;
+
+        /*
+		bool isColliding(const Sphere& other) override; 
+        bool isColliding(const LineInf& other) override; 
+        bool isColliding(const Capsule& other) override; 
+        bool isColliding(const Cylinder& other) override; 
+        bool isColliding(const Plane& other) override;
+        */
 
     private:
         glm::vec3 m_pos;

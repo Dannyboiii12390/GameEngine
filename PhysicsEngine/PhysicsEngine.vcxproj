@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shapes\Capsule.h" />
+    <ClInclude Include="Shapes\Collider.h" />
     <ClInclude Include="Shapes\Cylinder.h" />
     <ClInclude Include="Shapes\LineInf.h" />
     <ClInclude Include="Shapes\Plane.h" />

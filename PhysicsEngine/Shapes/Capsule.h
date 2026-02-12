@@ -1,13 +1,15 @@
 #pragma once
 #include <glm/glm.hpp>
 
+#include "Collider.h"
+
 namespace Physics
 {
     class Sphere;
 
     // Capsule: finite line segment [a,b] with radius r. The capsule volume is all points
     // whose distance to the segment is <= r (this naturally includes spherical end-caps).
-    class Capsule
+	class Capsule : public Collider
     {
     public:
         Capsule(const glm::vec3& a, const glm::vec3& b, float radius);
@@ -21,6 +23,15 @@ namespace Physics
 
         // Sphere-capusle intersection test.
         bool Intersects(const Sphere& s) const;
+
+		bool isColliding(const Sphere& other) const override; 
+        bool isColliding(const LineInf& other) const override;
+        bool isColliding(const Capsule& other) const override;
+        bool isColliding(const Cylinder& other) const override;
+        bool isColliding(const Plane& other) const override;
+
+
+
 
     private:
         glm::vec3 m_a;
