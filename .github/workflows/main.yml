@@ -25,13 +25,12 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
-      # 5️⃣ Build Physics Engine - FIXED PATH
       - name: Build Physics Engine
         shell: pwsh
         run: |
           $projPath = "PhysicsEngine\PhysicsEngine.vcxproj"
           Write-Host "Building project at $projPath"
-          msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /m
+          msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /p:AdditionalIncludeDirectories="D:\a\GameEngine\GameEngine\Dependencies\GLM\include" /m
 
       # 6️⃣ Build TestPhysicsEngine - FIXED PATH
       - name: Build TestPhysicsEngine
