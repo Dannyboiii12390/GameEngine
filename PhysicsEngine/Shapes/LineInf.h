@@ -18,7 +18,8 @@ namespace Physics
         glm::vec3 getShortestPathToPoint(const glm::vec3& point) const;
 
         // Intersection with sphere (declaration only; implementation in .cpp).
-        bool isCollidingWith(const Sphere& sphere) const;
+        bool Intersects(const Sphere& sphere) const;
+        bool SegmentIntersectsSphere(const Sphere& s, float length);
 
     private:
         glm::vec3 m_a;

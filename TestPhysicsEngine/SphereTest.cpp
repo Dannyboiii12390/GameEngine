@@ -11,8 +11,8 @@ namespace ShapeTests
         Sphere a(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
         Sphere b(glm::vec3(5.0f, 0.0f, 0.0f), 1.0f);
 
-        EXPECT_FALSE(a.isCollidingWith(b));
-        EXPECT_FALSE(b.isCollidingWith(a));
+        EXPECT_FALSE(a.Intersects(b));
+        EXPECT_FALSE(b.Intersects(a));
     }
 
     TEST(SphereTest, NoIntersection_OffsetCentre)
@@ -20,8 +20,8 @@ namespace ShapeTests
         Sphere a(glm::vec3(3.0f, 3.0f, 3.0f), 2.0f);
         Sphere b(glm::vec3(10.0f, 10.0f, 10.0f), 2.0f);
 
-        EXPECT_FALSE(a.isCollidingWith(b));
-        EXPECT_FALSE(b.isCollidingWith(a));
+        EXPECT_FALSE(a.Intersects(b));
+        EXPECT_FALSE(b.Intersects(a));
     }
 
     TEST(SphereTest, Overlapping_CentreAtOrigin)
@@ -29,8 +29,8 @@ namespace ShapeTests
         Sphere a(glm::vec3(0.0f, 0.0f, 0.0f), 2.0f);
         Sphere b(glm::vec3(2.0f, 0.0f, 0.0f), 2.0f);
 
-        EXPECT_TRUE(a.isCollidingWith(b));
-        EXPECT_TRUE(b.isCollidingWith(a));
+        EXPECT_TRUE(a.Intersects(b));
+        EXPECT_TRUE(b.Intersects(a));
     }
 
     TEST(SphereTest, Overlapping_OffsetCentre)
@@ -38,8 +38,8 @@ namespace ShapeTests
         Sphere a(glm::vec3(5.0f, 5.0f, 5.0f), 3.0f);
         Sphere b(glm::vec3(8.0f, 5.0f, 5.0f), 3.0f);
 
-        EXPECT_TRUE(a.isCollidingWith(b));
-        EXPECT_TRUE(b.isCollidingWith(a));
+        EXPECT_TRUE(a.Intersects(b));
+        EXPECT_TRUE(b.Intersects(a));
     }
 
     TEST(SphereTest, FullyContained_CentreAtOrigin)
@@ -47,8 +47,8 @@ namespace ShapeTests
         Sphere outer(glm::vec3(0.0f, 0.0f, 0.0f), 3.0f);
         Sphere inner(glm::vec3(1.0f, 0.0f, 0.0f), 1.0f);
 
-        EXPECT_TRUE(outer.isCollidingWith(inner));
-        EXPECT_TRUE(inner.isCollidingWith(outer));
+        EXPECT_TRUE(outer.Intersects(inner));
+        EXPECT_TRUE(inner.Intersects(outer));
     }
 
     TEST(SphereTest, FullyContained_OffsetCentre)
@@ -56,7 +56,7 @@ namespace ShapeTests
         Sphere outer(glm::vec3(6.0f, 6.0f, 6.0f), 5.0f);
         Sphere inner(glm::vec3(7.0f, 6.0f, 6.0f), 2.0f);
 
-        EXPECT_TRUE(outer.isCollidingWith(inner));
-        EXPECT_TRUE(inner.isCollidingWith(outer));
+        EXPECT_TRUE(outer.Intersects(inner));
+        EXPECT_TRUE(inner.Intersects(outer));
     }
 }

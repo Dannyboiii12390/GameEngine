@@ -37,7 +37,7 @@ float Plane::getShortestDistance(const glm::vec3& p) const
 	return glm::abs(signedDistance(p));
 }
 
-bool Plane::isCollidingWith(const Sphere& sphere) const
+bool Plane::Intersects(const Sphere& sphere) const
 {
 	float dist = getShortestDistance(sphere.getPos());
 	return dist <= sphere.getRadius();

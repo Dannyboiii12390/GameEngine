@@ -21,7 +21,7 @@ namespace Physics
         bool containsPoint(const glm::vec3& p, float epsilon = 1e-5f) const;
         float getShortestDistance(const glm::vec3& p) const;
 
-        bool isCollidingWith(const class Sphere& sphere) const;
+        bool Intersects(const class Sphere& sphere) const;
 
     private:
         glm::vec3 m_point;

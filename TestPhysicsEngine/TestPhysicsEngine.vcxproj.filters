@@ -24,6 +24,15 @@
     <ClCompile Include="ThreadTest.cpp">
       <Filter>ThreadTests</Filter>
     </ClCompile>
+    <ClCompile Include="LineSphereSegmentTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
+    <ClCompile Include="CylinderTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
+    <ClCompile Include="SphereIntersectionCylinderTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

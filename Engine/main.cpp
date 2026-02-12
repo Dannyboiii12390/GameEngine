@@ -55,13 +55,17 @@ int main()
 
         VulkanRHI vulkanRHI;
 
+
         #ifndef _DEBUG
             // Disable validation layers in release builds to avoid their per-call CPU overhead
             vulkanRHI.EnableValidationLayers(false);
+            constexpr bool VsyncOn = false; 
+        #else
+		    constexpr bool VsyncOn = true; // Enable VSync in debug builds to cap FPS and make debugging easier 
         #endif
 
 		vulkanRHI.Initialise(&window);
-        vulkanRHI.ToggleVSync(false);    
+        vulkanRHI.ToggleVSync(VsyncOn);    
 
         GUI gui;
         gui.Create(vulkanRHI, window);
@@ -71,7 +75,7 @@ int main()
 		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
 		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
 
-		std::cout << "Colliding? " << (testSphere.isCollidingWith(testSphere2) ? "Yes" : "No") << std::endl;
+		std::cout << "Colliding? " << (testSphere.Intersects(testSphere2) ? "Yes" : "No") << std::endl;
 
 
 		std::fstream file("fps_log.txt");
