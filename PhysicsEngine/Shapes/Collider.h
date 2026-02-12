@@ -1,4 +1,8 @@
 #pragma once
+/* things still to inherit and implement Collider
+LineInf
+Plane
+*/
 
 namespace Physics
 {

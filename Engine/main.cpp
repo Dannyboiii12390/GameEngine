@@ -76,7 +76,7 @@ int main()
 		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
 		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
 
-		std::cout << "Colliding? " << (testSphere.Intersects(testSphere2) ? "Yes" : "No") << std::endl;
+		std::cout << "Colliding? " << (testSphere.isColliding(testSphere2) ? "Yes" : "No") << std::endl;
 
 
 		std::fstream file("fps_log.txt");

@@ -16,8 +16,8 @@ namespace ShapeTests
 
 		Cylinder cyl(a, b, cylR);
         Sphere s(glm::vec3(5.0f, 1.0f, 0.0f), 0.5f); // center projects to middle, perpDist=1 <= cylR -> inside
-        EXPECT_TRUE(s.Intersects(cyl));
-        EXPECT_TRUE(cyl .Intersects(s));
+        EXPECT_TRUE(s.isColliding(cyl));
+        EXPECT_TRUE(cyl.isColliding(s));
     }
 
     TEST(SphereCylinderIntersectionTest, SphereOutsideAtMiddleOfSegment)
@@ -28,8 +28,8 @@ namespace ShapeTests
 
 		Cylinder cyl(a, b, cylR);
         Sphere s(glm::vec3(5.0f, 3.5f, 0.0f), 0.5f); // perpDist = 3.5 -> 3.5 - 2.0 = 1.5 > sphere radius -> no intersection
-        EXPECT_FALSE(s.Intersects(cyl));
-        EXPECT_FALSE(cyl.Intersects(s));
+        EXPECT_FALSE(s.isColliding(cyl));
+        EXPECT_FALSE(cyl.isColliding(s));
     }
 
     TEST(SphereCylinderIntersectionTest, SphereInside_IntersectingAtStart)
@@ -41,8 +41,8 @@ namespace ShapeTests
         // center inside cylinder volume near the start cap
 		Cylinder cyl(a, b, cylR);
         Sphere s(glm::vec3(0.5f, 0.0f, 0.0f), 0.6f);
-        EXPECT_TRUE(s.Intersects(cyl));
-        EXPECT_TRUE(cyl.Intersects(s));
+        EXPECT_TRUE(s.isColliding(cyl));
+        EXPECT_TRUE(cyl.isColliding(s));
     }
 
     TEST(SphereCylinderIntersectionTest, SphereOutside_ButIntersectingAtStart)
@@ -54,8 +54,8 @@ namespace ShapeTests
         // center just before start but sphere radius reaches into the cap -> intersects
 		Cylinder cyl(a, b, cylR);
         Sphere s(glm::vec3(-0.5f, 0.0f, 0.0f), 0.6f);
-        EXPECT_TRUE(s.Intersects(cyl));
-        EXPECT_TRUE(cyl.Intersects(s));
+        EXPECT_TRUE(s.isColliding(cyl));
+        EXPECT_TRUE(cyl.isColliding(s));
     }
 
     TEST(SphereCylinderIntersectionTest, SphereInside_IntersectingAtEnd)
@@ -67,8 +67,8 @@ namespace ShapeTests
         // center inside near the end cap
 		Cylinder cyl(a, b, cylR);
         Sphere s(glm::vec3(10.0f, 0.5f, 0.0f), 0.4f);
-        EXPECT_TRUE(s.Intersects(cyl));
-        EXPECT_TRUE(cyl.Intersects(s));
+        EXPECT_TRUE(s.isColliding(cyl));
+        EXPECT_TRUE(cyl.isColliding(s));
     }
 
     TEST(SphereCylinderIntersectionTest, SphereOutside_ButIntersectingAtEnd)
@@ -80,7 +80,7 @@ namespace ShapeTests
         // center beyond end but sphere radius reaches into the end cap -> intersects
 		Cylinder cyl(a, b, cylR);
         Sphere s(glm::vec3(10.8f, 0.0f, 0.0f), 1.0f);
-        EXPECT_TRUE(s.Intersects(cyl));
-        EXPECT_TRUE(cyl.Intersects(s));
+        EXPECT_TRUE(s.isColliding(cyl));
+        EXPECT_TRUE(cyl.isColliding(s));
     }
 }

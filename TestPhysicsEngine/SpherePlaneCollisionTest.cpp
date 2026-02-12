@@ -15,7 +15,7 @@ namespace ShapeTests
 
         Sphere s(glm::vec3(0.0f, 0.0f, 5.0f), 1.0f);
 
-        EXPECT_FALSE(s.Intersects(plane));
+        EXPECT_FALSE(s.isColliding(plane));
     }
 
     TEST(SpherePlaneTest, Tangent_DistanceEqualsRadius)
@@ -26,7 +26,7 @@ namespace ShapeTests
 
         Sphere s(glm::vec3(0.0f, 0.0f, 1.0f), 1.0f); // center at z=1, radius=1 -> tangent
 
-        EXPECT_TRUE(s.Intersects(plane));
+        EXPECT_TRUE(s.isColliding(plane));
     }
 
     TEST(SpherePlaneTest, Intersecting_DistanceLessThanRadius)
@@ -37,7 +37,7 @@ namespace ShapeTests
 
         Sphere s(glm::vec3(0.0f, 0.0f, 0.5f), 1.0f); // center at z=0.5, radius=1 -> intersects
 
-        EXPECT_TRUE(s.Intersects(plane));
+        EXPECT_TRUE(s.isColliding(plane));
     }
 
     TEST(SpherePlaneTest, PlaneWithFlippedNormal_StillDetectsCollision)
@@ -49,6 +49,6 @@ namespace ShapeTests
 
         Sphere s(glm::vec3(0.0f, 0.0f, -0.5f), 1.0f); // center below plane but within radius
 
-        EXPECT_TRUE(s.Intersects(plane));
+        EXPECT_TRUE(s.isColliding(plane));
     }
 }

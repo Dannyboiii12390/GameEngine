@@ -14,7 +14,7 @@ namespace ShapeTests
         Sphere sphere(glm::vec3(0.0f, 0.0f, 0.0f), 3.0f);
 
         EXPECT_FALSE(line.Intersects(sphere));
-        EXPECT_FALSE(sphere.Intersects(line));
+        EXPECT_FALSE(sphere.isColliding(line));
     }
 
     TEST(LineSphereIntersectionTest, PassesThroughSphere_CentreAtOrigin)
@@ -26,7 +26,7 @@ namespace ShapeTests
         Sphere sphere(glm::vec3(10.0f, 0.0f, 0.0f), 5.0f);
 
         EXPECT_TRUE(line.Intersects(sphere));
-        EXPECT_TRUE(sphere.Intersects(line));
+        EXPECT_TRUE(sphere.isColliding(line));
     }
 
     TEST(LineSphereIntersectionTest, LineStartsInsideSphere)
@@ -38,7 +38,7 @@ namespace ShapeTests
         Sphere sphere(glm::vec3(2.0f, 2.0f, 2.0f), 5.0f);
 
         EXPECT_TRUE(line.Intersects(sphere));
-        EXPECT_TRUE(sphere.Intersects(line));
+        EXPECT_TRUE(sphere.isColliding(line));
     }
 
     TEST(LineSphereIntersectionTest, LinePassesThroughSphereCenter)
@@ -50,6 +50,6 @@ namespace ShapeTests
         Sphere sphere(glm::vec3(0.0f, 0.0f, 0.0f), 3.0f);
 
         EXPECT_TRUE(line.Intersects(sphere));
-        EXPECT_TRUE(sphere.Intersects(line));
+        EXPECT_TRUE(sphere.isColliding(line));
     }
 }

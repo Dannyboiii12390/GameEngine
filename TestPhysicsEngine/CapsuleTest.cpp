@@ -40,7 +40,7 @@ namespace ShapeTests
     {
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 2.0f);
         Sphere s(glm::vec3(5.0f, 1.0f, 0.0f), 0.5f); // projects to middle, inside
-        EXPECT_TRUE(s.Intersects(cap));
+        EXPECT_TRUE(s.isColliding(cap));
         EXPECT_TRUE(cap.Intersects(s));
     }
 
@@ -48,7 +48,7 @@ namespace ShapeTests
     {
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 2.0f);
         Sphere s(glm::vec3(5.0f, 3.5f, 0.0f), 0.5f); // too far radially
-        EXPECT_FALSE(s.Intersects(cap));
+        EXPECT_FALSE(s.isColliding(cap));
         EXPECT_FALSE(cap.Intersects(s));
     }
 
@@ -56,7 +56,7 @@ namespace ShapeTests
     {
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(0.5f, 0.0f, 0.0f), 0.6f); // inside near start
-        EXPECT_TRUE(s.Intersects(cap));
+        EXPECT_TRUE(s.isColliding(cap));
         EXPECT_TRUE(cap.Intersects(s));
     }
 
@@ -64,7 +64,7 @@ namespace ShapeTests
     {
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(-0.5f, 0.0f, 0.0f), 0.6f); // center before start but radius reaches cap -> intersects
-        EXPECT_TRUE(s.Intersects(cap));
+        EXPECT_TRUE(s.isColliding(cap));
         EXPECT_TRUE(cap.Intersects(s));
     }
 
@@ -72,7 +72,7 @@ namespace ShapeTests
     {
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(10.0f, 0.5f, 0.0f), 0.4f); // inside near end
-        EXPECT_TRUE(s.Intersects(cap));
+        EXPECT_TRUE(s.isColliding(cap));
         EXPECT_TRUE(cap.Intersects(s));
     }
 
@@ -80,7 +80,7 @@ namespace ShapeTests
     {
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(10.8f, 0.0f, 0.0f), 1.0f); // center beyond end but radius reaches cap -> intersects
-        EXPECT_TRUE(s.Intersects(cap));
+        EXPECT_TRUE(s.isColliding(cap));
         EXPECT_TRUE(cap.Intersects(s));
     }
 }
