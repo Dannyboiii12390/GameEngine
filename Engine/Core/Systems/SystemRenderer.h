@@ -30,7 +30,7 @@ public:
 
 	// Render a list of entities using the provided command buffer.
 	// Entities containing a ComponentGeometry will be drawn (if valid).
-	void Render(VkCommandBuffer cmd, const std::vector<Entity*>& entities);
+	void Render(VkCommandBuffer cmd, std::vector<Entity>& entities);
 
 private:
 	VulkanRHI* m_RHI = nullptr;

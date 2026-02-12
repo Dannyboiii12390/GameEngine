@@ -1,5 +1,4 @@
-﻿
-#define GLFW_INCLUDE_VULKAN
+﻿#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <iostream>
 
@@ -18,8 +17,9 @@
 
 #include "../PhysicsEngine/Shapes/Sphere.h"
 
+#include <fstream>
+
 /*
-- ImGui integration
 - Render Passes
 - Render Graph
 */
@@ -54,8 +54,14 @@ int main()
         SceneManager sceneManager;
 
         VulkanRHI vulkanRHI;
+
+        #ifndef _DEBUG
+            // Disable validation layers in release builds to avoid their per-call CPU overhead
+            vulkanRHI.EnableValidationLayers(false);
+        #endif
+
 		vulkanRHI.Initialise(&window);
-        vulkanRHI.ToggleVSync(true);    
+        vulkanRHI.ToggleVSync(false);    
 
         GUI gui;
         gui.Create(vulkanRHI, window);
@@ -68,7 +74,7 @@ int main()
 		std::cout << "Colliding? " << (testSphere.isCollidingWith(testSphere2) ? "Yes" : "No") << std::endl;
 
 
-        
+		std::fstream file("fps_log.txt");
 
 
         while (window.getGLFWwindow() && !glfwWindowShouldClose(window.getGLFWwindow()))
@@ -81,8 +87,23 @@ int main()
             scene->Draw();
 
 			static float timeAccumulator = 0.0f;
-			//after 5 seconds, add a new scene on top of the current one to test scene management
+			static int frameCount = 0;
+			static float framTimeAccumulator = 0.0f;
+
+			// Log FPS every second
 			timeAccumulator += deltaTime;
+			framTimeAccumulator += deltaTime;
+            frameCount++; 
+            if (framTimeAccumulator >= 1.0f)
+            { 
+                float fps = frameCount / framTimeAccumulator;
+                std::cout << "FPS: " << fps << std::endl; 
+                file << fps << std::endl; 
+                framTimeAccumulator = 0.0f;
+                frameCount = 0; 
+            }
+
+			//after 5 seconds, add a new scene on top of the current one to test scene management
             if (timeAccumulator > 5.0f)
             {
                 sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI, &gui));

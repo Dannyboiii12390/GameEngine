@@ -109,10 +109,7 @@ void TemplateScene::Draw()
 	VkCommandBuffer cmd = m_vulkanRHI->GetCurrentCommandBuffer();
 	if (cmd != VK_NULL_HANDLE)
 	{
-		std::vector<Entity*> entityPtrs;
-		for (auto& entity : m_entities)
-			entityPtrs.push_back(&entity);
-		m_renderer.Render(cmd, entityPtrs);
+		m_renderer.Render(cmd, m_entities);
 
 
 		if (m_gui)

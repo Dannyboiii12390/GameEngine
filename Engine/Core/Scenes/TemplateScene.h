@@ -49,8 +49,4 @@ private:
 	SystemRenderer m_renderer; // temporary for testing, should be owned by system manager, not scene
 
 	GUI* m_gui;
-
-
-
-
 };

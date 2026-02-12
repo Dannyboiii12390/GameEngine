@@ -23,7 +23,7 @@ void SystemRenderer::Shutdown()
 	m_RHI = nullptr;
 }
 
-void SystemRenderer::Render(VkCommandBuffer cmd, const std::vector<Entity*>& entities)
+void SystemRenderer::Render(VkCommandBuffer cmd, std::vector<Entity>& entities)
 {
 	if (cmd == VK_NULL_HANDLE)
 		return;
@@ -49,9 +49,9 @@ void SystemRenderer::Render(VkCommandBuffer cmd, const std::vector<Entity*>& ent
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
 	}
 
-	for (Entity* e : entities)
+	for (Entity& e : entities)
 	{
-		auto* geom = e->GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+		auto* geom = e.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 		if (!geom || !geom->IsValid())
 		{
 			OutputDebugStringA("SystemRenderer: skipping entity - no valid ComponentGeometry\n");
@@ -92,9 +92,9 @@ void SystemRenderer::Render(VkCommandBuffer cmd, const std::vector<Entity*>& ent
 
 		// Always push a model matrix because the vertex shader expects a push-constant mat4.
 		glm::mat4 transform = glm::mat4(1.0f);
-		if (e->HasComponent(EComponentType::Component_Translation))
+		if (e.HasComponent(EComponentType::Component_Translation))
 		{
-			auto* xf = e->GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+			auto* xf = e.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
 			if (xf)
 			{
 				transform = xf->GetTransformMatrix();
