@@ -30,7 +30,7 @@ jobs:
         run: |
           $projPath = "PhysicsEngine\PhysicsEngine.vcxproj"
           Write-Host "Building project at $projPath"
-          msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /p:AdditionalIncludeDirectories="D:\a\GameEngine\Dependencies\GLM\include" /m
+          msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /m
 
       # 6️⃣ Build TestPhysicsEngine - FIXED PATH
       - name: Build TestPhysicsEngine
