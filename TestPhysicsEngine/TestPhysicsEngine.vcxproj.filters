@@ -33,6 +33,9 @@
     <ClCompile Include="SphereIntersectionCylinderTest.cpp">
       <Filter>ShapeTests</Filter>
     </ClCompile>
+    <ClCompile Include="CapsuleTest.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Shapes\Capsule.h" />
     <ClInclude Include="Shapes\Cylinder.h" />
     <ClInclude Include="Shapes\LineInf.h" />
     <ClInclude Include="Shapes\Plane.h" />
@@ -27,6 +28,7 @@
     <ClInclude Include="Threading\ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Shapes\Capsule.cpp" />
     <ClCompile Include="Shapes\Cylinder.cpp" />
     <ClCompile Include="Shapes\LineInf.cpp" />
     <ClCompile Include="Shapes\Plane.cpp" />

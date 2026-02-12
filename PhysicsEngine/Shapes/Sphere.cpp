@@ -2,6 +2,7 @@
 #include "LineInf.h"
 #include "Plane.h"
 #include "Cylinder.h"
+#include "Capsule.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/epsilon.hpp>
@@ -112,4 +113,9 @@ bool Sphere::Intersects(const Cylinder& cyl) const
     }
 
     return shortestDistanceToCylinderVolume <= m_radius;
+}
+
+bool Sphere::Intersects(const Capsule& cap) const
+{
+	return cap.Intersects(*this);
 }

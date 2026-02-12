@@ -107,6 +107,7 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CapsuleTest.cpp" />
     <ClCompile Include="CylinderTest.cpp" />
     <ClCompile Include="LineSphereIntersectionTest.cpp" />
     <ClCompile Include="LineSphereSegmentTest.cpp" />

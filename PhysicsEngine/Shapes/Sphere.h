@@ -7,6 +7,7 @@ namespace Physics
     class LineInf;
     class Plane;
 	class Cylinder;
+    class Capsule;
 
     class Sphere
     {
@@ -21,6 +22,7 @@ namespace Physics
         bool Intersects(const LineInf& line) const;
         bool Intersects(const Plane& plane) const;
 		bool Intersects(const Cylinder& cyl) const;
+		bool Intersects(const Capsule& cap) const;
 
     private:
         glm::vec3 m_pos;
