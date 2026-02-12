@@ -25,37 +25,39 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore GameEngine.sln
 
-      - name: Show repo root and contents
-        shell: pwsh
-        run: |
-          Write-Host "Current directory: $PWD"
-          Get-ChildItem -Recurse -Name
-
+      # 5️⃣ Build Physics Engine - FIXED PATH
       - name: Build Physics Engine
         shell: pwsh
         run: |
-          $projPath = "GameEngine\PhysicsEngine\PhysicsEngine.vcxproj"
+          $projPath = "PhysicsEngine\PhysicsEngine.vcxproj"
           Write-Host "Building project at $projPath"
           msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /m
 
+      # 6️⃣ Build TestPhysicsEngine - FIXED PATH
       - name: Build TestPhysicsEngine
         shell: pwsh
         run: |
-          $projPath = "GameEngine\TestPhysicsEngine\TestPhysicsEngine.vcxproj"
+          $projPath = "TestPhysicsEngine\TestPhysicsEngine.vcxproj"
           Write-Host "Building project at $projPath"
           msbuild "$projPath" /p:Configuration=Release /p:Platform=x64 /m
 
-      # 7️⃣ Run GoogleTest
+      # 7️⃣ Run GoogleTest - FIXED PATH
       - name: Run GoogleTest
         shell: pwsh
         run: |
-          $exePath = "GameEngine\x64\Release\TestPhysicsEngine.exe"
-
-          if (-Not (Test-Path $exePath)) {
-              Write-Error "❌ TestPhysicsEngine.exe not found at $exePath"
+          # First, let's find where the executable actually is
+          Write-Host "Searching for TestPhysicsEngine.exe..."
+          $exePath = Get-ChildItem -Path . -Recurse -Filter "TestPhysicsEngine.exe" | 
+                     Where-Object { $_.FullName -like "*Release*" } | 
+                     Select-Object -First 1
+          
+          if ($null -eq $exePath) {
+              Write-Error "❌ TestPhysicsEngine.exe not found"
+              Write-Host "`n📁 All .exe files found:"
+              Get-ChildItem -Path . -Recurse -Include *.exe -Name
               exit 1
           }
-
-          Write-Host "✅ Found TestPhysicsEngine.exe at $exePath"
+          
+          Write-Host "✅ Found TestPhysicsEngine.exe at: $($exePath.FullName)"
           Write-Host "Running tests..."
-          & $exePath --gtest_color=yes
+          & $exePath.FullName --gtest_color=yes
