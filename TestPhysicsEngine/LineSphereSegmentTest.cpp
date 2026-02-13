@@ -16,7 +16,7 @@ namespace ShapeTests
 
         LineInf line(start, end);
         float length = glm::length(end - start);
-        EXPECT_TRUE(line.SegmentIntersectsSphere(s, length));
+        EXPECT_TRUE(line.isColliding(s, length));
     }
 
     TEST(LineSegmentSphereTest, Intersects_AtStartOfSegment)
@@ -27,7 +27,7 @@ namespace ShapeTests
 
         LineInf line(start, end);
         float length = glm::length(end - start);
-        EXPECT_TRUE(line.SegmentIntersectsSphere(s, length));
+        EXPECT_TRUE(line.isColliding(s, length));
     }
 
     TEST(LineSegmentSphereTest, Intersects_AtEndOfSegment)
@@ -38,7 +38,7 @@ namespace ShapeTests
 
         LineInf line(start, end);
         float length = glm::length(end - start);
-        EXPECT_TRUE(line.SegmentIntersectsSphere(s, length));
+        EXPECT_TRUE(line.isColliding(s, length));
     }
 
     TEST(LineSegmentSphereTest, NoIntersection_SphereTooFar)
@@ -49,7 +49,7 @@ namespace ShapeTests
 
         LineInf line(start, end);
         float length = glm::length(end - start);
-        EXPECT_FALSE(line.SegmentIntersectsSphere(s, length));
+        EXPECT_FALSE(line.isColliding(s, length));
     }
 
     TEST(LineSegmentSphereTest, NoIntersection_LineIntersectsBeforeStart)
@@ -62,7 +62,7 @@ namespace ShapeTests
 
         LineInf line(start, end);
         float length = glm::length(end - start);
-        EXPECT_FALSE(line.SegmentIntersectsSphere(s, length));
+        EXPECT_FALSE(line.isColliding(s, length));
     }
 
     TEST(LineSegmentSphereTest, NoIntersection_LineIntersectsAfterEnd)
@@ -75,6 +75,6 @@ namespace ShapeTests
 
         LineInf line(start, end);
         float length = glm::length(end - start);
-        EXPECT_FALSE(line.SegmentIntersectsSphere(s, length));
+        EXPECT_FALSE(line.isColliding(s, length));
     }
 }

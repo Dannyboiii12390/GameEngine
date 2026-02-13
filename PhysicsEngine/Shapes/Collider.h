@@ -1,7 +1,8 @@
 #pragma once
+
+
 /* things still to inherit and implement Collider
 LineInf
-Plane
 */
 
 namespace Physics
@@ -12,10 +13,20 @@ namespace Physics
 	class Cylinder;
 	class Plane;
 
+	enum class EColliderType
+	{
+		NONE,
+		SPHERE,
+		LINEINF,
+		CAPSULE,
+		CYLINDER,
+		PLANE
+	};
+
 	class Collider
 	{
 	public: 
-		Collider() = default; 
+		Collider(EColliderType p_type) : m_type(p_type) {};
 		virtual ~Collider() = default; 
 
 		virtual bool isColliding(const Sphere& other) const = 0;
@@ -23,8 +34,7 @@ namespace Physics
 		virtual bool isColliding(const Capsule& other) const = 0;
 		virtual bool isColliding(const Cylinder& other) const = 0;
 		virtual bool isColliding(const Plane& other) const = 0;
-
-
-
+	private:
+		EColliderType m_type = EColliderType::NONE;
 	};
 }

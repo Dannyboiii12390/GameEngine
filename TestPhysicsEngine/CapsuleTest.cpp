@@ -41,7 +41,7 @@ namespace ShapeTests
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 2.0f);
         Sphere s(glm::vec3(5.0f, 1.0f, 0.0f), 0.5f); // projects to middle, inside
         EXPECT_TRUE(s.isColliding(cap));
-        EXPECT_TRUE(cap.Intersects(s));
+        EXPECT_TRUE(cap.isColliding(s));
     }
 
     TEST(CapsuleTest, SphereDoesNotIntersectAtMiddle)
@@ -49,7 +49,7 @@ namespace ShapeTests
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 2.0f);
         Sphere s(glm::vec3(5.0f, 3.5f, 0.0f), 0.5f); // too far radially
         EXPECT_FALSE(s.isColliding(cap));
-        EXPECT_FALSE(cap.Intersects(s));
+        EXPECT_FALSE(cap.isColliding(s));
     }
 
     TEST(CapsuleTest, SphereIntersectsAtStart_Inside)
@@ -57,7 +57,7 @@ namespace ShapeTests
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(0.5f, 0.0f, 0.0f), 0.6f); // inside near start
         EXPECT_TRUE(s.isColliding(cap));
-        EXPECT_TRUE(cap.Intersects(s));
+        EXPECT_TRUE(cap.isColliding(s));
     }
 
     TEST(CapsuleTest, SphereIntersectsAtStart_OutsideButTouching)
@@ -65,7 +65,7 @@ namespace ShapeTests
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(-0.5f, 0.0f, 0.0f), 0.6f); // center before start but radius reaches cap -> intersects
         EXPECT_TRUE(s.isColliding(cap));
-        EXPECT_TRUE(cap.Intersects(s));
+        EXPECT_TRUE(cap.isColliding(s));
     }
 
     TEST(CapsuleTest, SphereIntersectsAtEnd_Inside)
@@ -73,7 +73,7 @@ namespace ShapeTests
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(10.0f, 0.5f, 0.0f), 0.4f); // inside near end
         EXPECT_TRUE(s.isColliding(cap));
-        EXPECT_TRUE(cap.Intersects(s));
+        EXPECT_TRUE(cap.isColliding(s));
     }
 
     TEST(CapsuleTest, SphereIntersectsAtEnd_OutsideButTouching)
@@ -81,6 +81,6 @@ namespace ShapeTests
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
         Sphere s(glm::vec3(10.8f, 0.0f, 0.0f), 1.0f); // center beyond end but radius reaches cap -> intersects
         EXPECT_TRUE(s.isColliding(cap));
-        EXPECT_TRUE(cap.Intersects(s));
+        EXPECT_TRUE(cap.isColliding(s));
     }
 }

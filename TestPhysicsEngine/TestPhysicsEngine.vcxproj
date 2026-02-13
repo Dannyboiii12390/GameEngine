@@ -108,6 +108,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CapsuleTest.cpp" />
+    <ClCompile Include="CollidingCapsuleTest.cpp" />
+    <ClCompile Include="CollidingCylinderTest.cpp" />
+    <ClCompile Include="CollidingLineTest.cpp" />
+    <ClCompile Include="CollidingPlaneTest.cpp" />
+    <ClCompile Include="CollidingSphereTest.cpp" />
     <ClCompile Include="CylinderTest.cpp" />
     <ClCompile Include="LineSphereIntersectionTest.cpp" />
     <ClCompile Include="LineSphereSegmentTest.cpp" />

@@ -36,6 +36,21 @@
     <ClCompile Include="CapsuleTest.cpp">
       <Filter>ShapeTests</Filter>
     </ClCompile>
+    <ClCompile Include="CollidingSphereTest.cpp">
+      <Filter>ShapeTests\isCollidingTests</Filter>
+    </ClCompile>
+    <ClCompile Include="CollidingLineTest.cpp">
+      <Filter>ShapeTests\isCollidingTests</Filter>
+    </ClCompile>
+    <ClCompile Include="CollidingCylinderTest.cpp">
+      <Filter>ShapeTests\isCollidingTests</Filter>
+    </ClCompile>
+    <ClCompile Include="CollidingPlaneTest.cpp">
+      <Filter>ShapeTests\isCollidingTests</Filter>
+    </ClCompile>
+    <ClCompile Include="CollidingCapsuleTest.cpp">
+      <Filter>ShapeTests\isCollidingTests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -46,6 +61,9 @@
     </Filter>
     <Filter Include="ThreadTests">
       <UniqueIdentifier>{87e6a764-c6c8-4230-93c8-b21174d5d20f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ShapeTests\isCollidingTests">
+      <UniqueIdentifier>{d11a1606-049b-4cbd-8209-11246a5893f5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

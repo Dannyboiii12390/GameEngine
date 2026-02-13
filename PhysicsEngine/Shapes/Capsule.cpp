@@ -12,7 +12,7 @@
 using namespace Physics;
 
 Capsule::Capsule(const glm::vec3& a, const glm::vec3& b, float radius)
-    : m_a(a), m_b(b), m_radius(radius)
+	: m_a(a), m_b(b), m_radius(radius), Collider(EColliderType::CAPSULE)
 {
 }
 
@@ -20,19 +20,39 @@ const glm::vec3& Capsule::getA() const { return m_a; }
 const glm::vec3& Capsule::getB() const { return m_b; }
 float Capsule::getRadius() const { return m_radius; }
 
+bool Capsule::ContainsPoint(const glm::vec3& point) const
+{
+    glm::vec3 ab = m_b - m_a;
+    float abLenSq = glm::dot(ab, ab);
+
+    const float EPS = 1e-8f;
+    if (abLenSq <= EPS)
+    {
+        glm::vec3 d = point - m_a;
+        return glm::dot(d, d) <= m_radius * m_radius;
+    }
+
+    float t = glm::dot(point - m_a, ab) / abLenSq;
+    t = std::clamp(t, 0.0f, 1.0f);
+    glm::vec3 closest = m_a + t * ab;
+    glm::vec3 diff = point - closest;
+    return glm::dot(diff, diff) <= m_radius * m_radius;
+}
+
+// Shortest distance between point p and finite segment [a,b]
 static float DistancePointToSegment(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b)
 {
     glm::vec3 ab = b - a;
-    float denom = glm::dot(ab, ab);
-    if (denom == 0.0f)
+    float ab2 = glm::dot(ab, ab);
+    const float EPS = 1e-8f;
+    if (ab2 <= EPS)
         return glm::length(p - a);
 
-    float t = glm::dot(p - a, ab) / denom;
+    float t = glm::dot(p - a, ab) / ab2;
     t = std::clamp(t, 0.0f, 1.0f);
     glm::vec3 closest = a + t * ab;
     return glm::length(p - closest);
 }
-
 // Robust shortest distance between two finite segments [p1,q1] and [p2,q2]
 static float DistanceSegmentToSegment(const glm::vec3& p1, const glm::vec3& q1, const glm::vec3& p2, const glm::vec3& q2)
 {
@@ -45,7 +65,7 @@ static float DistanceSegmentToSegment(const glm::vec3& p1, const glm::vec3& q1, 
     float    c = glm::dot(v, v); // squared length of segment S2
     float    d = glm::dot(u, w);
     float    e = glm::dot(v, w);
-    float    D = a*c - b*b; // always >= 0
+    float    D = a * c - b * b; // always >= 0
 
     float sc, sN, sD = D; // sc = sN / sD
     float tc, tN, tD = D; // tc = tN / tD
@@ -59,8 +79,8 @@ static float DistanceSegmentToSegment(const glm::vec3& p1, const glm::vec3& q1, 
     }
     else {
         // get the closest points on the infinite lines
-        sN = (b*e - c*d);
-        tN = (a*e - b*d);
+        sN = (b * e - c * d);
+        tN = (a * e - b * d);
         if (sN < 0.0f) {
             // sc < 0 => the s=0 edge is visible
             sN = 0.0f;
@@ -112,7 +132,6 @@ static float DistanceSegmentToSegment(const glm::vec3& p1, const glm::vec3& q1, 
 
     return glm::length(dP);
 }
-
 // Shortest distance between finite segment [a,b] and infinite line through l0->l1
 static float DistanceSegmentToInfiniteLine(const glm::vec3& a, const glm::vec3& b, const glm::vec3& l0, const glm::vec3& l1)
 {
@@ -169,19 +188,6 @@ static float DistanceSegmentToInfiniteLine(const glm::vec3& a, const glm::vec3& 
     return glm::length(ptOnSeg - closestOnLine);
 }
 
-bool Capsule::ContainsPoint(const glm::vec3& point) const
-{
-    float dist = DistancePointToSegment(point, m_a, m_b);
-    return dist <= m_radius;
-}
-bool Capsule::Intersects(const Sphere& s) const
-{
-    // Compute minimal distance from sphere center to the capsule's central segment.
-    float dist = DistancePointToSegment(s.getPos(), m_a, m_b);
-    // Intersection occurs when center-to-segment distance <= (capsuleRadius + sphereRadius)
-    return dist <= (m_radius + s.getRadius());
-}
-
 bool Capsule::isColliding(const Sphere& other) const
 {
     // Minimal distance from sphere center to capsule axis segment
@@ -196,11 +202,76 @@ bool Capsule::isColliding(const LineInf& other) const
     float dist = DistanceSegmentToInfiniteLine(m_a, m_b, l0, l1);
     return dist <= m_radius;
 }
-bool Capsule::isColliding(const Capsule& other) const 
+bool Capsule::isColliding(const Capsule& other) const
 {
-    float dist = DistanceSegmentToSegment(m_a, m_b, other.m_a, other.m_b);
-    return dist <= (m_radius + other.m_radius);
+    // Compute squared distance between two segments (from Real-Time Collision Detection)
+    auto segSegDistSq = [](const glm::vec3& p1, const glm::vec3& q1, const glm::vec3& p2, const glm::vec3& q2) -> float
+        {
+            const float EPS = 1e-8f;
+            glm::vec3 d1 = q1 - p1;
+            glm::vec3 d2 = q2 - p2;
+            glm::vec3 r = p1 - p2;
+            float a = glm::dot(d1, d1);
+            float e = glm::dot(d2, d2);
+            float f = glm::dot(d2, r);
+
+            // both degenerate to points
+            if (a <= EPS && e <= EPS)
+            {
+                glm::vec3 diff = p1 - p2;
+                return glm::dot(diff, diff);
+            }
+            // first degenerate -> point-segment
+            if (a <= EPS)
+            {
+                float t = std::clamp(f / e, 0.0f, 1.0f);
+                glm::vec3 c2 = p2 + d2 * t;
+                glm::vec3 diff = p1 - c2;
+                return glm::dot(diff, diff);
+            }
+            // second degenerate -> segment-point
+            if (e <= EPS)
+            {
+                float s = std::clamp(-glm::dot(d1, r) / a, 0.0f, 1.0f);
+                glm::vec3 c1 = p1 + d1 * s;
+                glm::vec3 diff = c1 - p2;
+                return glm::dot(diff, diff);
+            }
+
+            float b = glm::dot(d1, d2);
+            float c = glm::dot(d1, r);
+            float denom = a * e - b * b;
+
+            float s = 0.0f;
+            if (denom != 0.0f)
+                s = std::clamp((b * f - c * e) / denom, 0.0f, 1.0f);
+            else
+                s = 0.0f; // parallel case - pick s = 0 and solve for t
+
+            float t = (b * s + f) / e;
+
+            if (t < 0.0f)
+            {
+                t = 0.0f;
+                s = std::clamp(-c / a, 0.0f, 1.0f);
+            }
+            else if (t > 1.0f)
+            {
+                t = 1.0f;
+                s = std::clamp((b - c) / a, 0.0f, 1.0f);
+            }
+
+            glm::vec3 c1 = p1 + d1 * s;
+            glm::vec3 c2 = p2 + d2 * t;
+            glm::vec3 diff = c1 - c2;
+            return glm::dot(diff, diff);
+        };
+
+    float distSq = segSegDistSq(m_a, m_b, other.m_a, other.m_b);
+    float radiusSum = m_radius + other.m_radius;
+    return distSq <= radiusSum * radiusSum;
 }
+
 bool Capsule::isColliding(const Cylinder& other) const 
 {
     // Treat cylinder axis as a finite segment; check axis-to-axis minimal distance against sum of radii.

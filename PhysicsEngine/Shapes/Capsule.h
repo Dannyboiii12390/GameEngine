@@ -21,9 +21,6 @@ namespace Physics
         // True when point lies inside capsule (inclusive of surface).
         bool ContainsPoint(const glm::vec3& point) const;
 
-        // Sphere-capusle intersection test.
-        bool Intersects(const Sphere& s) const;
-
 		bool isColliding(const Sphere& other) const override; 
         bool isColliding(const LineInf& other) const override;
         bool isColliding(const Capsule& other) const override;

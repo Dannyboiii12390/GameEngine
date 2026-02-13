@@ -1,12 +1,13 @@
 #pragma once
 #include <glm/glm.hpp>
+#include "Collider.h"
 
 namespace Physics
 {
     class Plane;
     class Sphere;
 
-    class LineInf
+	class LineInf : public Collider
     {
     public:
         LineInf(const glm::vec3& a, const glm::vec3& b);
@@ -17,9 +18,14 @@ namespace Physics
         // Returns the closest point on the infinite line to `point`.
         glm::vec3 getShortestPathToPoint(const glm::vec3& point) const;
 
-        // Intersection with sphere (declaration only; implementation in .cpp).
-        bool Intersects(const Sphere& sphere) const;
-        bool SegmentIntersectsSphere(const Sphere& s, float length);
+        bool isColliding(const Sphere& s, float length) const;
+		bool isColliding(const Sphere& other) const override;
+		bool isColliding(const LineInf& other) const override;
+		bool isColliding(const Plane& other) const override;
+		bool isColliding(const Capsule& other) const override;
+		bool isColliding(const Cylinder& other) const override;
+
+
 
     private:
         glm::vec3 m_a;

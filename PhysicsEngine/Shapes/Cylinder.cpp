@@ -11,7 +11,7 @@
 using namespace Physics;
 
 Cylinder::Cylinder(const glm::vec3& a, const glm::vec3& b, float radius)
-    : m_a(a), m_b(b), m_radius(radius)
+	: m_a(a), m_b(b), m_radius(radius), Collider(EColliderType::CYLINDER)
 {
 }
 
@@ -37,76 +37,6 @@ bool Cylinder::ContainsPoint(const glm::vec3& point) const
     glm::vec3 closest = m_a + t * ab;
     glm::vec3 diff = point - closest;
     return glm::dot(diff, diff) <= m_radius * m_radius; // inclusive: on surface counts as inside
-}
-
-bool Cylinder::Intersects(const Sphere& sphere) const
-{
-    const glm::vec3 A = getA();
-    const glm::vec3 B = getB();
-    const float cylR = getRadius();
-    const float sphereR = sphere.getRadius();
-    const glm::vec3 P = sphere.getPos();
-
-    glm::vec3 AB = B - A;
-    float L = glm::length(AB);
-
-    // Degenerate axis -> treat as sphere (cap) at A with radius cylR
-    const float EPS = 1e-6f;
-    if (L <= EPS)
-    {
-        glm::vec3 diff = P - A;
-        float distSq = glm::dot(diff, diff);
-        float radiusSum = cylR + sphereR;
-        return distSq <= radiusSum * radiusSum;
-    }
-
-    glm::vec3 u = AB / L; // unit axis
-    glm::vec3 AP = P - A;
-    float t_raw = glm::dot(AP, u);
-
-    float shortestDistanceToCylinderVolume = 0.0f;
-
-    if (t_raw >= 0.0f && t_raw <= L)
-    {
-        // Projects inside segment - distance to lateral surface
-        glm::vec3 radialVec = AP - t_raw * u;
-        float radialDist = glm::length(radialVec);
-        shortestDistanceToCylinderVolume = std::max(0.0f, radialDist - cylR);
-    }
-    else if (t_raw < 0.0f)
-    {
-        float axialDist = -t_raw;
-        // radial distance relative to axis projection
-        glm::vec3 radialVec = AP - t_raw * u; // AP - (dot(AP,u))*u gives perpendicular component
-        float radialDist = glm::length(radialVec);
-        if (radialDist <= cylR)
-        {
-            shortestDistanceToCylinderVolume = axialDist; // nearest point on cap disk
-        }
-        else
-        {
-            float rimDelta = radialDist - cylR;
-            shortestDistanceToCylinderVolume = std::sqrt(rimDelta * rimDelta + axialDist * axialDist);
-        }
-    }
-    else // t_raw > L
-    {
-        float axialDist = t_raw - L;
-        glm::vec3 radialVec = AP - L * u; // relative to B
-        float radialDist = glm::length(radialVec);
-        if (radialDist <= cylR)
-        {
-            shortestDistanceToCylinderVolume = axialDist;
-        }
-        else
-        {
-            float rimDelta = radialDist - cylR;
-            shortestDistanceToCylinderVolume = std::sqrt(rimDelta * rimDelta + axialDist * axialDist);
-        }
-    }
-
-    // Intersection occurs if distance from sphere center to cylinder volume <= sphere radius
-    return shortestDistanceToCylinderVolume <= sphereR;
 }
 
 bool Cylinder::isColliding(const Sphere& other) const

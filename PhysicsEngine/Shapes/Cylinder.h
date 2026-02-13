@@ -23,7 +23,6 @@ namespace Physics
 
         // Returns true when point is inside the finite cylinder (inclusive of surface).
         bool ContainsPoint(const glm::vec3& point) const;
-		bool Intersects(const Sphere& sphere) const;
 
         bool isColliding(const Sphere& other) const override;
         bool isColliding(const LineInf& other) const override;
