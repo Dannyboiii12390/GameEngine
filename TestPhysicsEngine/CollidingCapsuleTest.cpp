@@ -55,7 +55,7 @@ namespace Collisions
     TEST(CollidingCapsuleTest, Capsule_Capsule_Intersecting)
     {
         Capsule a(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
-        Capsule b(glm::vec3(5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 1.0f);
+        Capsule b(glm::vec3(5.0f, 0.0f, 0.0f), glm::vec3(15.0f, 0.0f, 0.0f), 1.0f);
 
         EXPECT_TRUE(a.isColliding(b));
         EXPECT_TRUE(b.isColliding(a));
@@ -75,7 +75,7 @@ namespace Collisions
     TEST(CollidingCapsuleTest, Capsule_Cylinder_Intersecting)
     {
         Capsule cap(glm::vec3(0.0f), glm::vec3(10.0f, 0.0f, 0.0f), 1.0f);
-        Cylinder cyl(glm::vec3(5.0f), glm::vec3(15.0f, 0.0f, 0.0f), 1.0f);
+        Cylinder cyl(glm::vec3(5.0f, 0.0f, 0.0f), glm::vec3(15.0f, 0.0f, 0.0f), 1.0f);
 
         EXPECT_TRUE(cap.isColliding(cyl));
         EXPECT_TRUE(cyl.isColliding(cap));

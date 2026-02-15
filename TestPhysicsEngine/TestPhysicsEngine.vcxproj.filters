@@ -51,6 +51,9 @@
     <ClCompile Include="CollidingCapsuleTest.cpp">
       <Filter>ShapeTests\isCollidingTests</Filter>
     </ClCompile>
+    <ClCompile Include="IntegrationTest.cpp">
+      <Filter>Maths</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -64,6 +67,9 @@
     </Filter>
     <Filter Include="ShapeTests\isCollidingTests">
       <UniqueIdentifier>{d11a1606-049b-4cbd-8209-11246a5893f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Maths">
+      <UniqueIdentifier>{caca9f19-981a-49cf-87e7-09ac31adf1d1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

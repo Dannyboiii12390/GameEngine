@@ -114,6 +114,7 @@
     <ClCompile Include="CollidingPlaneTest.cpp" />
     <ClCompile Include="CollidingSphereTest.cpp" />
     <ClCompile Include="CylinderTest.cpp" />
+    <ClCompile Include="IntegrationTest.cpp" />
     <ClCompile Include="LineSphereIntersectionTest.cpp" />
     <ClCompile Include="LineSphereSegmentTest.cpp" />
     <ClCompile Include="LineTest.cpp" />

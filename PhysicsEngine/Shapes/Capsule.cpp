@@ -267,8 +267,8 @@ bool Capsule::isColliding(const Capsule& other) const
             return glm::dot(diff, diff);
         };
 
-    float distSq = segSegDistSq(m_a, m_b, other.m_a, other.m_b);
-    float radiusSum = m_radius + other.m_radius;
+    float distSq = segSegDistSq(m_a, m_b, other.getA(), other.getB());
+    float radiusSum = m_radius + other.getRadius();
     return distSq <= radiusSum * radiusSum;
 }
 
