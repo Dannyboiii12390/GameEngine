@@ -10,7 +10,7 @@
 #include "../../IMGUI/imgui.h"
 
 
-TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi), m_gui(p_gui)
+TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi), m_gui(p_gui), m_velocitySystem(m_entities)
 {
 	// Initialize VulkanRHI and Renderer here if needed
 	m_renderer.Initialize(m_vulkanRHI);
@@ -19,11 +19,12 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : m_w
 	//temporary entity creation for testing, should be done in a scene setup function or via a scene editor in the future
 	auto createEntity = [this](Entity& entity, glm::vec3 pos)
 	{
+		static int entityCount = 0;
+
 		entity.AddComponent(EComponentType::Component_Translation, pos, glm::vec3(0.0f), glm::vec3(1.0f));
-		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
+		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(entityCount, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
 
-		static int entityCount = 0;
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 		if (geom)
 		{
@@ -96,6 +97,7 @@ void TemplateScene::Update(float deltaTime)
 			xf->SetRotation(rot);
 		}
 	}
+	m_velocitySystem.OnUpdate(deltaTime);
 }
 void TemplateScene::FixedUpdate()
 {
@@ -146,6 +148,7 @@ void TemplateScene::DeserializeState()
 
 void TemplateScene::AddEntity(Entity&& entity) {
 	m_entities.push_back(std::move(entity));
+	m_velocitySystem = SystemVelocity(m_entities);
 }
 void TemplateScene::RemoveEntity(int index) {
 	if (index >= 0 && index < m_entities.size())

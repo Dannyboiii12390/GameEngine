@@ -8,6 +8,7 @@
 #include "../../Renderer/VulkanRHI.h"
 #include "../../Renderer/Camera.h"
 #include "../../Renderer/GUI.h"
+#include "../Systems/SystemVelocity.h"
 
 class Entity;
 
@@ -47,6 +48,7 @@ private:
 
 
 	SystemRenderer m_renderer; // temporary for testing, should be owned by system manager, not scene
+	SystemVelocity m_velocitySystem; // temporary for testing, should be owned by system manager, not scene
 
 	GUI* m_gui;
 };
