@@ -14,9 +14,32 @@ Texture::Texture()
     : m_Resources(std::make_shared<TextureGPUResources>())
 {
 }
+Texture::Texture(VulkanRHI* rhi, const std::string& path, TextureType type, bool srgb)
+    : m_Resources(std::make_shared<TextureGPUResources>())
+{
+    if (!LoadFromFile(rhi, path, type, srgb))
+    {
+        throw std::runtime_error("Failed to load texture from file: " + path);
+    }
+}
 Texture::~Texture()
 {
-    // Destructor only clears handles; user should call Destroy(rhi) before RHI shutdown.
+    if (m_Resources)
+    {
+        long count = m_Resources.use_count();
+        std::cout << "Texture destroyed (ref_count=" << count << ")";
+
+        if (count == 1)
+        {
+            std::cout << " - Freeing GPU resources";
+        }
+        else
+        {
+            std::cout << " - GPU resources still shared by " << (count - 1) << " other instance(s)";
+        }
+
+        std::cout << std::endl;
+    }
 }
 
 // Copy - shallow copy (share GPU resources)
@@ -365,9 +388,6 @@ void Texture::Destroy(VulkanRHI* rhi)
             m_Resources->ImageMemory = VK_NULL_HANDLE;
         }
     }
-
-    // Reset to an empty GPU resource struct so methods can still safely access m_Resources.
-    m_Resources = std::make_shared<TextureGPUResources>();
 }
 
 uint32_t Texture::FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) const

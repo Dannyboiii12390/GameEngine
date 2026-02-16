@@ -25,6 +25,7 @@ void SceneManager::Shutdown()
 	std::cout << "Number of scenes to shutdown: " << m_scenes.size() << std::endl;
 	while (!m_scenes.empty())
 	{
+		m_scenes.top()->Destroy(); // Call Destroy on the scene to clean up its resources
 		m_scenes.pop();
 	}
 }

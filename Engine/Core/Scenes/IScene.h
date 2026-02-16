@@ -46,6 +46,8 @@ public:
 
 	virtual void HandleInput(float deltaTime) = 0;
 
+	virtual void Destroy() = 0;
+
 private:
 	/// <summary>
 	/// private helper functions for managing entities and components within the scene. These functions can be used internally by the scene to add or remove entities, manage component data, or handle entity lifecycle events. Example: AddEntity() creates a new entity and adds it to the scene, RemoveEntity() deletes an entity and cleans up its components.

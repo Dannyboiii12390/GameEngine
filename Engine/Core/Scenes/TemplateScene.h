@@ -35,6 +35,8 @@ public:
 
 	void HandleInput(float deltaTime) override;
 
+	void Destroy() override;
+
 private:
 	void AddEntity(Entity&& entity) override;
 	void RemoveEntity(int index) override;
@@ -52,4 +54,5 @@ private:
 	SystemPhysics m_physicsSystem;
 
 	GUI* m_gui;
+
 };

@@ -18,7 +18,7 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 
 	//temporary entity creation for testing, should be done in a scene setup function or via a scene editor in the future
-	auto createEntity = [this](Entity& entity, glm::vec3 pos)
+	auto createEntity = [this](Entity& entity, glm::vec3 pos, const Texture& entTex)
 	{
 		static int entityCount = 0;
 
@@ -40,9 +40,7 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			if (!geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), vertSpv, fragSpv))
 				throw std::runtime_error("Failed to create triangle pipeline");
 
-			const std::string texturePath = "red_brick_diff_1k.jpg";
-
-			if (!geom->CreateTexture(m_vulkanRHI, texturePath, TextureType::Albedo, true));
+			if (!geom->AddTexture(m_vulkanRHI, entTex));
 		}
 		entityCount++;
 	};
@@ -50,8 +48,11 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	Entity entity1;
 	Entity entity2;
 
-	createEntity(entity1, glm::vec3(-1.0f));
-	createEntity(entity2, glm::vec3(1.0f, 0.0f, 0.0f));
+	const std::string texturePath = "red_brick_diff_1k.jpg";
+	const Texture entTex(m_vulkanRHI, texturePath, TextureType::Albedo, true);
+
+	createEntity(entity1, glm::vec3(-1.0f), entTex);
+	createEntity(entity2, glm::vec3(1.0f, 0.0f, 0.0f), entTex);
 
 	entity2.AddComponent(EComponentType::Component_Physics);
 
@@ -70,13 +71,25 @@ TemplateScene::~TemplateScene()
 
 		for(auto& entity : m_entities)
 		{
-			auto geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
-			if (geom) geom->Destroy(); // ensure mesh & pipeline free their VkBuffers/VkPipeline while device is still valid and idle
+			entity.Destroy();
 		}
 
 		m_renderer.Shutdown();
 	}
+}
+void TemplateScene::Destroy()
+{
+	if (m_vulkanRHI)
+	{
+		m_vulkanRHI->WaitIdle(); // ensure device idle before destroying GUI resources
 
+		for (auto& entity : m_entities)
+		{
+			entity.Destroy();
+		}
+
+		m_renderer.Shutdown();
+	}
 }
 void TemplateScene::Start(float deltaTime)
 {

@@ -33,6 +33,8 @@ public:
 	bool InitializePipeline(VulkanRHI* rhi, VkRenderPass renderPass, VkExtent2D extent, const std::string& vertSpvPath, const std::string& fragSpvPath);
 
 	bool CreateTexture(VulkanRHI* rhi, const std::string& path, TextureType type, bool srgb);
+	Texture GetTexture() const;
+	bool AddTexture(VulkanRHI* rhi, const Texture& texture);	
 
 	// Bind pipeline and mesh and issue draw commands on the provided command buffer.
 	void BindAndDraw(VkCommandBuffer cmd) const;

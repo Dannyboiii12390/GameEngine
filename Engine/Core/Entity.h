@@ -59,6 +59,20 @@ public:
 				std::cout << "Unsupported component type " << std::endl;
 		}
 	}
+
+	void Destroy()
+	{
+		for (auto& comp : m_Components)
+		{
+			if (HasComponent(EComponentType::Component_Geometry))
+			{
+				auto* geom = GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+				geom->Destroy();
+			}
+		}
+		m_Components.clear();
+	}
+
 	// Retrieve first component with matching type (non-template)
 	IComponent* GetComponent(EComponentType type)
 	{

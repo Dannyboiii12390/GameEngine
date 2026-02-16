@@ -119,9 +119,12 @@ int main()
         }
 
 		vulkanRHI.WaitIdle();
-        gui.Shutdown();
-
+        
+        // IMPORTANT: Destroy all scenes BEFORE shutting down GUI and VulkanRHI
+        // This ensures all texture resources are cleaned up while the device is still valid
         sceneManager.Shutdown();
+        
+        gui.Shutdown();
         vulkanRHI.Shutdown();
         window.Shutdown();
     }

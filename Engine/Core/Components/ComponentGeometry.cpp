@@ -54,16 +54,8 @@ bool ComponentGeometry::CreateTexture(VulkanRHI* rhi, const std::string& path, T
 {
 	if (!rhi) return false;
 
-	// lazy create
-	if (!m_Texture)
-		m_Texture = std::make_unique<Texture>();
-
 	// Load texture from file
-	if (!m_Texture->LoadFromFile(rhi, path, type, srgb))
-	{
-		m_Texture.reset();
-		return false;
-	}
+	m_Texture = std::make_unique<Texture>(rhi, path, type, srgb);
 
 	// Write the texture into RHI descriptor sets (binding = 1 in RHI layout)
 	m_Texture->WriteToDescriptorSets(rhi);
@@ -71,6 +63,22 @@ bool ComponentGeometry::CreateTexture(VulkanRHI* rhi, const std::string& path, T
 	// remember RHI for later destroy
 	m_RHI = rhi;
 	return true;
+}
+bool ComponentGeometry::AddTexture(VulkanRHI* rhi, const Texture& texture)
+{
+	if (!rhi) return false;
+	// Take ownership of the provided texture (shallow copy of GPU resources)
+	m_Texture = std::make_unique<Texture>(texture);
+	// Write the texture into RHI descriptor sets (binding = 1 in RHI layout)
+	m_Texture->WriteToDescriptorSets(rhi);
+	// remember RHI for later destroy
+	m_RHI = rhi;
+	return true;
+}
+Texture ComponentGeometry::GetTexture() const
+{
+	auto* texPtr = m_Texture.get();
+	return Texture(*texPtr);
 }
 void ComponentGeometry::BindAndDraw(VkCommandBuffer cmd) const
 {
