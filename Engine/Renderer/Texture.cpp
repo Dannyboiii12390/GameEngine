@@ -8,55 +8,51 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
+#include <memory>
 
+Texture::Texture()
+    : m_Resources(std::make_shared<TextureGPUResources>())
+{
+}
 Texture::~Texture()
 {
     // Destructor only clears handles; user should call Destroy(rhi) before RHI shutdown.
 }
 
+// Copy - shallow copy (share GPU resources)
+Texture::Texture(const Texture& other)
+{
+    m_Resources = other.m_Resources;
+}
+
+Texture& Texture::operator=(const Texture& other)
+{
+    if (this != &other)
+    {
+        m_Resources = other.m_Resources;
+    }
+    return *this;
+}
+
+// Move - take ownership of the shared_ptr and leave other in a valid empty state.
 Texture::Texture(Texture&& other) noexcept
 {
-    m_Image = other.m_Image;
-    m_ImageMemory = other.m_ImageMemory;
-    m_ImageView = other.m_ImageView;
-    m_Sampler = other.m_Sampler;
-    m_Width = other.m_Width;
-    m_Height = other.m_Height;
-    m_MipLevels = other.m_MipLevels;
-    m_Type = other.m_Type;
-
-    other.m_Image = VK_NULL_HANDLE;
-    other.m_ImageMemory = VK_NULL_HANDLE;
-    other.m_ImageView = VK_NULL_HANDLE;
-    other.m_Sampler = VK_NULL_HANDLE;
-    other.m_Width = other.m_Height = 0;
-    other.m_MipLevels = 1;
-    other.m_Type = TextureType::Unknown;
+    m_Resources = std::move(other.m_Resources);
+    // Ensure the moved-from object still has a valid (empty) resources struct because
+    // other methods expect m_Resources to be non-null.
+    other.m_Resources = std::make_shared<TextureGPUResources>();
 }
 
 Texture& Texture::operator=(Texture&& other) noexcept
 {
     if (this != &other)
     {
-        m_Image = other.m_Image;
-        m_ImageMemory = other.m_ImageMemory;
-        m_ImageView = other.m_ImageView;
-        m_Sampler = other.m_Sampler;
-        m_Width = other.m_Width;
-        m_Height = other.m_Height;
-        m_MipLevels = other.m_MipLevels;
-        m_Type = other.m_Type;
-
-        other.m_Image = VK_NULL_HANDLE;
-        other.m_ImageMemory = VK_NULL_HANDLE;
-        other.m_ImageView = VK_NULL_HANDLE;
-        other.m_Sampler = VK_NULL_HANDLE;
-        other.m_Width = other.m_Height = 0;
-        other.m_MipLevels = 1;
-        other.m_Type = TextureType::Unknown;
+        m_Resources = std::move(other.m_Resources);
+        other.m_Resources = std::make_shared<TextureGPUResources>();
     }
     return *this;
 }
+
 bool Texture::LoadFromFile(VulkanRHI* rhi, const std::string& path, TextureType type, bool srgb)
 {
     if (!rhi) return false;
@@ -129,10 +125,11 @@ bool Texture::LoadFromFile(VulkanRHI* rhi, const std::string& path, TextureType 
     stbi_image_free(pixels);
 
     if (ok) {
-		rhi->RegisterTexture(this);
-	}
+        rhi->RegisterTexture(this);
+    }
     return ok;
 }
+
 bool Texture::CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWidth, int texHeight, int channels, VkFormat format)
 {
     VkDevice device = rhi->GetDevice();
@@ -144,11 +141,11 @@ bool Texture::CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWi
         return false;
     }
 
-    m_Width = static_cast<uint32_t>(texWidth);
-    m_Height = static_cast<uint32_t>(texHeight);
-    m_MipLevels = 1;
+    m_Resources->Width = static_cast<uint32_t>(texWidth);
+    m_Resources->Height = static_cast<uint32_t>(texHeight);
+    m_Resources->MipLevels = 1;
 
-    VkDeviceSize imageSize = static_cast<VkDeviceSize>(m_Width) * m_Height * 4; // we always upload as RGBA8
+    VkDeviceSize imageSize = static_cast<VkDeviceSize>(m_Resources->Width) * m_Resources->Height * 4; // we always upload as RGBA8
 
     // Create staging buffer
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
@@ -189,10 +186,10 @@ bool Texture::CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWi
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = m_Width;
-    imageInfo.extent.height = m_Height;
+    imageInfo.extent.width = m_Resources->Width;
+    imageInfo.extent.height = m_Resources->Height;
     imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = m_MipLevels;
+    imageInfo.mipLevels = m_Resources->MipLevels;
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -201,24 +198,24 @@ bool Texture::CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWi
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateImage(device, &imageInfo, nullptr, &m_Image) != VK_SUCCESS) {
+    if (vkCreateImage(device, &imageInfo, nullptr, &m_Resources->Image) != VK_SUCCESS) {
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
         throw std::runtime_error("Failed to create image");
     }
 
-    vkGetImageMemoryRequirements(device, m_Image, &memReq);
+    vkGetImageMemoryRequirements(device, m_Resources->Image, &memReq);
     allocInfo.allocationSize = memReq.size;
     allocInfo.memoryTypeIndex = FindMemoryType(physical, memReq.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &m_ImageMemory) != VK_SUCCESS) {
-        vkDestroyImage(device, m_Image, nullptr);
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &m_Resources->ImageMemory) != VK_SUCCESS) {
+        vkDestroyImage(device, m_Resources->Image, nullptr);
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
         throw std::runtime_error("Failed to allocate image memory");
     }
 
-    vkBindImageMemory(device, m_Image, m_ImageMemory, 0);
+    vkBindImageMemory(device, m_Resources->Image, m_Resources->ImageMemory, 0);
 
     // Begin single time command buffer
     VkCommandBufferAllocateInfo cmdAllocInfo{};
@@ -245,10 +242,10 @@ bool Texture::CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWi
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = m_Image;
+    barrier.image = m_Resources->Image;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = m_MipLevels;
+    barrier.subresourceRange.levelCount = m_Resources->MipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
     barrier.srcAccessMask = 0;
@@ -273,9 +270,9 @@ bool Texture::CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWi
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
     region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { m_Width, m_Height, 1 };
+    region.imageExtent = { m_Resources->Width, m_Resources->Height, 1 };
 
-    vkCmdCopyBufferToImage(cmdBuf, stagingBuffer, m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    vkCmdCopyBufferToImage(cmdBuf, stagingBuffer, m_Resources->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
     // Transition to SHADER_READ_ONLY_OPTIMAL
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -313,24 +310,25 @@ bool Texture::CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWi
     // Create image view
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = m_Image;
+    viewInfo.image = m_Resources->Image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = format;
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = m_MipLevels;
+    viewInfo.subresourceRange.levelCount = m_Resources->MipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    if (vkCreateImageView(device, &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS) {
+    if (vkCreateImageView(device, &viewInfo, nullptr, &m_Resources->ImageView) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create texture image view");
     }
 
     // Create sampler via RHI helper (respects device/physical)
-    m_Sampler = rhi->CreateSampler();
+    m_Resources->Sampler = rhi->CreateSampler();
 
     return true;
 }
+
 void Texture::Destroy(VulkanRHI* rhi)
 {
     if (!rhi)
@@ -345,30 +343,33 @@ void Texture::Destroy(VulkanRHI* rhi)
 
     VkDevice device = rhi->GetDevice();
 
-    if (m_ImageView != VK_NULL_HANDLE)
+    // Destroy only if we are the last owner of the GPU resources.
+    // If other Texture instances share the same GPU resources (shallow copy),
+    // they will keep the shared_ptr alive and handle destruction or they will call Destroy themselves.
+    if (m_Resources && m_Resources.use_count() == 1)
     {
-        vkDestroyImageView(device, m_ImageView, nullptr);
-        m_ImageView = VK_NULL_HANDLE;
+        if (m_Resources->Sampler != VK_NULL_HANDLE) {
+            vkDestroySampler(device, m_Resources->Sampler, nullptr);
+            m_Resources->Sampler = VK_NULL_HANDLE;
+        }
+        if (m_Resources->ImageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, m_Resources->ImageView, nullptr);
+            m_Resources->ImageView = VK_NULL_HANDLE;
+        }
+        if (m_Resources->Image != VK_NULL_HANDLE) {
+            vkDestroyImage(device, m_Resources->Image, nullptr);
+            m_Resources->Image = VK_NULL_HANDLE;
+        }
+        if (m_Resources->ImageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, m_Resources->ImageMemory, nullptr);
+            m_Resources->ImageMemory = VK_NULL_HANDLE;
+        }
     }
 
-    if (m_Sampler != VK_NULL_HANDLE)
-    {
-        vkDestroySampler(device, m_Sampler, nullptr);
-        m_Sampler = VK_NULL_HANDLE;
-    }
-
-    if (m_Image != VK_NULL_HANDLE)
-    {
-        vkDestroyImage(device, m_Image, nullptr);
-        m_Image = VK_NULL_HANDLE;
-    }
-
-    if (m_ImageMemory != VK_NULL_HANDLE)
-    {
-        vkFreeMemory(device, m_ImageMemory, nullptr);
-        m_ImageMemory = VK_NULL_HANDLE;
-    }
+    // Reset to an empty GPU resource struct so methods can still safely access m_Resources.
+    m_Resources = std::make_shared<TextureGPUResources>();
 }
+
 uint32_t Texture::FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) const
 {
     VkPhysicalDeviceMemoryProperties memProperties;
@@ -381,13 +382,14 @@ uint32_t Texture::FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeF
     }
     throw std::runtime_error("Failed to find suitable memory type");
 }
+
 void Texture::WriteToDescriptorSets(VulkanRHI* rhi) const
 {
     if (!rhi) return;
     VkDevice device = rhi->GetDevice();
     const auto& sets = rhi->GetDescriptorSets();
     if (sets.empty()) return;
-    if (m_ImageView == VK_NULL_HANDLE || m_Sampler == VK_NULL_HANDLE) return;
+    if (m_Resources->ImageView == VK_NULL_HANDLE || m_Resources->Sampler == VK_NULL_HANDLE) return;
 
     std::vector<VkWriteDescriptorSet> descriptorWrites;
     std::vector<VkDescriptorImageInfo> imageInfos;
@@ -398,8 +400,8 @@ void Texture::WriteToDescriptorSets(VulkanRHI* rhi) const
     {
         VkDescriptorImageInfo imgInfo{};
         imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imgInfo.imageView = m_ImageView;
-        imgInfo.sampler = m_Sampler;
+        imgInfo.imageView = m_Resources->ImageView;
+        imgInfo.sampler = m_Resources->Sampler;
         imageInfos.push_back(imgInfo);
 
         VkWriteDescriptorSet descriptorWrite{};

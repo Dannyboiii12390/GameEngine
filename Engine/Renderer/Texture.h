@@ -15,16 +15,57 @@ enum class TextureType
     AO,
     ORM // occlusion-roughness-metallic packed
 };
+struct TextureGPUResources
+{
+    VkImage        Image = VK_NULL_HANDLE;
+    VkDeviceMemory ImageMemory = VK_NULL_HANDLE;
+    VkImageView    ImageView = VK_NULL_HANDLE;
+    VkSampler      Sampler = VK_NULL_HANDLE;
+
+    uint32_t Width = 0;
+    uint32_t Height = 0;
+    uint32_t MipLevels = 1;
+    TextureType Type = TextureType::Unknown;
+
+	VkDevice* device = nullptr; // Pointer to VulkanRHI's device for cleanup
+
+    ~TextureGPUResources()
+    {
+        if (ImageView != VK_NULL_HANDLE)
+        {
+            vkDestroyImageView(*device, ImageView, nullptr);
+            ImageView = VK_NULL_HANDLE;
+        }
+
+        if (Sampler != VK_NULL_HANDLE)
+        {
+            vkDestroySampler(*device, Sampler, nullptr);
+            Sampler = VK_NULL_HANDLE;
+        }
+
+        if (Image != VK_NULL_HANDLE)
+        {
+            vkDestroyImage(*device, Image, nullptr);
+            Image = VK_NULL_HANDLE;
+        }
+
+        if (ImageMemory != VK_NULL_HANDLE)
+        {
+            vkFreeMemory(*device, ImageMemory, nullptr);
+            ImageMemory = VK_NULL_HANDLE;
+        }
+    }
+};
 
 class Texture
 {
 public:
-    Texture() = default;
+    Texture();
     ~Texture();
 
     // Non-copyable
-    Texture(const Texture&) = delete;
-    Texture& operator=(const Texture&) = delete;
+    Texture(const Texture&);
+    Texture& operator=(const Texture&);
 
     // Movable
     Texture(Texture&&) noexcept;
@@ -37,11 +78,11 @@ public:
     // Destroy GPU resources (safe to call multiple times)
     void Destroy(VulkanRHI* rhi);
 
-    VkImage GetImage() const { return m_Image; }
-    VkImageView GetImageView() const { return m_ImageView; }
-    VkSampler GetSampler() const { return m_Sampler; }
-    uint32_t Width() const { return m_Width; }
-    uint32_t Height() const { return m_Height; }
+    VkImage GetImage() const { return m_Resources->Image; }
+    VkImageView GetImageView() const { return m_Resources->ImageView; }
+    VkSampler GetSampler() const { return m_Resources->Sampler; }
+    uint32_t Width() const { return m_Resources->Width; }
+    uint32_t Height() const { return m_Resources->Height; }
 
     // Write this texture into the RHI descriptor sets (binding 1). Safe to call after descriptors allocated.
     void WriteToDescriptorSets(VulkanRHI* rhi) const;
@@ -53,13 +94,5 @@ private:
     VkDeviceSize BytesPerPixel(int channels) const { return static_cast<VkDeviceSize>(channels); }
 
 private:
-    VkImage m_Image = VK_NULL_HANDLE;
-    VkDeviceMemory m_ImageMemory = VK_NULL_HANDLE;
-    VkImageView m_ImageView = VK_NULL_HANDLE;
-    VkSampler m_Sampler = VK_NULL_HANDLE;
-
-    uint32_t m_Width = 0;
-    uint32_t m_Height = 0;
-    uint32_t m_MipLevels = 1;
-    TextureType m_Type = TextureType::Unknown;
+	std::shared_ptr<TextureGPUResources> m_Resources;
 };
