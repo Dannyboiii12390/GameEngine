@@ -1,12 +1,14 @@
 #pragma once
 #include <vector>
 #include <memory>
-#include <type_traits>
-#include <glm/glm.hpp>
+
 #include "Components/IComponent.h"
 #include "Components/ComponentTranslation.h"
 #include "Components/ComponentVelocity.h"
 #include "Components/ComponentGeometry.h"
+#include "Components/ComponentPhysics.h"
+
+#include <iostream>s
 
 class Entity {
 
@@ -46,6 +48,15 @@ public:
 				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Geometry));
 				break;
 			}
+			case EComponentType::Component_Physics:
+			{
+				auto component = std::make_unique<ComponentPhysics>();
+				m_Components.push_back(std::move(component));
+				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Physics));
+				break;
+			}
+			default:
+				std::cout << "Unsupported component type " << std::endl;
 		}
 	}
 	// Retrieve first component with matching type (non-template)

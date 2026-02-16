@@ -25,6 +25,8 @@
 - Render Graph
 */
 
+// Integration class from physics engine is not used
+
 int main()
 {
     try

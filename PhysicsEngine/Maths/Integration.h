@@ -1,6 +1,7 @@
 ﻿#pragma once
+#include <utility>
 
-namespace PhysicsEngine
+namespace Physics
 {
 	enum class EIntegrationMethod
 	{
@@ -20,13 +21,13 @@ namespace PhysicsEngine
 			switch (method)
 			{
 			case EIntegrationMethod::Euler:
-				return Euler(args);
+				return Euler(std::forward<Args>(args)...);
 			case EIntegrationMethod::SemiImplicitEuler:
-				return SemiImplicitEuler(args);
-			case EIntegrationMethod::RungeKutta4:
-				return RungeKutta4(args);
+				return SemiImplicitEuler(std::forward<Args>(args)...);
+			/*case EIntegrationMethod::RungeKutta4:
+				return RungeKutta4(std::forward<Args>(args)...);
 			case EIntegrationMethod::Midpoint:
-				return Midpoint(std::forward<Args>(args)...);
+				return Midpoint(std::forward<Args>(args)...);*/
 
 			}
 		}

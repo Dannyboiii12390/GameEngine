@@ -10,7 +10,8 @@
 #include "../../IMGUI/imgui.h"
 
 
-TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi), m_gui(p_gui), m_velocitySystem(m_entities)
+TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : 
+	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi), m_gui(p_gui), m_velocitySystem(m_entities), m_physicsSystem(m_entities)
 {
 	// Initialize VulkanRHI and Renderer here if needed
 	m_renderer.Initialize(m_vulkanRHI);
@@ -22,7 +23,7 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : m_w
 		static int entityCount = 0;
 
 		entity.AddComponent(EComponentType::Component_Translation, pos, glm::vec3(0.0f), glm::vec3(1.0f));
-		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(entityCount, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
+		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
 
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
@@ -51,6 +52,8 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : m_w
 
 	createEntity(entity1, glm::vec3(-1.0f));
 	createEntity(entity2, glm::vec3(1.0f, 0.0f, 0.0f));
+
+	entity2.AddComponent(EComponentType::Component_Physics);
 
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));
@@ -97,6 +100,7 @@ void TemplateScene::Update(float deltaTime)
 			xf->SetRotation(rot);
 		}
 	}
+	m_physicsSystem.OnUpdate(deltaTime);
 	m_velocitySystem.OnUpdate(deltaTime);
 }
 void TemplateScene::FixedUpdate()
@@ -149,6 +153,7 @@ void TemplateScene::DeserializeState()
 void TemplateScene::AddEntity(Entity&& entity) {
 	m_entities.push_back(std::move(entity));
 	m_velocitySystem = SystemVelocity(m_entities);
+	m_physicsSystem = SystemPhysics(m_entities);
 }
 void TemplateScene::RemoveEntity(int index) {
 	if (index >= 0 && index < m_entities.size())

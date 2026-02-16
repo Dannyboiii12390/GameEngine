@@ -9,6 +9,7 @@
 #include "../../Renderer/Camera.h"
 #include "../../Renderer/GUI.h"
 #include "../Systems/SystemVelocity.h"
+#include "../Systems/SystemPhysics.h"
 
 class Entity;
 
@@ -45,10 +46,10 @@ private:
 	Window* m_window;
 	VulkanRHI* m_vulkanRHI;
 
-
-
-	SystemRenderer m_renderer; // temporary for testing, should be owned by system manager, not scene
-	SystemVelocity m_velocitySystem; // temporary for testing, should be owned by system manager, not scene
+	// temporary for testing, should be owned by system manager, not scene
+	SystemRenderer m_renderer;
+	SystemVelocity m_velocitySystem;
+	SystemPhysics m_physicsSystem;
 
 	GUI* m_gui;
 };

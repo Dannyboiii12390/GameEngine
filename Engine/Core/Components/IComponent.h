@@ -18,7 +18,8 @@ enum class EComponentType : uint32_t
 	Component_Translation = 1u << 0,
 	Component_Velocity = 1u << 1,
 	Component_Geometry = 1u << 2,
-	Component_Audio = 1u << 3
+	Component_Audio = 1u << 3,
+	Component_Physics = 1u << 4,
 };
 inline const uint32_t to_mask(EComponentType type) noexcept
 {

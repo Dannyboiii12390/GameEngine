@@ -153,9 +153,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Core\Components\ComponentGeometry.cpp" />
+    <ClCompile Include="Core\Components\ComponentPhysics.cpp" />
     <ClCompile Include="Core\InputHandler.cpp" />
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
+    <ClCompile Include="Core\Systems\SystemPhysics.cpp" />
     <ClCompile Include="Core\Systems\SystemRenderer.cpp" />
     <ClCompile Include="IMGUI\imgui.cpp" />
     <ClCompile Include="IMGUI\imgui_demo.cpp" />
@@ -177,6 +179,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Components\ComponentGeometry.h" />
+    <ClInclude Include="Core\Components\ComponentPhysics.h" />
     <ClInclude Include="Core\Components\ComponentTranslation.h" />
     <ClInclude Include="Core\Components\ComponentVelocity.h" />
     <ClInclude Include="Core\Components\IComponent.h" />
@@ -186,6 +189,7 @@
     <ClInclude Include="Core\Scenes\IScene.h" />
     <ClInclude Include="Core\Scenes\TemplateScene.h" />
     <ClInclude Include="Core\Systems\ISystem.h" />
+    <ClInclude Include="Core\Systems\SystemPhysics.h" />
     <ClInclude Include="Core\Systems\SystemRenderer.h" />
     <ClInclude Include="Core\Systems\SystemVelocity.h" />
     <ClInclude Include="Renderer\Camera.h" />

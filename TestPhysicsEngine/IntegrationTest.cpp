@@ -5,7 +5,7 @@
 
 namespace Calculus
 {
-    using namespace PhysicsEngine;
+    using namespace Physics;
 
     static void ExpectVecNear(const glm::vec3& a, const glm::vec3& b, float eps = 1e-5f)
     {
