@@ -18,7 +18,7 @@ namespace Threading
 	class ThreadPool
 	{
 	public:
-		ThreadPool(int numThreads);
+		ThreadPool(unsigned int numThreads);
 		~ThreadPool();
 
 		ThreadPool(const ThreadPool&) = delete;

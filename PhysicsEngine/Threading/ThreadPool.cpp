@@ -6,7 +6,7 @@
 
 namespace Threading
 {
-	ThreadPool::ThreadPool(int numThreads)
+	ThreadPool::ThreadPool(unsigned int numThreads)
 	{
 		if(numThreads <= 0)
 			throw std::invalid_argument("Number of threads must be greater than 0");

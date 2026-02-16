@@ -13,10 +13,6 @@ class SystemVelocity : public ISystem
 public:
 	SystemVelocity() : ISystem() { m_SystemType = ESystemType::System_Velocity; }
 
-	SystemVelocity(std::span<Entity> ents) : ISystem()
-	{ 
-		m_SystemType = ESystemType::System_Velocity; 
-	} 
 	void OnUpdate(std::span<Entity> entities, float deltaTime) override
 	{
 		for(auto& entity : entities)

@@ -19,11 +19,6 @@ public:
 		m_SystemType = ESystemType::System_Physics;
 	}
 
-	SystemPhysics(std::span<Entity> ents) : ISystem()
-	{
-		m_SystemType = ESystemType::System_Physics;
-	}
-
 	// Update physics: apply gravity (and any per-object forces handled elsewhere)
 	// This system updates velocities (semi-implicit Euler): v += a * dt.
 	// Position integration is left to SystemVelocity (keep responsibilities separate).

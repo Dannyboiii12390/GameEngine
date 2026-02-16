@@ -35,8 +35,10 @@ static void ShowCollisionInfo(ComponentCollision& comp, Physics::Collider& other
 		<< ". Other collider type: " << TypeToString(otherType) << std::endl;
 }
 
+
 TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : 
-	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi), m_gui(p_gui), m_velocitySystem(m_entities), m_physicsSystem(m_entities)
+	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi),
+	m_gui(p_gui)
 {
 	// Initialize VulkanRHI and Renderer here if needed
 	m_renderer.Initialize(m_vulkanRHI);
@@ -98,7 +100,6 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	m_camera.SetPosition(glm::vec3(2.0f));
 	m_camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
-
 }
 TemplateScene::~TemplateScene()
 {
@@ -153,6 +154,7 @@ void TemplateScene::Update(float deltaTime)
 	m_physicsSystem.OnUpdate(m_entities, deltaTime);
 	m_velocitySystem.OnUpdate(m_entities, deltaTime);
 	m_collisionSystem.OnUpdate(m_entities, deltaTime);
+
 }
 void TemplateScene::FixedUpdate()
 {
@@ -203,8 +205,6 @@ void TemplateScene::DeserializeState()
 
 void TemplateScene::AddEntity(Entity&& entity) {
 	m_entities.push_back(std::move(entity));
-	m_velocitySystem = SystemVelocity(m_entities);
-	m_physicsSystem = SystemPhysics(m_entities);
 }
 void TemplateScene::RemoveEntity(int index) {
 	if (index >= 0 && index < m_entities.size())
