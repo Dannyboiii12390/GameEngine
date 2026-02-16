@@ -1,12 +1,12 @@
 #include "SystemPhysics.h"
 
 
-void SystemPhysics::OnUpdate(float deltaTime)
+void SystemPhysics::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
     // We care about entities that have both physics and velocity.
     EComponentType requiredComponents = EComponentType::Component_Physics | EComponentType::Component_Velocity;
 
-    for (auto& entity : m_Entities)
+    for (auto& entity : entities)
     {
         if (!entity.HasComponent(requiredComponents))
             continue;

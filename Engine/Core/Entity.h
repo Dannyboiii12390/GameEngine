@@ -7,8 +7,9 @@
 #include "Components/ComponentVelocity.h"
 #include "Components/ComponentGeometry.h"
 #include "Components/ComponentPhysics.h"
+#include "Components/ComponentCollision.h"
 
-#include <iostream>s
+#include <iostream>
 
 class Entity {
 
@@ -53,6 +54,13 @@ public:
 				auto component = std::make_unique<ComponentPhysics>();
 				m_Components.push_back(std::move(component));
 				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Physics));
+				break;
+			}
+			case EComponentType::Component_Collision:
+			{
+				auto component = std::make_unique<ComponentCollision>();
+				m_Components.push_back(std::move(component));
+				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Collision));
 				break;
 			}
 			default:

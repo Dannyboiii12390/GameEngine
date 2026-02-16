@@ -16,11 +16,10 @@ public:
 	SystemVelocity(std::span<Entity> ents) : ISystem()
 	{ 
 		m_SystemType = ESystemType::System_Velocity; 
-		m_Entities = ents;
 	} 
-	void OnUpdate(float deltaTime) 
+	void OnUpdate(std::span<Entity> entities, float deltaTime) override
 	{
-		for(auto& entity : m_Entities)
+		for(auto& entity : entities)
 		{
 			EComponentType type = EComponentType::Component_Velocity | EComponentType::Component_Translation;
 			if(entity.HasComponent(type))
@@ -38,9 +37,4 @@ public:
 			}
 		}
 	}
-
-private:
-
-	std::span<Entity> m_Entities;
-
 };

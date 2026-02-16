@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include "../../IMGUI/imgui.h"
+#include "../Components/ComponentCollision.h"
 
 
 TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : 
@@ -29,7 +30,8 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 		if (geom)
 		{
-			auto [verts, indices] = entityCount ? ResourceManager::CreateCubeMesh() : ResourceManager::CreatePlaneMesh();
+			//auto [verts, indices] = entityCount ? ResourceManager::CreateCubeMesh() : ResourceManager::CreatePlaneMesh();
+			auto [verts, indices] = ResourceManager::CreateSphereMesh(16, 16);
 
 			if(!geom->InitializeMesh(m_vulkanRHI, verts, indices))
 				throw std::runtime_error("Failed to initialize triangle mesh");
@@ -51,10 +53,18 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	const std::string texturePath = "red_brick_diff_1k.jpg";
 	const Texture entTex(m_vulkanRHI, texturePath, TextureType::Albedo, true);
 
-	createEntity(entity1, glm::vec3(-1.0f), entTex);
-	createEntity(entity2, glm::vec3(1.0f, 0.0f, 0.0f), entTex);
+	createEntity(entity1, glm::vec3(0.0f, -5.0f, 0.0f), entTex);
+	createEntity(entity2, glm::vec3(0.0f, 0.0f, 0.0f), entTex);
 
+	entity1.AddComponent(EComponentType::Component_Collision);
 	entity2.AddComponent(EComponentType::Component_Physics);
+	entity2.AddComponent(EComponentType::Component_Collision);
+
+	ComponentCollision* col1 = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	ComponentCollision* col2 = entity2.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+
+	col1->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, -5.0f, 0.0f), 1.0f));
+	col2->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f));
 
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));
@@ -113,8 +123,9 @@ void TemplateScene::Update(float deltaTime)
 			xf->SetRotation(rot);
 		}
 	}
-	m_physicsSystem.OnUpdate(deltaTime);
-	m_velocitySystem.OnUpdate(deltaTime);
+	m_physicsSystem.OnUpdate(m_entities, deltaTime);
+	m_velocitySystem.OnUpdate(m_entities, deltaTime);
+	m_collisionSystem.OnUpdate(m_entities, deltaTime);
 }
 void TemplateScene::FixedUpdate()
 {

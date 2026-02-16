@@ -32,6 +32,7 @@
   <ItemGroup>
     <ClCompile Include="Maths\Integration.cpp" />
     <ClCompile Include="Shapes\Capsule.cpp" />
+    <ClCompile Include="Shapes\Collider.cpp" />
     <ClCompile Include="Shapes\Cylinder.cpp" />
     <ClCompile Include="Shapes\LineInf.cpp" />
     <ClCompile Include="Shapes\Plane.cpp" />

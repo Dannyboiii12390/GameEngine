@@ -32,6 +32,11 @@ public:
 	// Entities containing a ComponentGeometry will be drawn (if valid).
 	void Render(VkCommandBuffer cmd, std::vector<Entity>& entities);
 
+	void OnUpdate(std::span<Entity> entities, float deltaTime) override
+	{
+		// This system does not perform updates, only rendering. Render() is called separately by the scene.
+	}
+
 private:
 	VulkanRHI* m_RHI = nullptr;
 };

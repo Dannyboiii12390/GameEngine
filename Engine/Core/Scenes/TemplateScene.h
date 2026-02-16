@@ -10,6 +10,7 @@
 #include "../../Renderer/GUI.h"
 #include "../Systems/SystemVelocity.h"
 #include "../Systems/SystemPhysics.h"
+#include "../Systems/SystemCollision.h"
 
 class Entity;
 
@@ -52,6 +53,7 @@ private:
 	SystemRenderer m_renderer;
 	SystemVelocity m_velocitySystem;
 	SystemPhysics m_physicsSystem;
+	SystemCollision m_collisionSystem;
 
 	GUI* m_gui;
 

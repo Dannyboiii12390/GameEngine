@@ -1,17 +1,21 @@
 #pragma once
-
+#include <span>
 
 enum class ESystemType
 {
 	System_Invalid = 0,
 	System_Velocity = 1,
 	System_Rendering = 1 << 1,
-	System_Physics = 1 << 2
+	System_Physics = 1 << 2,
+	System_Collision = 1 << 3
 };
+class Entity;
 
 class ISystem
 {
 public:
+
+	virtual void OnUpdate(std::span<Entity> entities, float deltaTime) = 0;
 
 	ESystemType GetSystemType() const { return m_SystemType; }
 
