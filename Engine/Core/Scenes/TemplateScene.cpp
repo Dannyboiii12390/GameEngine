@@ -8,8 +8,32 @@
 #include <fstream>
 #include <iostream>
 #include "../../IMGUI/imgui.h"
-#include "../Components/ComponentCollision.h"
 
+static void ShowCollisionInfo(ComponentCollision& comp, Physics::Collider& other)
+{
+	if (!comp.GetCollider())
+	{
+		std::cout << "Collision: this component has no collider.\n";
+		return;
+	}
+
+	auto myType = comp.GetCollider()->getType();
+	auto otherType = other.getType();
+
+	auto TypeToString = [](Physics::EColliderType t) -> const char*
+	{
+		switch (t)
+		{
+		case Physics::EColliderType::SPHERE: return "Sphere";
+		// Add other known collider types here if available:
+		// case Physics::EColliderType::BOX: return "Box";
+		default: return "Unknown";
+		}
+	};
+
+	std::cout << "Collision detected. This collider type: " << TypeToString(myType)
+		<< ". Other collider type: " << TypeToString(otherType) << std::endl;
+}
 
 TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : 
 	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi), m_gui(p_gui), m_velocitySystem(m_entities), m_physicsSystem(m_entities)
@@ -42,7 +66,8 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			if (!geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), vertSpv, fragSpv))
 				throw std::runtime_error("Failed to create triangle pipeline");
 
-			if (!geom->AddTexture(m_vulkanRHI, entTex));
+			if (!geom->AddTexture(m_vulkanRHI, entTex))
+				throw std::runtime_error("Failed to add texture");
 		}
 		entityCount++;
 	};
@@ -65,6 +90,8 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	col1->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, -5.0f, 0.0f), 1.0f));
 	col2->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f));
+	// Pass the function pointer (do not call it here)
+	col2->SetOnCollision(ShowCollisionInfo);
 
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));

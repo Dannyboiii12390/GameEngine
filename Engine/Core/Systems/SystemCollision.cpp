@@ -29,7 +29,7 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 			bool isColliding = collisionComp->Collided(*otherCollision->GetCollider());
 			if(isColliding)
 			{
-				std::cout << "Collision detected between entities!" << std::endl;
+				collisionComp->InvokeCollision(*otherCollision->GetCollider());
 			}
 		}
 	}
