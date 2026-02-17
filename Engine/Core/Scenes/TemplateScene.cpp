@@ -9,18 +9,15 @@
 #include <iostream>
 #include "../../IMGUI/imgui.h"
 
-static void StopMoving(Entity& ent1, Entity& ent2)
+static void CollisionResponse(Entity& self, Entity& other)
 {
-	//set velocity of ent1 to zero
-	if (ent1.HasComponent(EComponentType::Component_Velocity))
-	{
-		auto* vel = ent1.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-		if (vel)
-		{
-			vel->SetPositionalVelocity(glm::vec3(0.0f));
-			std::cout << "Collision response: Stopping entity movement.\n";
-		}
-	}
+	// Example collision response: stop the entity's movement by zeroing its velocity.
+	//ComponentVelocity* velocity = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+	//if (velocity)
+	//{
+	//	velocity->SetPositionalVelocity(glm::vec3(0.0f));
+	//}
+	std::cout << "Collision detected between entities!" << std::endl;
 }
 
 
@@ -33,19 +30,38 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 
 	//temporary entity creation for testing, should be done in a scene setup function or via a scene editor in the future
-	auto createEntity = [this](Entity& entity, glm::vec3 pos, const Texture& entTex)
+	auto createEntity = [this](Entity& entity, glm::vec3 pos, const Texture& entTex, Physics::EColliderType type = Physics::EColliderType::SPHERE)
 	{
 		static int entityCount = 0;
 
 		entity.AddComponent(EComponentType::Component_Translation, pos, glm::vec3(0.0f), glm::vec3(1.0f));
 		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
+		entity.AddComponent(EComponentType::Component_Collision);
 
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 		if (geom)
 		{
-			//auto [verts, indices] = entityCount ? ResourceManager::CreateCubeMesh() : ResourceManager::CreatePlaneMesh();
-			auto [verts, indices] = ResourceManager::CreateSphereMesh(16, 16);
+			MeshData meshData;
+			ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+			ComponentTranslation* xf;
+			switch (type)
+			{
+				case Physics::EColliderType::SPHERE:
+					meshData = ResourceManager::CreateSphereMesh(16, 16);
+					col->SetCollider(std::make_unique<Physics::Sphere>(pos, 1.0f));
+					break;
+				case Physics::EColliderType::PLANE:
+					xf = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+					xf->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f)); // rotate plane to be horizontal
+					meshData = ResourceManager::CreatePlaneMesh();
+					col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
+					break;
+				default:
+					std::cout << "unsupported mesh type for entity" << std::endl;
+					break;
+			}
+			auto [verts, indices] = meshData;
 
 			if(!geom->InitializeMesh(m_vulkanRHI, verts, indices))
 				throw std::runtime_error("Failed to initialize triangle mesh");
@@ -68,26 +84,27 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	const std::string texturePath = "red_brick_diff_1k.jpg";
 	const Texture entTex(m_vulkanRHI, texturePath, TextureType::Albedo, true);
 
-	createEntity(entity1, glm::vec3(0.0f, -5.0f, 0.0f), entTex);
+	createEntity(entity1, glm::vec3(0.0f, -5.0f, 0.0f), entTex, Physics::EColliderType::PLANE);
 	createEntity(entity2, glm::vec3(0.0f, 0.0f, 0.0f), entTex);
 
-	entity1.AddComponent(EComponentType::Component_Collision);
+	//entity1.AddComponent(EComponentType::Component_Collision);
 	entity2.AddComponent(EComponentType::Component_Physics);
-	entity2.AddComponent(EComponentType::Component_Collision);
+	//entity2.AddComponent(EComponentType::Component_Collision);
 
-	ComponentCollision* col1 = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	//ComponentCollision* col1 = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	ComponentCollision* col2 = entity2.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 
-	col1->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, -5.0f, 0.0f), 1.0f));
-	col2->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f));
+	//col1->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, -5.0f, 0.0f), 1.0f));
+	//col2->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f));
+	// 
 	// Pass the function pointer (do not call it here)
-	col2->SetOnCollision(StopMoving);
+	col2->SetOnCollision(CollisionResponse);
 
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));
 
-	m_camera.SetPosition(glm::vec3(2.0f));
-	m_camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+	m_camera.SetPosition(glm::vec3(2.0f, -3.0f, 2.0f));
+	m_camera.LookAt(glm::vec3(0.0f, -5.0f, 0.0f));
 }
 TemplateScene::~TemplateScene()
 {
@@ -129,16 +146,16 @@ void TemplateScene::Update(float deltaTime)
 {
 	m_window->PollEvents();
 
-	if (m_entities[0].HasComponent(EComponentType::Component_Translation))
-	{
-		auto* xf = m_entities[0].GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
-		if (xf)
-		{
-			glm::vec3 rot = xf->Rotation();
-			rot.z += 90.0f * deltaTime; // rotate 90 deg/sec around Z
-			xf->SetRotation(rot);
-		}
-	}
+	//if (m_entities[0].HasComponent(EComponentType::Component_Translation))
+	//{
+	//	auto* xf = m_entities[0].GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+	//	if (xf)
+	//	{
+	//		glm::vec3 rot = xf->Rotation();
+	//		rot.z += 90.0f * deltaTime; // rotate 90 deg/sec around Z
+	//		xf->SetRotation(rot);
+	//	}
+	//}
 	m_physicsSystem.OnUpdate(m_entities, deltaTime);
 	m_velocitySystem.OnUpdate(m_entities, deltaTime);
 	m_collisionSystem.OnUpdate(m_entities, deltaTime);

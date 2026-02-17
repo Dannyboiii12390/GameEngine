@@ -10,6 +10,7 @@
 #include "../../PhysicsEngine/Shapes/Capsule.h"
 #include "../../PhysicsEngine/Shapes/Cylinder.h"
 #include "../../PhysicsEngine/Shapes/Plane.h"
+#include <iostream>
 
 class Entity;
 
@@ -54,7 +55,9 @@ public:
             {
                 const Physics::Sphere* sphereOther = dynamic_cast<const Physics::Sphere*>(&other);
                 if (sphereOther)
+                {
                     return m_collider->isColliding(*sphereOther);
+                }   
                 return false;
             }
             case Physics::EColliderType::LINEINF:
