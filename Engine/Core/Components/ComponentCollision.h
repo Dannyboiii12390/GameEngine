@@ -11,11 +11,13 @@
 #include "../../PhysicsEngine/Shapes/Cylinder.h"
 #include "../../PhysicsEngine/Shapes/Plane.h"
 
+class Entity;
+
 class ComponentCollision : public IComponent
 {
 public:
 
-    using CollisionCallback = std::function<void(ComponentCollision&, Physics::Collider&)>;
+    using CollisionCallback = std::function<void(Entity&, Entity&)>;
 
     ComponentCollision() : IComponent(EComponentType::Component_Collision) {}
 
@@ -27,11 +29,17 @@ public:
 
     // Called by the physics system when a collision occurs.
     // Passes this component and the other collider to the stored callback if present.
-    void InvokeCollision(Physics::Collider& other)
-    {
-        if (m_onCollision)
-            m_onCollision(*this, other);
-    }
+    //
+    // Pseudocode / Plan:
+    // 1. Invoke the stored collision callback if one exists so game logic can respond.
+    // 2. To prevent "sticking" due to overlapping colliders, attempt a best-effort positional fixup:
+    //    - If `Entity` exposes `GetPosition()` and `SetPosition(const glm::vec3&)`, compute the separation
+    //      vector from ent2 to ent1, normalize it, and nudge ent1 slightly along that direction.
+    //    - If separation is near zero, apply a small upward nudge to avoid degenerate direction.
+    //    - Use a small nudge value (e.g. 0.01f) so we don't visibly teleport the entity.
+    // 3. This is a conservative, minimal change to reduce sticking. More robust resolution should be
+    //    handled by the physics system (positional correction / penetration resolution).
+    void InvokeCollision(Entity& ent1, Entity& ent2);
 	Physics::Collider* GetCollider() const { return m_collider.get(); }
 
     // Replace only the Collided method implementation:

@@ -152,6 +152,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Core\Components\ComponentCollision.cpp" />
     <ClCompile Include="Core\Components\ComponentCollision.h" />
     <ClCompile Include="Core\Components\ComponentGeometry.cpp" />
     <ClCompile Include="Core\Components\ComponentPhysics.cpp" />

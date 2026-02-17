@@ -9,30 +9,18 @@
 #include <iostream>
 #include "../../IMGUI/imgui.h"
 
-static void ShowCollisionInfo(ComponentCollision& comp, Physics::Collider& other)
+static void StopMoving(Entity& ent1, Entity& ent2)
 {
-	if (!comp.GetCollider())
+	//set velocity of ent1 to zero
+	if (ent1.HasComponent(EComponentType::Component_Velocity))
 	{
-		std::cout << "Collision: this component has no collider.\n";
-		return;
-	}
-
-	auto myType = comp.GetCollider()->getType();
-	auto otherType = other.getType();
-
-	auto TypeToString = [](Physics::EColliderType t) -> const char*
-	{
-		switch (t)
+		auto* vel = ent1.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+		if (vel)
 		{
-		case Physics::EColliderType::SPHERE: return "Sphere";
-		// Add other known collider types here if available:
-		// case Physics::EColliderType::BOX: return "Box";
-		default: return "Unknown";
+			vel->SetPositionalVelocity(glm::vec3(0.0f));
+			std::cout << "Collision response: Stopping entity movement.\n";
 		}
-	};
-
-	std::cout << "Collision detected. This collider type: " << TypeToString(myType)
-		<< ". Other collider type: " << TypeToString(otherType) << std::endl;
+	}
 }
 
 
@@ -93,7 +81,7 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	col1->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, -5.0f, 0.0f), 1.0f));
 	col2->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f));
 	// Pass the function pointer (do not call it here)
-	col2->SetOnCollision(ShowCollisionInfo);
+	col2->SetOnCollision(StopMoving);
 
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));
