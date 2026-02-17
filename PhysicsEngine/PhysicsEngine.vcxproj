@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Maths\ConservationOfMomentum.h" />
     <ClInclude Include="Maths\Integration.h" />
     <ClInclude Include="Shapes\Capsule.h" />
     <ClInclude Include="Shapes\Collider.h" />

@@ -55,7 +55,7 @@
       <Filter>Maths</Filter>
     </ClCompile>
     <ClCompile Include="ConservationOfMomentumTests.cpp">
-      <Filter>ShapeTests</Filter>
+      <Filter>Maths</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
