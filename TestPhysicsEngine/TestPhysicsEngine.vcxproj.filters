@@ -54,6 +54,9 @@
     <ClCompile Include="IntegrationTest.cpp">
       <Filter>Maths</Filter>
     </ClCompile>
+    <ClCompile Include="ConservationOfMomentumTests.cpp">
+      <Filter>ShapeTests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
