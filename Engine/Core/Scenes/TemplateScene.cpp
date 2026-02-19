@@ -186,10 +186,55 @@ void TemplateScene::Draw()
 
 		if (m_gui)
 		{
+
 			m_gui->NewFrame();
-			ImGui::Begin("Hello, ImGui!");
-			ImGui::Text("This is a simple GUI overlay.");
-			ImGui::End();
+
+			// Simple main menu bar with File and View menus
+			static bool show_demo_window = false;
+			static bool show_about = false;
+
+			if (ImGui::BeginMainMenuBar())
+			{
+				if (ImGui::BeginMenu("File"))
+				{
+					if (ImGui::MenuItem("Exit", "Esc"))
+					{
+						glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
+					}
+					ImGui::EndMenu();
+				}
+
+				if (ImGui::BeginMenu("View"))
+				{
+					ImGui::MenuItem("Show ImGui Demo", nullptr, &show_demo_window);
+					ImGui::MenuItem("About", nullptr, &show_about);
+					ImGui::EndMenu();
+				}
+
+				if (ImGui::BeginMenu("Help"))
+				{
+					if (ImGui::MenuItem("Open Documentation"))
+					{
+						// TODO: open docs or trigger action
+					}
+					ImGui::EndMenu();
+				}
+
+				ImGui::EndMainMenuBar();
+			}
+
+			// Optional windows driven by menu toggles
+			if (show_demo_window)
+				ImGui::ShowDemoWindow(&show_demo_window);
+
+			if (show_about)
+			{
+				ImGui::Begin("About", &show_about);
+				ImGui::Text("GameEngine - ImGui Menu Bar Example");
+				ImGui::Text("Press Esc or use File -> Exit to quit.");
+				ImGui::End();
+			}
+
 			m_gui->Render(cmd);
 		}
 	}
