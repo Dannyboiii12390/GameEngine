@@ -18,6 +18,11 @@ static void CollisionResponse(Entity& self, Entity& other)
 	//	velocity->SetPositionalVelocity(glm::vec3(0.0f));
 	//}
 	std::cout << "Collision detected between entities!" << std::endl;
+	auto* comp_vel = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+	if (comp_vel)
+	{
+		comp_vel->SetPositionalVelocity(glm::vec3(0.0f));
+	}
 }
 
 
@@ -45,17 +50,20 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			MeshData meshData;
 			ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 			ComponentTranslation* xf;
+			auto* transform = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
 			switch (type)
 			{
 				case Physics::EColliderType::SPHERE:
 					meshData = ResourceManager::CreateSphereMesh(16, 16);
-					col->SetCollider(std::make_unique<Physics::Sphere>(pos, 1.0f));
+					col->SetCollider(std::make_unique<Physics::Sphere>(pos, 0.5f)); // radius 0.5 to match unit sphere mesh scaled by 0.5 in translation component
 					break;
 				case Physics::EColliderType::PLANE:
 					xf = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
 					xf->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f)); // rotate plane to be horizontal
 					meshData = ResourceManager::CreatePlaneMesh();
 					col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
+					transform->SetScale(glm::vec3(10.0f));
+
 					break;
 				default:
 					std::cout << "unsupported mesh type for entity" << std::endl;
@@ -103,7 +111,7 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));
 
-	m_camera.SetPosition(glm::vec3(2.0f, -3.0f, 2.0f));
+	m_camera.SetPosition(glm::vec3(5.0f, -1.0f, 5.0f));
 	m_camera.LookAt(glm::vec3(0.0f, -5.0f, 0.0f));
 }
 TemplateScene::~TemplateScene()
