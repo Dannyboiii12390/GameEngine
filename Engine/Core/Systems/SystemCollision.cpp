@@ -29,10 +29,8 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 			bool isColliding = collisionComp->Collided(*otherCollision->GetCollider());
 			if(isColliding)
 			{
-				collisionComp->InvokeCollision(*otherCollision->GetCollider());
+				collisionComp->InvokeCollision(entity, other);
 			}
 		}
 	}
-
-
 }
