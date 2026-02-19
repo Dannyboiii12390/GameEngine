@@ -113,6 +113,7 @@
     <ClCompile Include="CollidingLineTest.cpp" />
     <ClCompile Include="CollidingPlaneTest.cpp" />
     <ClCompile Include="CollidingSphereTest.cpp" />
+    <ClCompile Include="CollisionImpulseTests.cpp" />
     <ClCompile Include="ConservationOfMomentumTests.cpp" />
     <ClCompile Include="CylinderTest.cpp" />
     <ClCompile Include="IntegrationTest.cpp" />

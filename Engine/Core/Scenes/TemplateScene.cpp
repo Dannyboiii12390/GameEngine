@@ -8,91 +8,151 @@
 #include <fstream>
 #include <iostream>
 #include "../../IMGUI/imgui.h"
+#include "../../../PhysicsEngine/Maths/CollisionResolution/ConservationOfMomentum.h"
+#include "../../../PhysicsEngine/Maths/CollisionResolution/CollisionResolution.h"
 
 static void CollisionResponse(Entity& self, Entity& other)
 {
-	// Example collision response: stop the entity's movement by zeroing its velocity.
-	//ComponentVelocity* velocity = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-	//if (velocity)
-	//{
-	//	velocity->SetPositionalVelocity(glm::vec3(0.0f));
-	//}
 	std::cout << "Collision detected between entities!" << std::endl;
-	auto* comp_vel = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-	if (comp_vel)
+
+	auto* selfColComp = self.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	auto* col = selfColComp->GetCollider();
+	if (col->getType() != Physics::EColliderType::SPHERE)
+		return;
+
+	// Gather collider pointer for other entity
+	Physics::Collider* otherCollider = nullptr;
+	if (other.HasComponent(EComponentType::Component_Collision))
 	{
-		glm::vec3 currentVel = comp_vel->GetPositionVelocity();
-		comp_vel->SetPositionalVelocity(-currentVel * 0.9f);
+		ComponentCollision* otherColComp = other.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+		if (otherColComp)
+			otherCollider = otherColComp->GetCollider();
+	}
+	if (!otherCollider)
+		return;
+
+	// Required components on self to update velocity/position
+	ComponentTranslation* transSelf = self.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+	ComponentVelocity* velSelf = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+	ComponentPhysics* physSelf = self.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+
+	if (!transSelf || !velSelf)
+		return;
+
+	// Current data for self
+	glm::vec3 posSelf = transSelf->Position();
+	glm::vec3 vSelf = velSelf->GetPositionVelocity();
+	float massSelf = (physSelf) ? physSelf->GetMass() : 1.0f;
+	float invMassSelf = (physSelf) ? physSelf->GetInverseMass() : 1.0f; // if no physics component, treat as mass 1
+
+	// compute contact normal from other -> points from other surface toward sphere center
+	glm::vec3 contactNormal(0.0f);
+	const float EPS = 1e-6f;
+
+	if (otherCollider->getType() == Physics::EColliderType::PLANE)
+	{
+		auto* plane = dynamic_cast<Physics::Plane*>(otherCollider);
+		if (!plane) return;
+
+		glm::vec3 proj = plane->projectPoint(posSelf);
+		glm::vec3 dir = posSelf - proj;
+		float dist = glm::length(dir);
+		if (dist > EPS)
+			contactNormal = dir / dist;
+		else
+		{
+			// Degenerate: choose plane normal direction using signed distance sign
+			float signedD = plane->signedDistance(posSelf);
+			contactNormal = (std::abs(signedD) > EPS) ? glm::normalize(posSelf - proj) : glm::vec3(0.0f, 1.0f, 0.0f);
+		}
+	}
+	else if (otherCollider->getType() == Physics::EColliderType::SPHERE)
+	{
+		auto* otherSphere = dynamic_cast<Physics::Sphere*>(otherCollider);
+		if (!otherSphere) return;
+		glm::vec3 dir = posSelf - otherSphere->getPos();
+		float len = glm::length(dir);
+		contactNormal = (len > EPS) ? (dir / len) : glm::vec3(0.0f, 1.0f, 0.0f);
+	}
+	else if (otherCollider->getType() == Physics::EColliderType::CYLINDER)
+	{
+		auto* cyl = dynamic_cast<Physics::Cylinder*>(otherCollider);
+		if (!cyl) return;
+
+		glm::vec3 A = cyl->getA();
+		glm::vec3 B = cyl->getB();
+		glm::vec3 AB = B - A;
+		float L = glm::length(AB);
+		if (L <= EPS)
+		{
+			// degenerate -> radial from A
+			glm::vec3 diff = posSelf - A;
+			float dlen = glm::length(diff);
+			contactNormal = (dlen > EPS) ? diff / dlen : glm::vec3(0.0f, 1.0f, 0.0f);
+		}
+		else
+		{
+			glm::vec3 u = AB / L;
+			float t_raw = glm::dot(posSelf - A, u);
+			float t_clamped = std::clamp(t_raw, 0.0f, L);
+			glm::vec3 closest = A + u * t_clamped;
+			glm::vec3 diff = posSelf - closest;
+			float dlen = glm::length(diff);
+			contactNormal = (dlen > EPS) ? diff / dlen : glm::vec3(0.0f, 1.0f, 0.0f);
+		}
+	}
+	else
+	{
+		// Not handled
+		return;
 	}
 
-	//// stop object moving
-	//Physics::Collider* otherCollider = nullptr;
-	//if (other.HasComponent(EComponentType::Component_Collision))
-	//{
-	//    ComponentCollision* otherColComp = other.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-	//    if (otherColComp)
-	//        otherCollider = otherColComp->GetCollider();
-	//}
+	// If the other entity participates in physics with non-zero inverse mass -> two-body resolution
+	ComponentPhysics* physOther = other.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+	ComponentVelocity* velOther = other.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 
-	//if (!otherCollider)
-	//    return;
+	bool otherHasFiniteMass = (physOther && physOther->GetInverseMass() > 0.0f);
+	if (otherHasFiniteMass)
+	{
+		float massOther = physOther->GetMass();
+		glm::vec3 vOther = (velOther) ? velOther->GetPositionVelocity() : glm::vec3(0.0f);
 
-	//// We only handle the common case: a sphere (this) vs a plane (other).
-	//auto* selfColComp = self.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-	//auto* selfCollider = selfColComp->GetCollider();
-	//if (selfCollider->getType() == Physics::EColliderType::SPHERE && otherCollider->getType() == Physics::EColliderType::PLANE)
-	//{
-	//    auto* sphere = dynamic_cast<Physics::Sphere*>(selfCollider);
-	//    auto* plane = dynamic_cast<Physics::Plane*>(otherCollider);
-	//    if (!sphere || !plane)
-	//        return;
+		// Compute elastic collision along the collision normal only:
+		// Project velocities onto the normal and tangential components remain unchanged.
+		glm::vec3 n = contactNormal;
+		glm::vec3 u1n = glm::dot(vSelf, n) * n;
+		glm::vec3 u1t = vSelf - u1n;
+		glm::vec3 u2n = glm::dot(vOther, n) * n;
+		glm::vec3 u2t = vOther - u2n;
 
-	//    // Obtain translation component if present (colliders have been positioned by SystemCollision before this call).
-	//    ComponentTranslation* trans = self.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
-	//    if (!trans)
-	//        return;
+		// Solve 1D elastic collision for normal components
+		auto [v1_after, v2_after] = Physics::ElasticCollision(u1n, u2n, massSelf, massOther);
 
-	//    glm::vec3 pos = trans->Position();
-	//    glm::vec3 proj = plane->projectPoint(pos);
-	//    glm::vec3 dir = pos - proj;
-	//    float dist = glm::length(dir);
-	//    const float EPS = 1e-6f;
-	//    glm::vec3 normal;
-	//    if (dist > EPS)
-	//        normal = dir / dist; // points from plane toward sphere center
-	//    else
-	//    {
-	//        // Degenerate: choose plane normal direction using signed distance sign
-	//        float signedD = plane->signedDistance(pos);
-	//        // if signedD is zero use a safe up vector
-	//        normal = (std::abs(signedD) > EPS) ? glm::normalize(pos - proj) : glm::vec3(0.0f, 1.0f, 0.0f);
-	//    }
+		glm::vec3 newV1 = v1_after + u1t;
+		glm::vec3 newV2 = v2_after + u2t;
 
-	//    float penetration = sphere->getRadius() - dist;
-	//    if (penetration > 0.0f)
-	//    {
-	//        // Push sphere out so it's exactly touching the plane
-	//        glm::vec3 newPos = pos + normal * penetration;
-	//        trans->SetPosition(newPos);
-	//        sphere->setPosition(newPos); // keep collider consistent
+		// Apply velocities back
+		velSelf->SetPositionalVelocity(newV1);
+		if (velOther)
+			velOther->SetPositionalVelocity(newV2);
+	}
+	else
+	{
+		// Treat other as fixed/infinite mass. Use resolver with restitution.
+		// Determine restitution: prefer a restitution stored in physics component if present.
+		float restitution = 1.0f; // default perfectly elastic
+		// If self has a physics component we might expose restitution later; for now use 1.0
+		glm::vec3 newV = Physics::ResolveVelocityAgainstFixedObject(vSelf, restitution, contactNormal);
+		velSelf->SetPositionalVelocity(newV);
 
-	//        // Zero velocity if present
-	//        if (self.HasComponent(EComponentType::Component_Velocity))
-	//        {
-	//            ComponentVelocity* vel = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-	//            if (vel)
-	//                vel->SetPositionalVelocity(glm::vec3(0.0f));
-	//        }
+		// Optional: positional fixup (push sphere out of penetration) could be added here.
+	}
 
-	//        // Clear accumulated physics forces if present
-	//        if (self.HasComponent(EComponentType::Component_Physics))
-	//        {
-	//            ComponentPhysics* phys = self.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
-	//            if (phys)
-	//                phys->ClearForces();
-	//        }
-	//    }
-	//}
+	// Clear accumulated physics forces for self to avoid immediate re-penetration due to stored impulses
+	if (physSelf)
+	{
+		physSelf->ClearForces();
+	}
 }
 
 
@@ -229,6 +289,10 @@ void TemplateScene::Update(float deltaTime)
 	//		xf->SetRotation(rot);
 	//	}
 	//}
+
+	deltaTime = m_paused ? 0.0f : deltaTime;
+
+
 	m_physicsSystem.OnUpdate(m_entities, deltaTime);
 	m_velocitySystem.OnUpdate(m_entities, deltaTime);
 	m_collisionSystem.OnUpdate(m_entities, deltaTime);
@@ -297,6 +361,10 @@ void TemplateScene::Draw()
 				ImGui::Begin("About", &show_about);
 				ImGui::Text("GameEngine - ImGui Menu Bar Example");
 				ImGui::Text("Press Esc or use File -> Exit to quit.");
+				if (ImGui::Button("Start/Stop Simulation"))
+				{
+					m_paused = !m_paused;
+				}
 				ImGui::End();
 			}
 

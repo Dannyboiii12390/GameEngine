@@ -42,7 +42,10 @@
     <ClInclude Include="Maths\Integration.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Maths\ConservationOfMomentum.h">
+    <ClInclude Include="Maths\CollisionResolution\ConservationOfMomentum.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Maths\CollisionResolution\CollisionResolution.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -72,6 +75,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Shapes\Collider.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Maths\CollisionResolution\CollisionResolution.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

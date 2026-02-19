@@ -2,7 +2,7 @@
 #include <glm/glm.hpp>
 #include <tuple>
 
-#include "../PhysicsEngine/Maths/ConservationOfMomentum.h"
+#include "../PhysicsEngine/Maths/CollisionResolution/ConservationOfMomentum.h"
 
 namespace MomentumTests
 {

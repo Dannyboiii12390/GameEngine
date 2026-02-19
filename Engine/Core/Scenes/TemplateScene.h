@@ -57,4 +57,6 @@ private:
 
 	GUI* m_gui;
 
+	bool m_paused;
+
 };

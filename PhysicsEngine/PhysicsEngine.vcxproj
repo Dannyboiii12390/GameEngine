@@ -19,7 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Maths\ConservationOfMomentum.h" />
+    <ClInclude Include="Maths\CollisionResolution\CollisionResolution.h" />
+    <ClInclude Include="Maths\CollisionResolution\ConservationOfMomentum.h" />
     <ClInclude Include="Maths\Integration.h" />
     <ClInclude Include="Shapes\Capsule.h" />
     <ClInclude Include="Shapes\Collider.h" />
@@ -31,6 +32,7 @@
     <ClInclude Include="Threading\ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Maths\CollisionResolution\CollisionResolution.cpp" />
     <ClCompile Include="Maths\Integration.cpp" />
     <ClCompile Include="Shapes\Capsule.cpp" />
     <ClCompile Include="Shapes\Collider.cpp" />

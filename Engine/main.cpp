@@ -211,13 +211,6 @@ int main()
                 framTimeAccumulator = 0.0f;
                 frameCount = 0; 
             }
-
-			//after 5 seconds, add a new scene on top of the current one to test scene management
-            if (timeAccumulator > 5.0f)
-            {
-                sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI, &gui));
-                timeAccumulator = 0.0f;
-            }
         }
 
 		vulkanRHI.WaitIdle();
