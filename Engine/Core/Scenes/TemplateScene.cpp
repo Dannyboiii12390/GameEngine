@@ -34,6 +34,8 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_renderer.Initialize(m_vulkanRHI);
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 
+	m_gui->Create(*rhi, *m_window);
+
 	//temporary entity creation for testing, should be done in a scene setup function or via a scene editor in the future
 	auto createEntity = [this](Entity& entity, glm::vec3 pos, const Texture& entTex, Physics::EColliderType type = Physics::EColliderType::SPHERE)
 	{
@@ -191,7 +193,7 @@ void TemplateScene::Draw()
 
 			// Simple main menu bar with File and View menus
 			static bool show_demo_window = false;
-			static bool show_about = false;
+			static bool show_about = true;
 
 			if (ImGui::BeginMainMenuBar())
 			{

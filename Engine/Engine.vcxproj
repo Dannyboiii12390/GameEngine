@@ -253,10 +253,14 @@
     </CustomBuild>
     <None Include="red_brick_nor_gl_1k.exr" />
     <None Include="red_brick_rough_1k.exr" />
+    <None Include="wood_shutter_nor_gl_1k.exr" />
+    <None Include="wood_shutter_rough_1k.exr" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="red_brick_diff_1k.jpg" />
     <Image Include="red_brick_disp_1k.png" />
+    <Image Include="wood_shutter_diff_1k.jpg" />
+    <Image Include="wood_shutter_disp_1k.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Physics Engine\Physics Engine.vcxproj">

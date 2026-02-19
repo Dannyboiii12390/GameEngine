@@ -143,10 +143,6 @@ int main()
 
 		clientRequest();    
 
-
-
-
-
         if (!glfwInit())
         {
             throw std::runtime_error("Failed to initialize GLFW");
@@ -182,7 +178,6 @@ int main()
         vulkanRHI.ToggleVSync(VsyncOn);    
 
         GUI gui;
-        gui.Create(vulkanRHI, window);
 
 		sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI, &gui));
 
