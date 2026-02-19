@@ -221,7 +221,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <CustomBuild Include="SHADERS\triangle.frag">
+    <CustomBuild Include="SHADERS\object.frag">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
@@ -236,7 +236,7 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).frag" -o "$(ProjectDir)SHADERS\%(Filename).frag.spv</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).frag.spv;%(Outputs)</Outputs>
     </CustomBuild>
-    <CustomBuild Include="SHADERS\triangle.vert">
+    <CustomBuild Include="SHADERS\object.vert">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
@@ -251,16 +251,16 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).vert" -o "$(ProjectDir)SHADERS\%(Filename).vert.spv</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).vert.spv;%(Outputs)</Outputs>
     </CustomBuild>
-    <None Include="red_brick_nor_gl_1k.exr" />
-    <None Include="red_brick_rough_1k.exr" />
-    <None Include="wood_shutter_nor_gl_1k.exr" />
-    <None Include="wood_shutter_rough_1k.exr" />
+    <None Include="Assets\red_brick_nor_gl_1k.exr" />
+    <None Include="Assets\red_brick_rough_1k.exr" />
+    <None Include="Assets\wood_shutter_nor_gl_1k.exr" />
+    <None Include="Assets\wood_shutter_rough_1k.exr" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="red_brick_diff_1k.jpg" />
-    <Image Include="red_brick_disp_1k.png" />
-    <Image Include="wood_shutter_diff_1k.jpg" />
-    <Image Include="wood_shutter_disp_1k.png" />
+    <Image Include="Assets\red_brick_diff_1k.jpg" />
+    <Image Include="Assets\red_brick_disp_1k.png" />
+    <Image Include="Assets\wood_shutter_diff_1k.jpg" />
+    <Image Include="Assets\wood_shutter_disp_1k.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Physics Engine\Physics Engine.vcxproj">

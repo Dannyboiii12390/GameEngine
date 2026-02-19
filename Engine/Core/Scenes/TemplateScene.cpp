@@ -21,8 +21,78 @@ static void CollisionResponse(Entity& self, Entity& other)
 	auto* comp_vel = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 	if (comp_vel)
 	{
-		comp_vel->SetPositionalVelocity(glm::vec3(0.0f));
+		glm::vec3 currentVel = comp_vel->GetPositionVelocity();
+		comp_vel->SetPositionalVelocity(-currentVel * 0.9f);
 	}
+
+	//// stop object moving
+	//Physics::Collider* otherCollider = nullptr;
+	//if (other.HasComponent(EComponentType::Component_Collision))
+	//{
+	//    ComponentCollision* otherColComp = other.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	//    if (otherColComp)
+	//        otherCollider = otherColComp->GetCollider();
+	//}
+
+	//if (!otherCollider)
+	//    return;
+
+	//// We only handle the common case: a sphere (this) vs a plane (other).
+	//auto* selfColComp = self.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	//auto* selfCollider = selfColComp->GetCollider();
+	//if (selfCollider->getType() == Physics::EColliderType::SPHERE && otherCollider->getType() == Physics::EColliderType::PLANE)
+	//{
+	//    auto* sphere = dynamic_cast<Physics::Sphere*>(selfCollider);
+	//    auto* plane = dynamic_cast<Physics::Plane*>(otherCollider);
+	//    if (!sphere || !plane)
+	//        return;
+
+	//    // Obtain translation component if present (colliders have been positioned by SystemCollision before this call).
+	//    ComponentTranslation* trans = self.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+	//    if (!trans)
+	//        return;
+
+	//    glm::vec3 pos = trans->Position();
+	//    glm::vec3 proj = plane->projectPoint(pos);
+	//    glm::vec3 dir = pos - proj;
+	//    float dist = glm::length(dir);
+	//    const float EPS = 1e-6f;
+	//    glm::vec3 normal;
+	//    if (dist > EPS)
+	//        normal = dir / dist; // points from plane toward sphere center
+	//    else
+	//    {
+	//        // Degenerate: choose plane normal direction using signed distance sign
+	//        float signedD = plane->signedDistance(pos);
+	//        // if signedD is zero use a safe up vector
+	//        normal = (std::abs(signedD) > EPS) ? glm::normalize(pos - proj) : glm::vec3(0.0f, 1.0f, 0.0f);
+	//    }
+
+	//    float penetration = sphere->getRadius() - dist;
+	//    if (penetration > 0.0f)
+	//    {
+	//        // Push sphere out so it's exactly touching the plane
+	//        glm::vec3 newPos = pos + normal * penetration;
+	//        trans->SetPosition(newPos);
+	//        sphere->setPosition(newPos); // keep collider consistent
+
+	//        // Zero velocity if present
+	//        if (self.HasComponent(EComponentType::Component_Velocity))
+	//        {
+	//            ComponentVelocity* vel = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+	//            if (vel)
+	//                vel->SetPositionalVelocity(glm::vec3(0.0f));
+	//        }
+
+	//        // Clear accumulated physics forces if present
+	//        if (self.HasComponent(EComponentType::Component_Physics))
+	//        {
+	//            ComponentPhysics* phys = self.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+	//            if (phys)
+	//                phys->ClearForces();
+	//        }
+	//    }
+	//}
 }
 
 
@@ -76,8 +146,8 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			if(!geom->InitializeMesh(m_vulkanRHI, verts, indices))
 				throw std::runtime_error("Failed to initialize triangle mesh");
 
-			const std::string vertSpv = "SHADERS/triangle.vert.spv";
-			const std::string fragSpv = "SHADERS/triangle.frag.spv";
+			const std::string vertSpv = "SHADERS/object.vert.spv";
+			const std::string fragSpv = "SHADERS/object.frag.spv";
 
 			if (!geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), vertSpv, fragSpv))
 				throw std::runtime_error("Failed to create triangle pipeline");
@@ -91,8 +161,8 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	Entity entity1;
 	Entity entity2;
 
-	const Texture entTex(m_vulkanRHI, "red_brick_diff_1k.jpg", TextureType::Albedo, true);
-	const Texture woodTex(m_vulkanRHI, "wood_shutter_diff_1k.jpg", TextureType::Albedo, true);
+	const Texture entTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
+	const Texture woodTex(m_vulkanRHI, "Assets/wood_shutter_diff_1k.jpg", TextureType::Albedo, true);
 
 	createEntity(entity1, glm::vec3(0.0f, -5.0f, 0.0f), entTex, Physics::EColliderType::PLANE);
 	createEntity(entity2, glm::vec3(0.0f, 0.0f, 0.0f), woodTex);
