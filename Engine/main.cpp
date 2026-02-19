@@ -25,7 +25,112 @@
 - Render Graph
 */
 
-// Integration class from physics engine is not used
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <string>
+#include <vector>
+
+#pragma comment(lib, "Ws2_32.lib")
+
+int clientRequest()
+{
+    WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result != 0) {
+        std::cerr << "WSAStartup failed: " << result << "\n";
+        return 1;
+    }
+
+    const char* host = "127.0.0.1";
+    const char* port = "54000";
+
+    addrinfo hints;
+    ZeroMemory(&hints, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;      // IPv4 or IPv6
+    hints.ai_socktype = SOCK_STREAM;  // TCP
+
+    addrinfo* addrResult = nullptr;
+    result = getaddrinfo(host, port, &hints, &addrResult);
+    if (result != 0) {
+        std::cerr << "getaddrinfo failed: " << result << "\n";
+        WSACleanup();
+        return 1;
+    }
+    SOCKET sock = INVALID_SOCKET;
+    for (addrinfo* ptr = addrResult; ptr != nullptr; ptr = ptr->ai_next) {
+        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+        if (sock == INVALID_SOCKET) continue;
+        if (connect(sock, ptr->ai_addr, static_cast<int>(ptr->ai_addrlen)) == 0) {
+            break; // connected
+        }
+        closesocket(sock);
+        sock = INVALID_SOCKET;
+    }
+    freeaddrinfo(addrResult);
+
+    if (sock == INVALID_SOCKET) {
+        std::cerr << "Unable to connect to server.\n";
+        WSACleanup();
+        return 1;
+    }
+
+    std::cout << "Connected to " << host << ":" << port << "\n";
+
+    std::string line;
+    const size_t bufSize = 1024;
+    char recvBuf[bufSize];
+
+    while (true) {
+        std::cout << "Enter message (or 'quit' to exit): ";
+        if (!std::getline(std::cin, line)) break;
+        if (line == "quit") break;
+
+        // Send the data (allow empty strings by sending at least a newline if desired).
+        const char* data = line.c_str();
+        int toSend = static_cast<int>(line.size());
+        int sentTotal = 0;
+        while (sentTotal < toSend) {
+            int n = send(sock, data + sentTotal, toSend - sentTotal, 0);
+            if (n == SOCKET_ERROR) {
+                std::cerr << "send failed: " << WSAGetLastError() << "\n";
+                closesocket(sock);
+                WSACleanup();
+                return 1;
+            }
+            sentTotal += n;
+        }
+        // Receive the echoed bytes. We expect the same number of bytes back.
+        std::vector<char> received;
+        received.reserve(toSend ? toSend : 1);
+        int recvTotal = 0;
+        while (recvTotal < toSend) {
+            int n = recv(sock, recvBuf, static_cast<int>(bufSize), 0);
+            if (n > 0) {
+                received.insert(received.end(), recvBuf, recvBuf + n);
+                recvTotal += n;
+            }
+            else if (n == 0) {
+                std::cout << "Connection closed by server.\n";
+                closesocket(sock);
+                WSACleanup();
+                return 0;
+            }
+            else {
+                std::cerr << "recv failed: " << WSAGetLastError() << "\n";
+                closesocket(sock);
+                WSACleanup();
+                return 1;
+            }
+        }
+        std::string echoed(received.begin(), received.end());
+        std::cout << "Echoed: " << echoed << "\n";
+    }
+
+    closesocket(sock);
+    WSACleanup();
+    return 0;
+}
 
 int main()
 {
@@ -35,6 +140,12 @@ int main()
         #ifdef _OPENMP
         std::cout << "OpenMP is enabled! Max threads: " << omp_get_max_threads() << std::endl;
         #endif
+
+		clientRequest();    
+
+
+
+
 
         if (!glfwInit())
         {

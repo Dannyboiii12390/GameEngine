@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PhysicsEngine", "PhysicsEng
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestPhysicsEngine", "TestPhysicsEngine\TestPhysicsEngine.vcxproj", "{13DA5AB0-BB24-44F8-9BCC-D6B53B903D46}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcxproj", "{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -41,6 +43,14 @@ Global
 		{13DA5AB0-BB24-44F8-9BCC-D6B53B903D46}.Release|x64.Build.0 = Release|x64
 		{13DA5AB0-BB24-44F8-9BCC-D6B53B903D46}.Release|x86.ActiveCfg = Release|Win32
 		{13DA5AB0-BB24-44F8-9BCC-D6B53B903D46}.Release|x86.Build.0 = Release|Win32
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Debug|x64.ActiveCfg = Debug|x64
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Debug|x64.Build.0 = Debug|x64
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Debug|x86.ActiveCfg = Debug|Win32
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Debug|x86.Build.0 = Debug|Win32
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Release|x64.ActiveCfg = Release|x64
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Release|x64.Build.0 = Release|x64
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Release|x86.ActiveCfg = Release|Win32
+		{1E723461-4AE2-44D8-A5A6-A6C3AEA5B180}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
