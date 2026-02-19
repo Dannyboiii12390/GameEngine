@@ -187,9 +187,6 @@ int main()
 		std::cout << "Colliding? " << (testSphere.isColliding(testSphere2) ? "Yes" : "No") << std::endl;
 
 
-		std::fstream file("fps_log.txt");
-
-
         while (window.getGLFWwindow() && !glfwWindowShouldClose(window.getGLFWwindow()))
         {
             float deltaTime = getDeltaTime();
@@ -211,7 +208,6 @@ int main()
             { 
                 float fps = frameCount / framTimeAccumulator;
                 std::cout << "FPS: " << fps << std::endl; 
-                file << fps << std::endl; 
                 framTimeAccumulator = 0.0f;
                 frameCount = 0; 
             }
