@@ -33,7 +33,7 @@ void SystemRenderer::Render(VkCommandBuffer cmd, std::vector<Entity>& entities)
 	// If swapchain extent is available, set viewport/scissor here in case pipeline uses dynamic state.
 	if (m_RHI)
 	{
-		VkExtent2D extent = m_RHI->GetSwapchainExtent();
+		auto extent = m_RHI->GetSwapchainExtent();
 		VkViewport viewport{};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
@@ -75,18 +75,31 @@ void SystemRenderer::Render(VkCommandBuffer cmd, std::vector<Entity>& entities)
 			OutputDebugStringA("SystemRenderer: WARNING - pipeline renderPass != RHI renderPass\n");
 		}
 
-		// Bind pipeline
-		pipeline->Bind(cmd);
-		OutputDebugStringA("SystemRenderer: pipeline bound\n");
-
-		// Bind descriptor sets (camera UBO etc.) if RHI provides them.
-		if (m_RHI)
+		// Prefer binding a per-entity descriptor set if the component provided one.
+		// When an entity supplies its own full descriptor set (it should include the camera UBO copy),
+		// we must bind that set and avoid overwriting it with the global set below.
+		VkDescriptorSet entitySet = geom->GetDescriptorSet();
+		if (entitySet != VK_NULL_HANDLE)
 		{
-			const auto& sets = m_RHI->GetDescriptorSets();
-			if (!sets.empty())
+			// Bind pipeline and the entity's descriptor set (contains camera UBO copy + texture)
+			pipeline->Bind(cmd, entitySet);
+			OutputDebugStringA("SystemRenderer: pipeline bound with entity descriptor set\n");
+		}
+		else
+		{
+			// No entity-specific set: bind pipeline and then bind the RHI global set (camera UBO, etc.)
+			pipeline->Bind(cmd);
+			OutputDebugStringA("SystemRenderer: pipeline bound (no entity descriptor set)\n");
+
+			// Bind descriptor sets (camera UBO etc.) if RHI provides them.
+			if (m_RHI)
 			{
-				// bind only the first set (set 0) which contains the camera UBO in this implementation
-				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetLayout(), 0, 1, &sets[0], 0, nullptr);
+				const auto& sets = m_RHI->GetDescriptorSets();
+				if (!sets.empty())
+				{
+					// bind only the first set (set 0) which contains the camera UBO in this implementation
+					vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetLayout(), 0, 1, &sets[0], 0, nullptr);
+				}
 			}
 		}
 

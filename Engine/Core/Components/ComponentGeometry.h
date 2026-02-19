@@ -36,6 +36,9 @@ public:
 	Texture GetTexture() const;
 	bool AddTexture(VulkanRHI* rhi, const Texture& texture);	
 
+	// Returns the per-entity descriptor set for binding during draw.
+	VkDescriptorSet GetDescriptorSet() const { return m_DescriptorSet; }
+
 	// Bind pipeline and mesh and issue draw commands on the provided command buffer.
 	void BindAndDraw(VkCommandBuffer cmd) const;
 
@@ -55,6 +58,8 @@ private:
 	std::unique_ptr<Mesh> m_Mesh;
 	std::unique_ptr<Pipeline> m_Pipeline;
 	std::unique_ptr<Texture> m_Texture;
+
+	VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE; // per-entity descriptor set
 
 	VulkanRHI* m_RHI = nullptr;
 };

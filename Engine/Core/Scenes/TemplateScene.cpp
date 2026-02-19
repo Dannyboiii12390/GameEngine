@@ -91,23 +91,16 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	Entity entity1;
 	Entity entity2;
 
-	const std::string texturePath = "red_brick_diff_1k.jpg";
-	const Texture entTex(m_vulkanRHI, texturePath, TextureType::Albedo, true);
+	const Texture entTex(m_vulkanRHI, "red_brick_diff_1k.jpg", TextureType::Albedo, true);
+	const Texture woodTex(m_vulkanRHI, "wood_shutter_diff_1k.jpg", TextureType::Albedo, true);
 
 	createEntity(entity1, glm::vec3(0.0f, -5.0f, 0.0f), entTex, Physics::EColliderType::PLANE);
-	createEntity(entity2, glm::vec3(0.0f, 0.0f, 0.0f), entTex);
+	createEntity(entity2, glm::vec3(0.0f, 0.0f, 0.0f), woodTex);
 
-	//entity1.AddComponent(EComponentType::Component_Collision);
 	entity2.AddComponent(EComponentType::Component_Physics);
-	//entity2.AddComponent(EComponentType::Component_Collision);
 
-	//ComponentCollision* col1 = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	ComponentCollision* col2 = entity2.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 
-	//col1->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, -5.0f, 0.0f), 1.0f));
-	//col2->SetCollider(std::make_unique<Physics::Sphere>(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f));
-	// 
-	// Pass the function pointer (do not call it here)
 	col2->SetOnCollision(CollisionResponse);
 
 	AddEntity(std::move(entity1));

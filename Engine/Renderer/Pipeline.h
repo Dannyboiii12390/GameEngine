@@ -34,7 +34,7 @@ public:
     void Destroy();
 
     // Bind pipeline for drawing
-    void Bind(VkCommandBuffer cmd) const;
+    void Bind(VkCommandBuffer cmd, VkDescriptorSet overrideSet = VK_NULL_HANDLE) const;
 
     // Convenience wrapper to push constants using this pipeline's layout.
     // Requires that pipeline layout was created with a matching VkPushConstantRange.

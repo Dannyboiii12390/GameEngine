@@ -295,24 +295,25 @@ void Pipeline::Destroy()
     m_Extent = {};
 }
 
-void Pipeline::Bind(VkCommandBuffer cmd) const
+void Pipeline::Bind(VkCommandBuffer cmd, VkDescriptorSet overrideSet) const
 {
     if (m_Pipeline != VK_NULL_HANDLE && cmd != VK_NULL_HANDLE)
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 
-        // Bind descriptor sets (if any)
+        // Use the per-entity override set if provided, otherwise fall back to the global set.
         const auto& descSets = m_RHI->GetDescriptorSets();
-        if (!descSets.empty())
+        VkDescriptorSet setToBind = (overrideSet != VK_NULL_HANDLE) ? overrideSet
+            : (!descSets.empty() ? descSets[0] : VK_NULL_HANDLE);
+
+        if (setToBind != VK_NULL_HANDLE)
         {
             vkCmdBindDescriptorSets(cmd,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    m_PipelineLayout,
-                                    0,
-                                    1,
-                                    &descSets[0],
-                                    0,
-                                    nullptr);
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                m_PipelineLayout,
+                0, 1,
+                &setToBind,
+                0, nullptr);
         }
     }
 }

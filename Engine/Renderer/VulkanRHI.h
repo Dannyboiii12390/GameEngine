@@ -60,6 +60,10 @@ public:
     VkDescriptorSetLayout GetDescriptorSetLayout() const;
     const std::vector<VkDescriptorSet>& GetDescriptorSets() const;
 
+	// Allocate a new per-entity descriptor set from the pool using the RHI layout.
+// Returns VK_NULL_HANDLE on failure.
+	VkDescriptorSet AllocateTextureDescriptorSet();
+
 	VkSampler CreateSampler();
 
     // Register / unregister textures so RHI can keep descriptor sets valid

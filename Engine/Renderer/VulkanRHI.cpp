@@ -503,6 +503,24 @@ void VulkanRHI::Present()
 	m_CurrentFrame = (m_CurrentFrame + 1) % std::max<size_t>(1, m_InFlightFences.size());
 	m_CurrentImageIndex = UINT32_MAX;
 }
+VkDescriptorSet VulkanRHI::AllocateTextureDescriptorSet()
+{
+	VkDescriptorSetLayout layout = GetDescriptorSetLayout();
+	if (layout == VK_NULL_HANDLE || s_DescriptorPool == VK_NULL_HANDLE)
+		return VK_NULL_HANDLE;
+
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = s_DescriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &layout;
+
+	VkDescriptorSet set = VK_NULL_HANDLE;
+	if (vkAllocateDescriptorSets(m_Device, &allocInfo, &set) != VK_SUCCESS)
+		return VK_NULL_HANDLE;
+
+	return set;
+}
 void VulkanRHI::HandleWindowResize()
 {
 	// Wait for device idle then recreate swapchain resources.
@@ -1132,7 +1150,7 @@ VkSampler VulkanRHI::CreateSampler()
 	samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 	samplerInfo.mipLodBias = 0.0f;
 
-	VkSampler sampler = nullptr;
+	VkSampler sampler = VK_NULL_HANDLE;
 	if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create texture sampler");
 	}
@@ -1814,27 +1832,32 @@ void VulkanRHI::CreateDescriptorPool()
 {
 	if (m_Device == VK_NULL_HANDLE) throw std::runtime_error("CreateDescriptorPool called but device is not initialized");
 
-	// Determine count similarly to AllocateDescriptorSets logic so pool sizes match expected allocations.
-	uint32_t count = static_cast<uint32_t>(m_InFlightFences.size());
-	if (count == 0) count = s_MaxDescriptorFrames;
-	if (!m_SwapchainImages.empty()) {
-		count = std::max<uint32_t>(count, static_cast<uint32_t>(m_SwapchainImages.size()));
-	}
-	count = std::max<uint32_t>(count, s_MaxDescriptorFrames);
+	// Per-frame global sets (one per swapchain image / in-flight frame)
+	uint32_t frameCount = static_cast<uint32_t>(m_InFlightFences.size());
+	if (frameCount == 0) frameCount = s_MaxDescriptorFrames;
+	if (!m_SwapchainImages.empty())
+		frameCount = std::max<uint32_t>(frameCount, static_cast<uint32_t>(m_SwapchainImages.size()));
+	frameCount = std::max<uint32_t>(frameCount, s_MaxDescriptorFrames);
+
+	// Extra budget for per-entity texture descriptor sets allocated via AllocateTextureDescriptorSet()
+	constexpr uint32_t s_MaxEntityDescriptorSets = 64;
+
+	const uint32_t totalSamplerDescriptors = frameCount + s_MaxEntityDescriptorSets;
+	const uint32_t totalSets = frameCount + s_MaxEntityDescriptorSets;
 
 	VkDescriptorPoolSize poolSizes[2]{};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = count;
+	poolSizes[0].descriptorCount = frameCount;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = count;
+	poolSizes[1].descriptorCount = totalSamplerDescriptors;
 
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // allow per-entity sets to be freed individually
 	poolInfo.poolSizeCount = 2;
 	poolInfo.pPoolSizes = poolSizes;
-	poolInfo.maxSets = count;
+	poolInfo.maxSets = totalSets;
 
-	// If a pool already exists (recreate path), destroy it first to avoid leaks.
 	if (s_DescriptorPool != VK_NULL_HANDLE) {
 		vkDestroyDescriptorPool(m_Device, s_DescriptorPool, nullptr);
 		s_DescriptorPool = VK_NULL_HANDLE;
