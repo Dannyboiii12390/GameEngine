@@ -30,6 +30,7 @@
 #include <ws2tcpip.h>
 #include <string>
 #include <vector>
+#include "Core/Scenes/CollideBallWithAnotherBall.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -179,7 +180,7 @@ int main()
 
         GUI gui;
 
-		sceneManager.AddScene(std::make_unique<TemplateScene>(window, &vulkanRHI, &gui));
+		sceneManager.AddScene(std::make_unique<CollideBallWithAnotherBall>(window, &vulkanRHI, &gui));
 
 		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
 		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);

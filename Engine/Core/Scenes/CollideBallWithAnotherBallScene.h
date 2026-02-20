@@ -14,13 +14,13 @@
 class Entity;
 
 
-class TemplateScene : public IScene
+class CollideBallWithAnotherBallScene : public IScene
 {
 public:
-	
-	
-	TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
-	~TemplateScene() override;
+
+
+	CollideBallWithAnotherBallScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
+	~CollideBallWithAnotherBallScene() override;
 
 	void Start(float deltaTime) override;
 	void Stop() override;
@@ -41,7 +41,7 @@ private:
 	void AddEntity(Entity&& entity) override;
 	void RemoveEntity(int index) override;
 
-	
+
 	std::vector<Entity> m_entities;
 	Camera m_camera;
 	InputHandler m_inputHandler;

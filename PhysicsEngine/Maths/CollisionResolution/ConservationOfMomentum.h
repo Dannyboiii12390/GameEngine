@@ -5,14 +5,14 @@
 
 namespace Physics
 {
-	std::tuple<glm::vec3, glm::vec3> InElasticCollision(const glm::vec3& vel1, const glm::vec3& vel2, float m1, float m2)
+	inline std::tuple<glm::vec3, glm::vec3> InElasticCollision(const glm::vec3& vel1, const glm::vec3& vel2, float m1, float m2)
 	{
 		glm::vec3 v1 = (m1 - m2) / (m1 + m2) * vel1 + (2 * m2) / (m1 + m2) * vel2;
 		glm::vec3 v2 = (m2 - m1) / (m1 + m2) * vel2 + (2 * m1) / (m1 + m2) * vel1;
 
 		return std::make_tuple(v1, v2);
 	}
-	std::tuple<glm::vec3, glm::vec3> ElasticCollision(const glm::vec3& vel1, const glm::vec3& vel2, float m1, float m2)
+	inline std::tuple<glm::vec3, glm::vec3> ElasticCollision(const glm::vec3& vel1, const glm::vec3& vel2, float m1, float m2)
 	{
 		const float eps = 1e-8f;
 		float massSum = m1 + m2;

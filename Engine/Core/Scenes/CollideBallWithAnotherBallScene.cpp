@@ -1,11 +1,9 @@
-#include "TemplateScene.h"
-
+#include "CollideBallWithAnotherBallScene.h"
 #include "../Entity.h"
 #include "../../Renderer/VulkanRHI.h"
 #include "../Managers/ResourceManager.h"
 
 #include <chrono>
-#include <fstream>
 #include <iostream>
 #include "../../IMGUI/imgui.h"
 #include "../../../PhysicsEngine/Maths/CollisionResolution/ConservationOfMomentum.h"
@@ -156,7 +154,7 @@ static void CollisionResponse(Entity& self, Entity& other)
 }
 
 
-TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : 
+CollideBallWithAnotherBallScene::CollideBallWithAnotherBallScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi),
 	m_gui(p_gui)
 {
@@ -168,23 +166,23 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	//temporary entity creation for testing, should be done in a scene setup function or via a scene editor in the future
 	auto createEntity = [this](Entity& entity, glm::vec3 pos, const Texture& entTex, Physics::EColliderType type = Physics::EColliderType::SPHERE)
-	{
-		static int entityCount = 0;
-
-		entity.AddComponent(EComponentType::Component_Translation, pos, glm::vec3(0.0f), glm::vec3(1.0f));
-		entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
-		entity.AddComponent(EComponentType::Component_Geometry);
-		entity.AddComponent(EComponentType::Component_Collision);
-
-		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
-		if (geom)
 		{
-			MeshData meshData;
-			ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-			ComponentTranslation* xf;
-			auto* transform = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
-			switch (type)
+			static int entityCount = 0;
+
+			entity.AddComponent(EComponentType::Component_Translation, pos, glm::vec3(0.0f), glm::vec3(1.0f));
+			entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
+			entity.AddComponent(EComponentType::Component_Geometry);
+			entity.AddComponent(EComponentType::Component_Collision);
+
+			ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+			if (geom)
 			{
+				MeshData meshData;
+				ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+				ComponentTranslation* xf;
+				auto* transform = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+				switch (type)
+				{
 				case Physics::EColliderType::SPHERE:
 					meshData = ResourceManager::CreateSphereMesh(16, 16);
 					col->SetCollider(std::make_unique<Physics::Sphere>(pos, 0.5f)); // radius 0.5 to match unit sphere mesh scaled by 0.5 in translation component
@@ -200,23 +198,23 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 				default:
 					std::cout << "unsupported mesh type for entity" << std::endl;
 					break;
+				}
+				auto [verts, indices] = meshData;
+
+				if (!geom->InitializeMesh(m_vulkanRHI, verts, indices))
+					throw std::runtime_error("Failed to initialize triangle mesh");
+
+				const std::string vertSpv = "SHADERS/object.vert.spv";
+				const std::string fragSpv = "SHADERS/object.frag.spv";
+
+				if (!geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), vertSpv, fragSpv))
+					throw std::runtime_error("Failed to create triangle pipeline");
+
+				if (!geom->AddTexture(m_vulkanRHI, entTex))
+					throw std::runtime_error("Failed to add texture");
 			}
-			auto [verts, indices] = meshData;
-
-			if(!geom->InitializeMesh(m_vulkanRHI, verts, indices))
-				throw std::runtime_error("Failed to initialize triangle mesh");
-
-			const std::string vertSpv = "SHADERS/object.vert.spv";
-			const std::string fragSpv = "SHADERS/object.frag.spv";
-
-			if (!geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), vertSpv, fragSpv))
-				throw std::runtime_error("Failed to create triangle pipeline");
-
-			if (!geom->AddTexture(m_vulkanRHI, entTex))
-				throw std::runtime_error("Failed to add texture");
-		}
-		entityCount++;
-	};
+			entityCount++;
+		};
 
 	Entity entity1;
 	Entity entity2;
@@ -224,10 +222,13 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	const Texture entTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	const Texture woodTex(m_vulkanRHI, "Assets/wood_shutter_diff_1k.jpg", TextureType::Albedo, true);
 
-	createEntity(entity1, glm::vec3(0.5f, -5.0f, 0.0f), entTex, Physics::EColliderType::PLANE);
+	createEntity(entity1, glm::vec3(0.5f, -5.0f, 0.0f), entTex);
 	createEntity(entity2, glm::vec3(0.0f, 0.0f, 0.0f), woodTex);
 
 	entity2.AddComponent(EComponentType::Component_Physics);
+	entity1.AddComponent(EComponentType::Component_Physics);
+	ComponentPhysics* phys1 = entity1.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+	phys1->SetAffectedByGravity(false);
 
 	ComponentCollision* col2 = entity2.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 
@@ -239,21 +240,7 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_camera.SetPosition(glm::vec3(5.0f, -1.0f, 5.0f));
 	m_camera.LookAt(glm::vec3(0.0f, -5.0f, 0.0f));
 }
-TemplateScene::~TemplateScene()
-{
-	if (m_vulkanRHI)
-	{
-		m_vulkanRHI->WaitIdle(); // ensure device idle before destroying GUI resources
-
-		for(auto& entity : m_entities)
-		{
-			entity.Destroy();
-		}
-
-		m_renderer.Shutdown();
-	}
-}
-void TemplateScene::Destroy()
+CollideBallWithAnotherBallScene::~CollideBallWithAnotherBallScene()
 {
 	if (m_vulkanRHI)
 	{
@@ -267,15 +254,29 @@ void TemplateScene::Destroy()
 		m_renderer.Shutdown();
 	}
 }
-void TemplateScene::Start(float deltaTime)
+void CollideBallWithAnotherBallScene::Destroy()
+{
+	if (m_vulkanRHI)
+	{
+		m_vulkanRHI->WaitIdle(); // ensure device idle before destroying GUI resources
+
+		for (auto& entity : m_entities)
+		{
+			entity.Destroy();
+		}
+
+		m_renderer.Shutdown();
+	}
+}
+void CollideBallWithAnotherBallScene::Start(float deltaTime)
 {
 	// Example: start a timer, play music, trigger an animation.
 }
-void TemplateScene::Stop()
+void CollideBallWithAnotherBallScene::Stop()
 {
 	// Example: pause a timer, stop music, pause an animation.
 }
-void TemplateScene::Update(float deltaTime)
+void CollideBallWithAnotherBallScene::Update(float deltaTime)
 {
 	m_window->PollEvents();
 
@@ -298,11 +299,11 @@ void TemplateScene::Update(float deltaTime)
 	m_collisionSystem.OnUpdate(m_entities, deltaTime);
 
 }
-void TemplateScene::FixedUpdate()
+void CollideBallWithAnotherBallScene::FixedUpdate()
 {
 	// Example: physics updates at fixed timestep.
 }
-void TemplateScene::Draw()
+void CollideBallWithAnotherBallScene::Draw()
 {
 	m_vulkanRHI->BeginFrame();
 
@@ -374,7 +375,7 @@ void TemplateScene::Draw()
 	m_vulkanRHI->EndFrame();
 	m_vulkanRHI->Present();
 }
-void TemplateScene::HandleInput(float deltaTime) {
+void CollideBallWithAnotherBallScene::HandleInput(float deltaTime) {
 
 	if (m_inputHandler.isKeyPressed(GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
 
@@ -385,19 +386,19 @@ void TemplateScene::HandleInput(float deltaTime) {
 	if (m_inputHandler.isKeyHeld(GLFW_KEY_D)) m_camera.Translate(m_camera.Right() * cameraMoveSpeed * deltaTime);
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 }
-void TemplateScene::SerializeState()
+void CollideBallWithAnotherBallScene::SerializeState()
 {
 	// Example: serialize entity states to a file.
 }
-void TemplateScene::DeserializeState()
+void CollideBallWithAnotherBallScene::DeserializeState()
 {
 	// Example: deserialize entity states from a file.
 }
 
-void TemplateScene::AddEntity(Entity&& entity) {
+void CollideBallWithAnotherBallScene::AddEntity(Entity&& entity) {
 	m_entities.push_back(std::move(entity));
 }
-void TemplateScene::RemoveEntity(int index) {
+void CollideBallWithAnotherBallScene::RemoveEntity(int index) {
 	if (index >= 0 && index < m_entities.size())
 		m_entities.erase(m_entities.begin() + index);
 }

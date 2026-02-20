@@ -37,6 +37,7 @@ public:
 
 	void SetIntegrationMethod(Physics::EIntegrationMethod method) { m_IntegrationMethod = method; }
 	Physics::EIntegrationMethod GetIntegrationMethod() const { return m_IntegrationMethod; }
+	void SetAffectedByGravity(bool affected) { m_IsAffectedByGravity = affected; }
 
 
 private:
