@@ -228,8 +228,12 @@ CollideBallWithAnotherBallScene::CollideBallWithAnotherBallScene(Window& p_windo
 	entity2.AddComponent(EComponentType::Component_Physics);
 	entity1.AddComponent(EComponentType::Component_Physics);
 	ComponentPhysics* phys1 = entity1.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
-	phys1->SetAffectedByGravity(false);
-	phys1->SetMass(2.0f);
+	if (phys1)
+	{
+		phys1->SetAffectedByGravity(false);
+		phys1->SetMass(2.0f);
+	}
+	
 	ComponentTranslation* xf1 = entity1.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
 	xf1->SetScale(glm::vec3(2.0f));
 	ComponentCollision* col1 = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
