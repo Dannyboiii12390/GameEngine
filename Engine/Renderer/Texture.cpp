@@ -148,7 +148,10 @@ bool Texture::LoadFromFile(VulkanRHI* rhi, const std::string& path, TextureType 
     stbi_image_free(pixels);
 
     if (ok) {
-        rhi->RegisterTexture(this);
+        // Register the texture with RHI using a weak_ptr.
+        // If the Texture instance is owned by a shared_ptr, weak_from_this() will be valid.
+        // If not, the weak_ptr will be empty and RegisterTexture will ignore it.
+        rhi->RegisterTexture(this->weak_from_this());
     }
     return ok;
 }
@@ -362,6 +365,7 @@ void Texture::Destroy(VulkanRHI* rhi)
     rhi->WaitIdle();
 
     // Let RHI remove its references (descriptor bookkeeping) to this texture before destroying Vulkan objects.
+    // Keep compatibility: UnregisterTexture accepts raw pointer overload.
     rhi->UnregisterTexture(this);
 
     VkDevice device = rhi->GetDevice();

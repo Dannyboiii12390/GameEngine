@@ -43,7 +43,7 @@ struct TextureGPUResources
     }
 };
 
-class Texture
+class Texture : public std::enable_shared_from_this<Texture>
 {
 public:
     Texture();

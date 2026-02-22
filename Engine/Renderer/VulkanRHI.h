@@ -6,6 +6,7 @@
 #include <tuple>
 #include <cstdint>
 #include <algorithm>
+#include <memory>
 
 class Window;
 class Mesh;
@@ -67,8 +68,9 @@ public:
 	VkSampler CreateSampler();
 
     // Register / unregister textures so RHI can keep descriptor sets valid
-    void RegisterTexture(class Texture* texture);
-    void UnregisterTexture(class Texture* texture);
+    void RegisterTexture(const std::weak_ptr<Texture>& textureWeak);
+    void UnregisterTexture(const std::weak_ptr<Texture>& textureWeak);
+	void UnregisterTexture(Texture* textureRaw);
 
 	void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
 	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);

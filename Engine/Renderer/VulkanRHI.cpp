@@ -81,7 +81,10 @@ namespace {
 	std::vector<VkDescriptorSet> s_DescriptorSets;
 	VkPipelineLayout s_PipelineLayout = VK_NULL_HANDLE;
 
-	static std::vector<Texture*> s_RegisteredTextures;
+	// store weak_ptrs to avoid dangling raw pointers
+	static std::vector<std::weak_ptr<Texture>> s_RegisteredTextures;
+
+	static std::vector<VkDescriptorSet> s_EntityDescriptorSets;
 
 	// Default/fallback 1x1 white texture used to populate binding 1 if no textures are registered.
 	VkImage s_DefaultImage = VK_NULL_HANDLE;
@@ -251,7 +254,6 @@ void VulkanRHI::Initialise(Window* window)
 		m_CurrentFrame = 0;
 	m_CurrentImageIndex = UINT32_MAX;
 }
-
 void VulkanRHI::Shutdown()
 {
 	// Wait for device idle before tearing down
@@ -518,6 +520,10 @@ VkDescriptorSet VulkanRHI::AllocateTextureDescriptorSet()
 	VkDescriptorSet set = VK_NULL_HANDLE;
 	if (vkAllocateDescriptorSets(m_Device, &allocInfo, &set) != VK_SUCCESS)
 		return VK_NULL_HANDLE;
+
+	// Track entity-allocated sets so we can re-write binding 0 if the camera UBO buffer is recreated.
+	// This prevents entity descriptor sets from continuing to refer to a destroyed VkBuffer.
+	s_EntityDescriptorSets.push_back(set);
 
 	return set;
 }
@@ -1189,6 +1195,7 @@ void VulkanRHI::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t tex
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	barrier.subresourceRange.baseArrayLayer = 0;
 	barrier.subresourceRange.layerCount = 1;
+	barrier.subresourceRange.baseMipLevel = 0;
 	barrier.subresourceRange.levelCount = 1;
 
 	int32_t mipWidth = texWidth;
@@ -1832,6 +1839,15 @@ void VulkanRHI::CreateDescriptorPool()
 {
 	if (m_Device == VK_NULL_HANDLE) throw std::runtime_error("CreateDescriptorPool called but device is not initialized");
 
+	// If a pool already exists, keep it and do not recreate/destroy it.
+	// Per-entity descriptor sets (allocated via AllocateTextureDescriptorSet) are
+	// allocated from this pool — destroying the pool invalidates those sets.
+	// To avoid invalidating per-entity descriptor sets held by other systems,
+	// reuse the existing pool when present.
+	if (s_DescriptorPool != VK_NULL_HANDLE) {
+		return;
+	}
+
 	// Per-frame global sets (one per swapchain image / in-flight frame)
 	uint32_t frameCount = static_cast<uint32_t>(m_InFlightFences.size());
 	if (frameCount == 0) frameCount = s_MaxDescriptorFrames;
@@ -1857,11 +1873,6 @@ void VulkanRHI::CreateDescriptorPool()
 	poolInfo.poolSizeCount = 2;
 	poolInfo.pPoolSizes = poolSizes;
 	poolInfo.maxSets = totalSets;
-
-	if (s_DescriptorPool != VK_NULL_HANDLE) {
-		vkDestroyDescriptorPool(m_Device, s_DescriptorPool, nullptr);
-		s_DescriptorPool = VK_NULL_HANDLE;
-	}
 
 	if (vkCreateDescriptorPool(m_Device, &poolInfo, nullptr, &s_DescriptorPool) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create descriptor pool");
@@ -1899,9 +1910,13 @@ void VulkanRHI::AllocateDescriptorSets()
 	CreateCameraUniformBufferAndWriteDescriptors();
 
 	// Re-apply writes for any registered textures so binding 1 is valid for all sets.
-	for (Texture* tex : s_RegisteredTextures) {
-		if (tex) {
-			tex->WriteToDescriptorSets(this);
+	for (auto it = s_RegisteredTextures.begin(); it != s_RegisteredTextures.end(); ) {
+		auto sp = it->lock();
+		if (!sp) {
+			it = s_RegisteredTextures.erase(it);
+		} else {
+			sp->WriteToDescriptorSets(this);
+			++it;
 		}
 	}
 
@@ -1910,84 +1925,259 @@ void VulkanRHI::AllocateDescriptorSets()
 		CreateDefaultTextureForDescriptorSets(this);
 	}
 }
-void VulkanRHI::CreateCameraUniformBufferAndWriteDescriptors()
+
+// RegisterTexture: accept a weak_ptr and store it (skip expired / duplicates)
+void VulkanRHI::RegisterTexture(const std::weak_ptr<Texture>& textureWeak)
 {
-    if (m_Device == VK_NULL_HANDLE) return;
+    auto sp = textureWeak.lock();
+    if (!sp) return;
 
-    // number of descriptor sets (one per frame/image)
-    uint32_t count = static_cast<uint32_t>(s_DescriptorSets.size());
-    if (count == 0) count = 1;
-
-    // compute alignment for uniform buffer offsets
-    VkPhysicalDeviceProperties props{};
-    vkGetPhysicalDeviceProperties(m_PhysicalDevice, &props);
-    VkDeviceSize minAlign = props.limits.minUniformBufferOffsetAlignment;
-    VkDeviceSize entrySize = static_cast<VkDeviceSize>(m_CameraUniformBufferSize);
-    if (minAlign > 0) entrySize = (entrySize + minAlign - 1) & ~(minAlign - 1);
-
-    VkDeviceSize totalSize = entrySize * count;
-
-    // recreate buffer if it already exists (ensures correct size/alignment)
-    if (m_CameraUniformBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(m_Device, m_CameraUniformBuffer, nullptr);
-        m_CameraUniformBuffer = VK_NULL_HANDLE;
-    }
-    if (m_CameraUniformBufferMemory != VK_NULL_HANDLE) {
-        vkFreeMemory(m_Device, m_CameraUniformBufferMemory, nullptr);
-        m_CameraUniformBufferMemory = VK_NULL_HANDLE;
+    // clean expired and check duplicates
+    for (auto it = s_RegisteredTextures.begin(); it != s_RegisteredTextures.end(); ) {
+        auto existing = it->lock();
+        if (!existing) {
+            it = s_RegisteredTextures.erase(it);
+        } else {
+            if (existing.get() == sp.get()) {
+                return; // already registered
+            }
+            ++it;
+        }
     }
 
-    CreateBuffer(totalSize,
-                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 m_CameraUniformBuffer,
-                 m_CameraUniformBufferMemory);
+    s_RegisteredTextures.push_back(textureWeak);
 
-    // write each descriptor set to point to its own region (offset = i * entrySize)
-    for (uint32_t i = 0; i < count; ++i)
-    {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = m_CameraUniformBuffer;
-        bufferInfo.offset = static_cast<VkDeviceSize>(i) * entrySize;
-        bufferInfo.range = static_cast<VkDeviceSize>(m_CameraUniformBufferSize); // actual data size
-
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = s_DescriptorSets[i];
-        descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
-
-        vkUpdateDescriptorSets(m_Device, 1, &descriptorWrite, 0, nullptr);
+    // If descriptor sets already exist, immediately write descriptors for this texture
+    if (!s_DescriptorSets.empty()) {
+        sp->WriteToDescriptorSets(this);
     }
 }
-void VulkanRHI::RegisterTexture(Texture* texture)
-{
-	if (!texture) return;
-	if (std::find(s_RegisteredTextures.begin(), s_RegisteredTextures.end(), texture) == s_RegisteredTextures.end()) {
-		s_RegisteredTextures.push_back(texture);
-	}
-	// If descriptor sets already exist, immediately write descriptors for this texture
-	if (!s_DescriptorSets.empty()) {
-		texture->WriteToDescriptorSets(this);
-	}
-}
+
+// UnregisterTexture overload taking raw pointer (keeps backward compatibility)
 void VulkanRHI::UnregisterTexture(Texture* texture)
 {
 	if (!texture) return;
-	auto it = std::find(s_RegisteredTextures.begin(), s_RegisteredTextures.end(), texture);
-	if (it != s_RegisteredTextures.end()) s_RegisteredTextures.erase(it);
+
+	for (auto it = s_RegisteredTextures.begin(); it != s_RegisteredTextures.end(); ) {
+		auto sp = it->lock();
+		if (!sp || sp.get() == texture) {
+			it = s_RegisteredTextures.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
+
+	// If descriptor sets exist, ensure they no longer reference the removed texture.
+	// Replace binding 1 with the RHI default image/sampler (create default if necessary).
+	if (!s_DescriptorSets.empty()) {
+		// Ensure default texture exists and has been written into sets at least once.
+		if (!s_DefaultTextureCreated) {
+			CreateDefaultTextureForDescriptorSets(this);
+		}
+
+		// If default exists now, write it into every descriptor set at binding 1.
+		if (s_DefaultTextureCreated && s_DefaultImageView != VK_NULL_HANDLE && s_DefaultSampler != VK_NULL_HANDLE) {
+			std::vector<VkWriteDescriptorSet> descriptorWrites;
+			std::vector<VkDescriptorImageInfo> imageInfos;
+			descriptorWrites.reserve(s_DescriptorSets.size());
+			imageInfos.reserve(s_DescriptorSets.size());
+
+			for (size_t i = 0; i < s_DescriptorSets.size(); ++i) {
+				VkDescriptorImageInfo imgInfo{};
+				imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				imgInfo.imageView = s_DefaultImageView;
+				imgInfo.sampler = s_DefaultSampler;
+				imageInfos.push_back(imgInfo);
+
+				VkWriteDescriptorSet w{};
+				w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				w.dstSet = s_DescriptorSets[i];
+				w.dstBinding = 1;
+				w.dstArrayElement = 0;
+				w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				w.descriptorCount = 1;
+				w.pImageInfo = &imageInfos.back();
+				descriptorWrites.push_back(w);
+			}
+
+			if (!descriptorWrites.empty()) {
+				vkUpdateDescriptorSets(m_Device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+			}
+		}
+	}
+}
+// UnregisterTexture overload taking weak_ptr
+void VulkanRHI::UnregisterTexture(const std::weak_ptr<Texture>& textureWeak)
+{
+    if (std::shared_ptr<Texture> sp = textureWeak.lock()) {
+        UnregisterTexture(sp.get());
+    }
+}
+void VulkanRHI::CreateCameraUniformBufferAndWriteDescriptors()
+{
+	if (m_Device == VK_NULL_HANDLE)
+		throw std::runtime_error("CreateCameraUniformBufferAndWriteDescriptors called but device is not initialized");
+
+	// Determine how many per-frame UBO regions we need (match AllocateDescriptorSets logic).
+	uint32_t count = static_cast<uint32_t>(m_InFlightFences.size());
+	if (count == 0) count = s_MaxDescriptorFrames;
+	if (!m_SwapchainImages.empty()) {
+		count = std::max<uint32_t>(count, static_cast<uint32_t>(m_SwapchainImages.size()));
+	}
+	count = std::max<uint32_t>(count, s_MaxDescriptorFrames);
+
+	// Total buffer size holds 'count' consecutive regions of size m_CameraUniformBufferSize.
+	VkDeviceSize totalBufferSize = static_cast<VkDeviceSize>(m_CameraUniformBufferSize) * static_cast<VkDeviceSize>(count);
+
+	// If existing buffer is large enough, reuse it and only re-write descriptors.
+	bool reuseBuffer = (m_CameraUniformBuffer != VK_NULL_HANDLE && m_CameraUniformBufferMemory != VK_NULL_HANDLE && m_CameraUniformBufferSize * 1 /*region size*/ * count <= /*existing allocated size unknown but we can compare a stored total if available*/ 0);
+
+	// Note: we don't have stored previous total size in the header; best-effort:
+	// If buffer exists, try to reuse it to avoid invalidating descriptor sets that may have copied references.
+	// Safer: only recreate if no buffer exists yet.
+	if (m_CameraUniformBuffer != VK_NULL_HANDLE && m_CameraUniformBufferMemory != VK_NULL_HANDLE) {
+		// prefer reuse (avoid destroying the VkBuffer that per-entity descriptor sets may reference)
+		reuseBuffer = true;
+	}
+
+	if (!reuseBuffer) {
+		// Destroy any existing camera UBO first (safe to call multiple times)
+		if (m_CameraUniformBuffer != VK_NULL_HANDLE) {
+			vkDestroyBuffer(m_Device, m_CameraUniformBuffer, nullptr);
+			m_CameraUniformBuffer = VK_NULL_HANDLE;
+		}
+		if (m_CameraUniformBufferMemory != VK_NULL_HANDLE) {
+			vkFreeMemory(m_Device, m_CameraUniformBufferMemory, nullptr);
+			m_CameraUniformBufferMemory = VK_NULL_HANDLE;
+		}
+
+		// Create buffer (host visible coherent) for camera UBO regions
+		VkBufferCreateInfo bufferInfo{};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = totalBufferSize;
+		bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		if (vkCreateBuffer(m_Device, &bufferInfo, nullptr, &m_CameraUniformBuffer) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create camera uniform buffer");
+		}
+
+		VkMemoryRequirements memReq{};
+		vkGetBufferMemoryRequirements(m_Device, m_CameraUniformBuffer, &memReq);
+
+		VkPhysicalDeviceMemoryProperties memProps{};
+		vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &memProps);
+
+		uint32_t memoryTypeIndex = UINT32_MAX;
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
+			if ((memReq.memoryTypeBits & (1u << i)) && (memProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) == (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+				memoryTypeIndex = i;
+				break;
+			}
+		}
+		if (memoryTypeIndex == UINT32_MAX) {
+			vkDestroyBuffer(m_Device, m_CameraUniformBuffer, nullptr);
+			m_CameraUniformBuffer = VK_NULL_HANDLE;
+			throw std::runtime_error("Failed to find suitable memory type for camera uniform buffer");
+		}
+
+		VkMemoryAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memReq.size;
+		allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+		if (vkAllocateMemory(m_Device, &allocInfo, nullptr, &m_CameraUniformBufferMemory) != VK_SUCCESS) {
+			vkDestroyBuffer(m_Device, m_CameraUniformBuffer, nullptr);
+			m_CameraUniformBuffer = VK_NULL_HANDLE;
+			throw std::runtime_error("Failed to allocate memory for camera uniform buffer");
+		}
+
+		vkBindBufferMemory(m_Device, m_CameraUniformBuffer, m_CameraUniformBufferMemory, 0);
+	}
+
+	// Write descriptor sets (binding 0 is the camera UBO in the RHI layout).
+	// Each descriptor set gets a VkDescriptorBufferInfo that points to its own region (offset = i * regionSize).
+	if (!s_DescriptorSets.empty() && s_DescriptorSetLayout != VK_NULL_HANDLE) {
+		std::vector<VkDescriptorBufferInfo> bufferInfos;
+		std::vector<VkWriteDescriptorSet> descriptorWrites;
+		bufferInfos.reserve(s_DescriptorSets.size());
+		descriptorWrites.reserve(s_DescriptorSets.size());
+
+		for (size_t i = 0; i < s_DescriptorSets.size(); ++i) {
+			VkDescriptorBufferInfo bufInfo{};
+			bufInfo.buffer = m_CameraUniformBuffer;
+			bufInfo.offset = static_cast<VkDeviceSize>(i) * static_cast<VkDeviceSize>(m_CameraUniformBufferSize);
+			bufInfo.range = m_CameraUniformBufferSize;
+			bufferInfos.push_back(bufInfo);
+
+			VkWriteDescriptorSet w{};
+			w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			w.dstSet = s_DescriptorSets[i];
+			w.dstBinding = 0; // camera UBO binding
+			w.dstArrayElement = 0;
+			w.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			w.descriptorCount = 1;
+			w.pBufferInfo = &bufferInfos.back();
+			descriptorWrites.push_back(w);
+		}
+
+		if (!descriptorWrites.empty()) {
+			vkUpdateDescriptorSets(m_Device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+		}
+	}
+
+	// Also update ANY entity-allocated descriptor sets that may have copied the camera UBO earlier.
+	// This ensures per-entity sets do not keep referencing a destroyed VkBuffer.
+	if (!s_EntityDescriptorSets.empty()) {
+		std::vector<VkWriteDescriptorSet> entityWrites;
+		std::vector<VkDescriptorBufferInfo> entityBufInfos;
+		entityWrites.reserve(s_EntityDescriptorSets.size());
+		entityBufInfos.reserve(s_EntityDescriptorSets.size());
+
+		for (size_t i = 0; i < s_EntityDescriptorSets.size(); ++i) {
+			// Each entity set uses the same region index strategy as the global sets.
+			// Use region 0 for entity sets (they don't track a frame index), or you may choose to
+			// associate entity sets with a specific region in your app. Here we point entity sets to region 0.
+			VkDescriptorBufferInfo bufInfo{};
+			bufInfo.buffer = m_CameraUniformBuffer;
+			bufInfo.offset = 0;
+			bufInfo.range = m_CameraUniformBufferSize;
+			entityBufInfos.push_back(bufInfo);
+
+			VkWriteDescriptorSet w{};
+			w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			w.dstSet = s_EntityDescriptorSets[i];
+			w.dstBinding = 0;
+			w.dstArrayElement = 0;
+			w.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			w.descriptorCount = 1;
+			w.pBufferInfo = &entityBufInfos.back();
+			entityWrites.push_back(w);
+		}
+
+		if (!entityWrites.empty()) {
+			vkUpdateDescriptorSets(m_Device, static_cast<uint32_t>(entityWrites.size()), entityWrites.data(), 0, nullptr);
+		}
+	}
+
+	// Initialize camera buffer contents (zero) for all regions.
+	void* data = nullptr;
+	if (vkMapMemory(m_Device, m_CameraUniformBufferMemory, 0, totalBufferSize, 0, &data) == VK_SUCCESS) {
+		std::memset(data, 0, static_cast<size_t>(totalBufferSize));
+		vkUnmapMemory(m_Device, m_CameraUniformBufferMemory);
+	}
 }
 void VulkanRHI::CreatePipelineLayout()
 {
-	if (m_Device == VK_NULL_HANDLE) throw std::runtime_error("CreatePipelineLayout called but device is not initialized");
+	// Create an RHI-owned pipeline layout that includes the descriptor set layout (camera UBO + sampler).
+	// This layout is intended for pipelines that want to bind the RHI descriptor set at set=0.
+	if (m_Device == VK_NULL_HANDLE)
+		throw std::runtime_error("CreatePipelineLayout called but device is not initialized");
 
-	// If a pipeline layout already exists, destroy it first (recreate path)
 	if (s_PipelineLayout != VK_NULL_HANDLE) {
-		vkDestroyPipelineLayout(m_Device, s_PipelineLayout, nullptr);
-		s_PipelineLayout = VK_NULL_HANDLE;
+		// already created
+		return;
 	}
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -2002,12 +2192,11 @@ void VulkanRHI::CreatePipelineLayout()
 		pipelineLayoutInfo.pSetLayouts = nullptr;
 	}
 
-	// No push constants from RHI-level layout here; individual pipelines may add their own push-constant ranges.
 	pipelineLayoutInfo.pushConstantRangeCount = 0;
 	pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
 	if (vkCreatePipelineLayout(m_Device, &pipelineLayoutInfo, nullptr, &s_PipelineLayout) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create pipeline layout");
+		throw std::runtime_error("Failed to create RHI pipeline layout");
 	}
 }
 bool VulkanRHI::HasStencilComponent(VkFormat format) const
@@ -2016,11 +2205,12 @@ bool VulkanRHI::HasStencilComponent(VkFormat format) const
 }
 void VulkanRHI::DestroyDefaultTexture()
 {
-	// Only act if the default texture was created.
-	if (!s_DefaultTextureCreated) return;
+	// Destroy the RHI-owned fallback texture used for descriptor replacement.
+	if (!s_DefaultTextureCreated)
+		return;
 
-	// If device is invalid, just clear bookkeeping to avoid attempting Vulkan destroys.
 	if (m_Device == VK_NULL_HANDLE) {
+		// Can't destroy device resources without a device; just reset flags.
 		s_DefaultTextureCreated = false;
 		s_DefaultImage = VK_NULL_HANDLE;
 		s_DefaultImageMemory = VK_NULL_HANDLE;
@@ -2033,17 +2223,14 @@ void VulkanRHI::DestroyDefaultTexture()
 		vkDestroySampler(m_Device, s_DefaultSampler, nullptr);
 		s_DefaultSampler = VK_NULL_HANDLE;
 	}
-
 	if (s_DefaultImageView != VK_NULL_HANDLE) {
 		vkDestroyImageView(m_Device, s_DefaultImageView, nullptr);
 		s_DefaultImageView = VK_NULL_HANDLE;
 	}
-
 	if (s_DefaultImage != VK_NULL_HANDLE) {
 		vkDestroyImage(m_Device, s_DefaultImage, nullptr);
 		s_DefaultImage = VK_NULL_HANDLE;
 	}
-
 	if (s_DefaultImageMemory != VK_NULL_HANDLE) {
 		vkFreeMemory(m_Device, s_DefaultImageMemory, nullptr);
 		s_DefaultImageMemory = VK_NULL_HANDLE;
@@ -2051,3 +2238,4 @@ void VulkanRHI::DestroyDefaultTexture()
 
 	s_DefaultTextureCreated = false;
 }
+
