@@ -10,6 +10,7 @@
 #include "../Systems/SystemVelocity.h"
 #include "../Systems/SystemPhysics.h"
 #include "../Systems/SystemCollision.h"
+#include "../Managers/SystemManager.h"
 
 class Entity;
 
@@ -49,10 +50,7 @@ private:
 	VulkanRHI* m_vulkanRHI;
 
 	// temporary for testing, should be owned by system manager, not scene
-	SystemRenderer m_renderer;
-	SystemVelocity m_velocitySystem;
-	SystemPhysics m_physicsSystem;
-	SystemCollision m_collisionSystem;
+	SystemManager m_systemManager;
 
 	GUI* m_gui;
 
