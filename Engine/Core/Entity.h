@@ -67,7 +67,6 @@ public:
 				std::cout << "Unsupported component type " << std::endl;
 		}
 	}
-
 	void Destroy()
 	{
 		for (auto& comp : m_Components)
@@ -116,4 +115,6 @@ public:
 private:
 	std::unordered_map<EComponentType, std::unique_ptr<IComponent>> m_Components;
 	EComponentType m_EntityType = EComponentType::Component_None;
+
+
 };
