@@ -30,36 +30,36 @@ public:
 		{
 			case EComponentType::Component_Translation:
 			{
-				auto component = std::make_unique<ComponentTranslation>(args...);
-				m_Components.push_back(std::move(component));
+				auto component = std::make_unique<ComponentTranslation>(std::forward<Args>(args)...);
+				m_Components[type] = std::move(component);
 				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Translation));
 				break;
 			}
 			case EComponentType::Component_Velocity:
 			{
-				auto component = std::make_unique<ComponentVelocity>(args...);
-				m_Components.push_back(std::move(component));
+				auto component = std::make_unique<ComponentVelocity>(std::forward<Args>(args)...);
+				m_Components[type] = std::move(component);
 				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Velocity));
 				break;
 			}
 			case EComponentType::Component_Geometry:
 			{
 				auto component = std::make_unique<ComponentGeometry>();
-				m_Components.push_back(std::move(component));
+				m_Components[type] = std::move(component);
 				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Geometry));
 				break;
 			}
 			case EComponentType::Component_Physics:
 			{
 				auto component = std::make_unique<ComponentPhysics>();
-				m_Components.push_back(std::move(component));
+				m_Components[type] = std::move(component);
 				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Physics));
 				break;
 			}
 			case EComponentType::Component_Collision:
 			{
 				auto component = std::make_unique<ComponentCollision>();
-				m_Components.push_back(std::move(component));
+				m_Components[type] = std::move(component);
 				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Collision));
 				break;
 			}
@@ -84,11 +84,9 @@ public:
 	// Retrieve first component with matching type (non-template)
 	IComponent* GetComponent(EComponentType type)
 	{
-		for (const auto& comp : m_Components)
-		{
-			if (comp->GetType() == type)
-				return comp.get();
-		}
+		auto it = m_Components.find(type);
+		if (it != m_Components.end())
+			return it->second.get();
 		return nullptr;
 	}
 
@@ -102,14 +100,10 @@ public:
 
 	void RemoveComponent(EComponentType type)
 	{
-		for (auto it = m_Components.begin(); it != m_Components.end(); ++it)
+		size_t erased = m_Components.erase(type);
+		if (erased > 0)
 		{
-			if ((*it)->GetType() == type)
-			{
-				m_Components.erase(it);
-				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) & ~to_mask(type));
-				return;
-			}
+			m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) & ~to_mask(type));
 		}
 	}
 
@@ -120,6 +114,6 @@ public:
 	}
 
 private:
-	std::vector<std::unique_ptr<IComponent>> m_Components;
+	std::unordered_map<EComponentType, std::unique_ptr<IComponent>> m_Components;
 	EComponentType m_EntityType = EComponentType::Component_None;
 };

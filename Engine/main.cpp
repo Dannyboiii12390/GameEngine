@@ -209,7 +209,7 @@ int main()
             if (framTimeAccumulator >= 1.0f)
             { 
                 float fps = frameCount / framTimeAccumulator;
-                LOG_DEBUG("FPS: " << fps);
+                std::cout << "FPS: " << fps << std::endl;
                 framTimeAccumulator = 0.0f;
                 frameCount = 0; 
             }
