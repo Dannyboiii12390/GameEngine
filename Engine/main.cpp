@@ -225,7 +225,6 @@ int main()
         gui.Shutdown();
         vulkanRHI.Shutdown();
         window.Shutdown();
-
         for(auto it = fpsHistory.begin(); it != fpsHistory.end(); it++)
         {
             if(*it) std::cout << "FPS: " << *it << std::endl;
