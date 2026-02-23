@@ -218,19 +218,21 @@ CollideBallWithAnotherBallScene::CollideBallWithAnotherBallScene(Window& p_windo
 
 	Entity entity1;
 	Entity entity2;
+	Entity floorEntity;
 
 	const Texture entTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	const Texture woodTex(m_vulkanRHI, "Assets/wood_shutter_diff_1k.jpg", TextureType::Albedo, true);
 
 	createEntity(entity1, glm::vec3(0.5f, -5.0f, 0.0f), entTex);
 	createEntity(entity2, glm::vec3(0.0f, 0.0f, 0.0f), woodTex);
+	createEntity(floorEntity, glm::vec3(0.0f, -7.5f, 0.0f), woodTex, Physics::EColliderType::PLANE);
 
 	entity2.AddComponent(EComponentType::Component_Physics);
 	entity1.AddComponent(EComponentType::Component_Physics);
 	ComponentPhysics* phys1 = entity1.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
 	if (phys1)
 	{
-		phys1->SetAffectedByGravity(false);
+		//phys1->SetAffectedByGravity(false);
 		phys1->SetMass(2.0f);
 	}
 	
@@ -239,13 +241,16 @@ CollideBallWithAnotherBallScene::CollideBallWithAnotherBallScene(Window& p_windo
 	ComponentCollision* col1 = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	Physics::Sphere* sphereColEntity1 = dynamic_cast<Physics::Sphere*>(col1->GetCollider());
 	sphereColEntity1->setRadius(1.0f);
+	col1->SetOnCollision(CollisionResponse);
 
 	ComponentCollision* col2 = entity2.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-
 	col2->SetOnCollision(CollisionResponse);
+
+	ComponentTranslation* xf_floor = floorEntity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
 
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));
+	AddEntity(std::move(floorEntity));
 
 	m_camera.SetPosition(glm::vec3(5.0f, -1.0f, 5.0f));
 	m_camera.LookAt(glm::vec3(0.0f, -5.0f, 0.0f));
