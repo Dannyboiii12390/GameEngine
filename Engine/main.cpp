@@ -26,6 +26,8 @@
 
 #include "DebugUtils.h"
 
+#include "../ServerWSock2/Sockets/TCPSocket.h"
+#include "../ServerWSock2/Packet.h"
 #pragma comment(lib, "Ws2_32.lib")
 
 int clientRequest()
@@ -40,32 +42,11 @@ int clientRequest()
     const char* host = "127.0.0.1";
     const char* port = "54000";
 
-    addrinfo hints;
-    ZeroMemory(&hints, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;      // IPv4 or IPv6
-    hints.ai_socktype = SOCK_STREAM;  // TCP
-
-    addrinfo* addrResult = nullptr;
-    result = getaddrinfo(host, port, &hints, &addrResult);
-    if (result != 0) {
-        std::cerr << "getaddrinfo failed: " << result << "\n";
-        WSACleanup();
-        return 1;
-    }
-    SOCKET sock = INVALID_SOCKET;
-    for (addrinfo* ptr = addrResult; ptr != nullptr; ptr = ptr->ai_next) {
-        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-        if (sock == INVALID_SOCKET) continue;
-        if (connect(sock, ptr->ai_addr, static_cast<int>(ptr->ai_addrlen)) == 0) {
-            break; // connected
-        }
-        closesocket(sock);
-        sock = INVALID_SOCKET;
-    }
-    freeaddrinfo(addrResult);
-
-    if (sock == INVALID_SOCKET) {
-        std::cerr << "Unable to connect to server.\n";
+    Networking::TCPSocket tcp;
+    tcp.connect(host, port);
+    if (!tcp.isConnected())
+    {
+        std::cerr << "Unable to connect to server: " << host << ":" << port << "\n";
         WSACleanup();
         return 1;
     }
@@ -73,56 +54,84 @@ int clientRequest()
     std::cout << "Connected to " << host << ":" << port << "\n";
 
     std::string line;
-    const size_t bufSize = 1024;
-    char recvBuf[bufSize];
+    constexpr size_t bufSize = 1024;
+    std::vector<char> recvBuf(bufSize);
+
+    // Buffer for assembling incoming TCP stream into packets
+    std::vector<uint8_t> tcpRecvBuffer;
 
     while (true) {
         std::cout << "Enter message (or 'quit' to exit): ";
         if (!std::getline(std::cin, line)) break;
         if (line == "quit") break;
 
-        // Send the data (allow empty strings by sending at least a newline if desired).
-        const char* data = line.c_str();
+        const char* data = line.data();
         int toSend = static_cast<int>(line.size());
-        int sentTotal = 0;
-        while (sentTotal < toSend) {
-            int n = send(sock, data + sentTotal, toSend - sentTotal, 0);
+
+        // Build a Packet and serialize it
+        Networking::Packet pkt(1); // arbitrary type 1 for application message
+        if (toSend > 0) {
+            pkt.setPayload(data, static_cast<std::size_t>(toSend));
+        }
+        else {
+            pkt.setPayload(nullptr, 0);
+        }
+
+        std::vector<uint8_t> out;
+        pkt.serialize(out);
+
+        if (out.empty()) {
+            std::cerr << "Failed to serialize packet\n";
+            continue;
+        }
+
+        // Send the serialized packet (handle partial sends)
+        const char* sendBuf = reinterpret_cast<const char*>(out.data());
+        int total = static_cast<int>(out.size());
+        int sent = 0;
+        while (sent < total) {
+            int n = tcp.send(sendBuf + sent, total - sent) ? (total - sent) : SOCKET_ERROR;
+            // Note: tcp.send already handles full-send in original API. If it returns true we assume all bytes sent.
             if (n == SOCKET_ERROR) {
-                std::cerr << "send failed: " << WSAGetLastError() << "\n";
-                closesocket(sock);
+                std::cerr << "send failed (TCPSocket)\n";
+                tcp.disconnect();
                 WSACleanup();
                 return 1;
             }
-            sentTotal += n;
+            sent = total;
         }
-        // Receive the echoed bytes. We expect the same number of bytes back.
-        std::vector<char> received;
-        received.reserve(toSend ? toSend : 1);
-        int recvTotal = 0;
-        while (recvTotal < toSend) {
-            int n = recv(sock, recvBuf, static_cast<int>(bufSize), 0);
+
+        // Wait for echoed Packet. Accumulate stream bytes until Packet::tryDeserializeFromBuffer succeeds.
+        Networking::Packet echoedPkt;
+        while (true) {
+            // First attempt to parse any already-received bytes
+            if (Networking::Packet::tryDeserializeFromBuffer(tcpRecvBuffer, echoedPkt)) {
+                break;
+            }
+
+            int n = tcp.receive(recvBuf.data(), static_cast<int>(bufSize));
             if (n > 0) {
-                received.insert(received.end(), recvBuf, recvBuf + n);
-                recvTotal += n;
+                tcpRecvBuffer.insert(tcpRecvBuffer.end(), recvBuf.data(), recvBuf.data() + n);
             }
             else if (n == 0) {
                 std::cout << "Connection closed by server.\n";
-                closesocket(sock);
+                tcp.disconnect();
                 WSACleanup();
                 return 0;
             }
             else {
-                std::cerr << "recv failed: " << WSAGetLastError() << "\n";
-                closesocket(sock);
+                std::cerr << "recv failed (TCPSocket)\n";
+                tcp.disconnect();
                 WSACleanup();
                 return 1;
             }
         }
-        std::string echoed(received.begin(), received.end());
+
+        std::string echoed(reinterpret_cast<const char*>(echoedPkt.payload.data()), echoedPkt.payload.size());
         std::cout << "Echoed: " << echoed << "\n";
     }
 
-    closesocket(sock);
+    tcp.disconnect();
     WSACleanup();
     return 0;
 }
