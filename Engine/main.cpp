@@ -188,6 +188,7 @@ int main()
 		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
 		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
 
+        std::vector<float> fpsHistory(100);
 
         while (window.getGLFWwindow() && !glfwWindowShouldClose(window.getGLFWwindow()))
         {
@@ -209,7 +210,7 @@ int main()
             if (framTimeAccumulator >= 1.0f)
             { 
                 float fps = frameCount / framTimeAccumulator;
-                std::cout << "FPS: " << fps << std::endl;
+				fpsHistory.push_back(fps);
                 framTimeAccumulator = 0.0f;
                 frameCount = 0; 
             }
@@ -224,6 +225,11 @@ int main()
         gui.Shutdown();
         vulkanRHI.Shutdown();
         window.Shutdown();
+
+        for(auto it = fpsHistory.begin(); it != fpsHistory.end(); it++)
+        {
+            if(*it) std::cout << "FPS: " << *it << std::endl;
+		}
     }
 
 
