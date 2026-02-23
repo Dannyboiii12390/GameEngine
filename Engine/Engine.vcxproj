@@ -222,6 +222,7 @@
     <ClInclude Include="Core\Managers\SceneManager.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="DebugUtils.h" />
     <None Include="packages.config" />
     <CustomBuild Include="SHADERS\object.frag">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>

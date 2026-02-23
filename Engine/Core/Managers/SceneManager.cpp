@@ -1,5 +1,6 @@
 #include "SceneManager.h"
 #include <iostream>
+#include "../../DebugUtils.h"
 
 void SceneManager::AddScene(std::unique_ptr<IScene>&& scene)
 {
@@ -22,7 +23,8 @@ IScene* SceneManager::GetCurrentScene() const
 
 void SceneManager::Shutdown()
 {
-	std::cout << "Number of scenes to shutdown: " << m_scenes.size() << std::endl;
+	LOG_DEBUG("Number of scenes to shutdown: " << m_scenes.size());
+
 	while (!m_scenes.empty())
 	{
 		m_scenes.top()->Destroy(); // Call Destroy on the scene to clean up its resources

@@ -8,10 +8,11 @@
 #include "../../IMGUI/imgui.h"
 #include "../../../PhysicsEngine/Maths/CollisionResolution/ConservationOfMomentum.h"
 #include "../../../PhysicsEngine/Maths/CollisionResolution/CollisionResolution.h"
+#include "../../DebugUtils.h"
 
 static void CollisionResponse(Entity& self, Entity& other)
 {
-	std::cout << "Collision detected between entities!" << std::endl;
+	LOG_DEBUG("Collision detected between entities!");
 
 	auto* selfColComp = self.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	auto* col = selfColComp->GetCollider();
@@ -192,11 +193,11 @@ CollideBallWithAnotherBallScene::CollideBallWithAnotherBallScene(Window& p_windo
 					xf->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f)); // rotate plane to be horizontal
 					meshData = ResourceManager::CreatePlaneMesh();
 					col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
-					transform->SetScale(glm::vec3(10.0f));
+					transform->SetScale(glm::vec3(50.0f));
 
 					break;
 				default:
-					std::cout << "unsupported mesh type for entity" << std::endl;
+					LOG_DEBUG("unsupported mesh type for entity");
 					break;
 				}
 				auto [verts, indices] = meshData;
@@ -232,7 +233,7 @@ CollideBallWithAnotherBallScene::CollideBallWithAnotherBallScene(Window& p_windo
 	ComponentPhysics* phys1 = entity1.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
 	if (phys1)
 	{
-		//phys1->SetAffectedByGravity(false);
+		phys1->SetAffectedByGravity(false);
 		phys1->SetMass(2.0f);
 	}
 	

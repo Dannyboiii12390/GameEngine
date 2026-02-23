@@ -1,23 +1,15 @@
 ﻿#define GLFW_INCLUDE_VULKAN
+
 #include <GLFW/glfw3.h>
 #include <iostream>
-
 #include <chrono>
 #include <omp.h>
+#include <fstream>
 
 #include "Renderer/Window.h"
 #include "Core/Managers/SceneManager.h"
 #include "Core/Scenes/TemplateScene.h"
-
-#ifdef _DEBUG
-#define LOG_DEBUG(msg) std::cout << msg << std::endl;
-#else
-#define LOG_DEBUG(msg)
-#endif
-
 #include "../PhysicsEngine/Shapes/Sphere.h"
-
-#include <fstream>
 
 /*
 - Simple Lighting
@@ -31,6 +23,8 @@
 #include <string>
 #include <vector>
 #include "Core/Scenes/CollideBallWithAnotherBallScene.h"
+
+#include "DebugUtils.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -139,7 +133,7 @@ int main()
     {
 
         #ifdef _OPENMP
-        std::cout << "OpenMP is enabled! Max threads: " << omp_get_max_threads() << std::endl;
+        LOG_DEBUG("OpenMP is enabled! Max threads: " << omp_get_max_threads());
         #endif
 
 		clientRequest();    
@@ -206,7 +200,7 @@ int main()
             if (framTimeAccumulator >= 1.0f)
             { 
                 float fps = frameCount / framTimeAccumulator;
-                std::cout << "FPS: " << fps << std::endl; 
+                LOG_DEBUG("FPS: " << fps);
                 framTimeAccumulator = 0.0f;
                 frameCount = 0; 
             }

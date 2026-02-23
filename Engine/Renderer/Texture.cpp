@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include "../DebugUtils.h"
 
 Texture::Texture()
     : m_Resources(std::make_shared<TextureGPUResources>())
@@ -27,18 +28,15 @@ Texture::~Texture()
     if (m_Resources)
     {
         long count = m_Resources.use_count();
-        std::cout << "Texture destroyed (ref_count=" << count << ")";
 
         if (count == 1)
         {
-            std::cout << " - Freeing GPU resources";
+            LOG_DEBUG("Texture destroyed (ref_count=" << count << ")" << " - Freeing GPU resources");
         }
         else
         {
-            std::cout << " - GPU resources still shared by " << (count - 1) << " other instance(s)";
+            LOG_DEBUG("Texture destroyed (ref_count=" << count-1 << ")" << " other instance(s)");
         }
-
-        std::cout << std::endl;
     }
 }
 
