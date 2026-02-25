@@ -22,6 +22,10 @@
     <ClInclude Include="Maths\CollisionResolution\CollisionResolution.h" />
     <ClInclude Include="Maths\CollisionResolution\ConservationOfMomentum.h" />
     <ClInclude Include="Maths\Integration.h" />
+    <ClInclude Include="Networking\Address.h" />
+    <ClInclude Include="Networking\Environment.h" />
+    <ClInclude Include="Networking\ListeningSocket.h" />
+    <ClInclude Include="Networking\Packet.h" />
     <ClInclude Include="Shapes\Capsule.h" />
     <ClInclude Include="Shapes\Collider.h" />
     <ClInclude Include="Shapes\Cylinder.h" />
@@ -34,6 +38,9 @@
   <ItemGroup>
     <ClCompile Include="Maths\CollisionResolution\CollisionResolution.cpp" />
     <ClCompile Include="Maths\Integration.cpp" />
+    <ClCompile Include="Networking\ListeningSocket.cpp" />
+    <ClCompile Include="Networking\TCPSocket.cpp" />
+    <ClCompile Include="Networking\TCPSocket.h" />
     <ClCompile Include="Shapes\Capsule.cpp" />
     <ClCompile Include="Shapes\Collider.cpp" />
     <ClCompile Include="Shapes\Cylinder.cpp" />

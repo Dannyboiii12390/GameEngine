@@ -16,160 +16,79 @@
 - Render Passes
 - Render Graph
 */
-
-#define WIN32_LEAN_AND_MEAN
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <string>
 #include <vector>
 #include "Core/Scenes/CollideBallWithAnotherBallScene.h"
 
 #include "DebugUtils.h"
-
-#include "../ServerWSock2/Sockets/TCPSocket.h"
-#include "../ServerWSock2/Packet.h"
-#include <mutex>
-#include "../PhysicsEngine/Threading/ThreadPool.h"
-#pragma comment(lib, "Ws2_32.lib")
+#include "../PhysicsEngine/Networking/Environment.h"
+#include "../PhysicsEngine/Networking/Address.h"
+#include "../PhysicsEngine/Networking/Packet.h"
+#include "../PhysicsEngine/Networking/TCPSocket.h"
+#include <thread>
 
 //  flat buffer serialization - packet should probably use this
 //  .fbs
 //  wireshark - network sniffer
 //  winsock shims
 //  TMNetsim
-//  potential to get a bug by not converting the port to big-endian in the client code
-//  class for port name and ip
-//  class environment
-//  class listening socket
-//  class client socket
+
+//  need to implement a UDP Socket class
+//  class UDP socket
 
 int clientRequest()
 {
-    constexpr int numClients = 10;
+    Networking::Environment env;
+    Networking::Address serverAddr("127.0.0.1", 54000);
 
-    WSADATA wsaData;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (result != 0) {
-        std::cerr << "WSAStartup failed: " << result << "\n";
-        return 1;
+    Networking::TCPSocket client(serverAddr);
+
+    std::vector<std::string> messages = {
+        "Hello, Server!",
+        "This is a test message.",
+        "Goodbye, Server!"
+    };
+    std::vector<uint8_t> recvAccumulator;
+    recvAccumulator.reserve(8192);
+
+    for (const auto& msg : messages) {
+        // Create packet and set payload (updates header.payloadSize)
+        Networking::Packet pkt;
+        pkt.header.type = 1; // example type
+        pkt.setPayload(msg.data(), static_cast<std::size_t>(msg.size()));
+
+        // Serialize packet
+        std::vector<uint8_t> out;
+        pkt.serialize(out);
+        // Send packet
+        client.Send(out.data(), static_cast<int>(out.size()));
+
+        while (true)
+        {
+            uint8_t temp[4096];
+            int r = client.Receive(temp, static_cast<int>(sizeof(temp)));
+            if (r <= 0) {
+                std::cerr << "clientRequest: receive failed or connection closed\n";
+                return -1;
+            }
+            recvAccumulator.insert(recvAccumulator.end(), temp, temp + r);
+
+            Networking::Packet incoming;
+            if (Networking::Packet::tryDeserializeFromBuffer(recvAccumulator, incoming)) {
+                std::string payload;
+                if (incoming.payloadSize() > 0) {
+                    payload.assign(reinterpret_cast<const char*>(incoming.payloadData()), incoming.payloadSize());
+                }
+                std::cout << "Echoed back: type=" << incoming.header.type << " payload=\"" << payload << "\"\n";
+                break; // proceed to next message
+            }
+            // otherwise continue receiving bytes
+        }
+
+        // small delay so output is readable
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    const char* host = "127.0.0.1";
-    const char* port = "54000";
-
-    std::mutex coutMutex;
-    std::atomic<int> failures{ 0 };
-
-    Threading::ThreadPool threadpool(2);
-    std::vector<std::future<void>> futures;
-    futures.reserve(numClients);
-
-    for (int id = 0; id < numClients; ++id)
-    {
-        futures.push_back(threadpool.Enqueue([id, host, port, &coutMutex, &failures]()
-            {
-                Networking::TCPSocket tcp;
-                tcp.connect(host, port);
-                if (!tcp.isConnected())
-                {
-                    std::lock_guard<std::mutex> lk(coutMutex);
-                    std::cerr << "Client " << id << " - Unable to connect to server: " << host << ":" << port << "\n";
-                    ++failures;
-                    return;
-                }
-
-                {
-                    std::lock_guard<std::mutex> lk(coutMutex);
-                    std::cout << "Client " << id << " - Connected to " << host << ":" << port << "\n";
-                }
-
-                // Prepare a message unique to this client
-                std::string message = "Hello from client " + std::to_string(id);
-
-                Networking::Packet pkt(1); // application message type
-                if (!message.empty()) {
-                    pkt.setPayload(message.data(), static_cast<std::size_t>(message.size()));
-                }
-                else {
-                    pkt.setPayload(nullptr, 0);
-                }
-
-                std::vector<uint8_t> out;
-                pkt.serialize(out);
-
-                if (out.empty()) {
-                    std::lock_guard<std::mutex> lk(coutMutex);
-                    std::cerr << "Client " << id << " - Failed to serialize packet\n";
-                    ++failures;
-                    tcp.disconnect();
-                    return;
-                }
-
-                // Send serialized packet (TCPSocket::send is used similarly to original code)
-                const char* sendBuf = reinterpret_cast<const char*>(out.data());
-                int total = static_cast<int>(out.size());
-                int sent = 0;
-                while (sent < total) {
-                    int n = tcp.send(sendBuf + sent, total - sent) ? (total - sent) : SOCKET_ERROR;
-                    // Note: the wrapper used in this project returns true when send succeeded for the whole buffer.
-                    if (n == SOCKET_ERROR) {
-                        std::lock_guard<std::mutex> lk(coutMutex);
-                        std::cerr << "Client " << id << " - send failed (TCPSocket)\n";
-                        ++failures;
-                        tcp.disconnect();
-                        return;
-                    }
-                    sent = total;
-                }
-
-                // Wait for echoed Packet. Accumulate stream bytes until Packet::tryDeserializeFromBuffer succeeds.
-                constexpr size_t bufSize = 1024;
-                std::vector<char> recvBuf(bufSize);
-                std::vector<uint8_t> tcpRecvBuffer;
-                Networking::Packet echoedPkt;
-
-                while (true) {
-                    if (Networking::Packet::tryDeserializeFromBuffer(tcpRecvBuffer, echoedPkt)) {
-                        break;
-                    }
-
-                    int n = tcp.receive(recvBuf.data(), static_cast<int>(bufSize));
-                    if (n > 0) {
-                        tcpRecvBuffer.insert(tcpRecvBuffer.end(), recvBuf.data(), recvBuf.data() + n);
-                    }
-                    else if (n == 0) {
-                        std::lock_guard<std::mutex> lk(coutMutex);
-                        std::cout << "Client " << id << " - Connection closed by server.\n";
-                        tcp.disconnect();
-                        ++failures;
-                        return;
-                    }
-                    else {
-                        std::lock_guard<std::mutex> lk(coutMutex);
-                        std::cerr << "Client " << id << " - recv failed (TCPSocket)\n";
-                        ++failures;
-                        tcp.disconnect();
-                        return;
-                    }
-                }
-
-                std::string echoed(reinterpret_cast<const char*>(echoedPkt.payload.data()), echoedPkt.payload.size());
-                {
-                    std::lock_guard<std::mutex> lk(coutMutex);
-                    std::cout << "Client " << id << " - Echoed: " << echoed << "\n";
-                }
-
-                tcp.disconnect();
-            }));
-    }
-
-    // Join all threads
-    for (auto& t : futures) {
-        t.get();
-    }
-
-    WSACleanup();
-    return (failures.load() == 0) ? 0 : 1;
+    return 0;
 }
 
 int main()

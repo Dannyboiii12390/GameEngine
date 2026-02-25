@@ -128,8 +128,8 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ServerWSock2\ServerWSock2.vcxproj">
-      <Project>{4402db8d-2d1d-411e-970f-e8ca113eb550}</Project>
+    <ProjectReference Include="..\PhysicsEngine\PhysicsEngine.vcxproj">
+      <Project>{7c638cb6-7803-46f8-9d78-47a6c14110ae}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

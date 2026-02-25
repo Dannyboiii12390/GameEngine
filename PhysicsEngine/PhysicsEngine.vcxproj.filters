@@ -48,6 +48,18 @@
     <ClInclude Include="Maths\CollisionResolution\CollisionResolution.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Networking\Address.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Networking\Environment.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Networking\Packet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Networking\ListeningSocket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Shapes\LineInf.cpp">
@@ -78,6 +90,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Maths\CollisionResolution\CollisionResolution.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Networking\TCPSocket.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Networking\TCPSocket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Networking\ListeningSocket.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
