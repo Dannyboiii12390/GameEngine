@@ -34,6 +34,7 @@
 
 //  need to implement a UDP Socket class
 //  class UDP socket
+//  unit tests for networking code
 
 int clientRequest()
 {
