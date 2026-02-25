@@ -32,6 +32,17 @@
 #include "../PhysicsEngine/Threading/ThreadPool.h"
 #pragma comment(lib, "Ws2_32.lib")
 
+//  flat buffer serialization - packet should probably use this
+//  .fbs
+//  wireshark - network sniffer
+//  winsock shims
+//  TMNetsim
+//  potential to get a bug by not converting the port to big-endian in the client code
+//  class for port name and ip
+//  class environment
+//  class listening socket
+//  class client socket
+
 int clientRequest()
 {
     constexpr int numClients = 10;
