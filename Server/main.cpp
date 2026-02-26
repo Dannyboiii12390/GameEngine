@@ -12,6 +12,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+#include <flatbuffers/flatbuffers.h>
+
 static void handleClient(SOCKET clientSock, Networking::Address clientAddr)
 {
     std::cout << "Client connected: " << clientAddr.getIP() << ":" << clientAddr.getPort() << "\n";
@@ -46,10 +48,24 @@ static void handleClient(SOCKET clientSock, Networking::Address clientAddr)
         Networking::Packet pkt;
         while (Networking::Packet::tryDeserializeFromBuffer(recvBuffer, pkt)) {
             // Process packet (example: print info and echo back)
-            std::cout << "Received packet type=" << pkt.header.type
-                << " payloadSize=" << pkt.payloadSize() << "\n";
+            std::string payloadText;
+            if (pkt.payloadSize() > 0) {
+                const uint8_t* p = pkt.payloadData();
+                // Try to interpret payload as a FlatBuffers root string.
+                const flatbuffers::String* fbStr = flatbuffers::GetRoot<flatbuffers::String>(p);
+                if (fbStr && fbStr->c_str()) {
+                    payloadText.assign(fbStr->c_str());
+                }
+                else {
+                    payloadText.assign(reinterpret_cast<const char*>(p), pkt.payloadSize());
+                }
+            }
 
-            // Echo the packet back
+            std::cout << "Received packet type=" << pkt.header.type
+                << " payloadSize=" << pkt.payloadSize()
+                << " text=\"" << payloadText << "\"\n";
+
+            // Echo the packet back (preserve original payload bytes)
             std::vector<uint8_t> out;
             pkt.serialize(out);
 

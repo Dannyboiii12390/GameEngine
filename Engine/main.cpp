@@ -26,6 +26,8 @@
 #include "../PhysicsEngine/Networking/TCPSocket.h"
 #include <thread>
 
+#include "flatbuffers/flatbuffers.h"
+
 //  flat buffer serialization - packet should probably use this
 //  .fbs
 //  wireshark - network sniffer
@@ -52,10 +54,16 @@ int clientRequest()
     recvAccumulator.reserve(8192);
 
     for (const auto& msg : messages) {
+        // Build a FlatBuffers buffer whose root is a string.
+        // This avoids needing a generated schema while still using FlatBuffers.
+        flatbuffers::FlatBufferBuilder builder;
+        auto strOff = builder.CreateString(msg);
+        builder.Finish(strOff); // root is the string itself
+
         // Create packet and set payload (updates header.payloadSize)
         Networking::Packet pkt;
         pkt.header.type = 1; // example type
-        pkt.setPayload(msg.data(), static_cast<std::size_t>(msg.size()));
+        pkt.setPayload(builder.GetBufferPointer(), builder.GetSize());
 
         // Serialize packet
         std::vector<uint8_t> out;
@@ -77,7 +85,17 @@ int clientRequest()
             if (Networking::Packet::tryDeserializeFromBuffer(recvAccumulator, incoming)) {
                 std::string payload;
                 if (incoming.payloadSize() > 0) {
-                    payload.assign(reinterpret_cast<const char*>(incoming.payloadData()), incoming.payloadSize());
+                    // Try to interpret payload as a FlatBuffers root string.
+                    // If that fails, fall back to raw bytes as string.
+                    const uint8_t* p = incoming.payloadData();
+                    // flatbuffers::GetRoot<T> is valid for built buffers whose root is T
+                    const flatbuffers::String* fbStr = flatbuffers::GetRoot<flatbuffers::String>(p);
+                    if (fbStr && fbStr->c_str()) {
+                        payload.assign(fbStr->c_str());
+                    }
+                    else {
+                        payload.assign(reinterpret_cast<const char*>(p), incoming.payloadSize());
+                    }
                 }
                 std::cout << "Echoed back: type=" << incoming.header.type << " payload=\"" << payload << "\"\n";
                 break; // proceed to next message
