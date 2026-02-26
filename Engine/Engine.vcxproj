@@ -160,6 +160,7 @@
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
     <ClCompile Include="Core\Managers\SystemManager.cpp" />
     <ClCompile Include="Core\Scenes\CollideBallWithAnotherBallScene.cpp" />
+    <ClCompile Include="Core\Scenes\RotationScene.cpp" />
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.h" />
@@ -195,6 +196,7 @@
     <ClInclude Include="Core\Managers\SystemManager.h" />
     <ClInclude Include="Core\Scenes\CollideBallWithAnotherBallScene.h" />
     <ClInclude Include="Core\Scenes\IScene.h" />
+    <ClInclude Include="Core\Scenes\RotationScene.h" />
     <ClInclude Include="Core\Scenes\TemplateScene.h" />
     <ClInclude Include="Core\Systems\ISystem.h" />
     <ClInclude Include="Core\Systems\SystemPhysics.h" />

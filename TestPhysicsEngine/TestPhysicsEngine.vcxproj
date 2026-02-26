@@ -121,6 +121,7 @@
     <ClCompile Include="LineSphereSegmentTest.cpp" />
     <ClCompile Include="LineTest.cpp" />
     <ClCompile Include="PlaneTests.cpp" />
+    <ClCompile Include="RotationTest.cpp" />
     <ClCompile Include="SphereIntersectionCylinderTest.cpp" />
     <ClCompile Include="SpherePlaneCollisionTest.cpp" />
     <ClCompile Include="SphereTest.cpp" />

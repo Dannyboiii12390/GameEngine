@@ -38,6 +38,7 @@ namespace Physics
 		virtual bool isColliding(const ::Physics::Capsule& other) const = 0;
 		virtual bool isColliding(const ::Physics::Cylinder& other) const = 0;
 		virtual bool isColliding(const ::Physics::Plane& other) const = 0;
+		//virtual bool isColliding(const Collider& other) const = 0;
 		virtual void setPosition(const glm::vec3& newPos) {} // Only relevant for some collider types, so provide a default empty implementation.
 
 		EColliderType getType() const { return m_type; }

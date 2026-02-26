@@ -22,6 +22,7 @@
     <ClInclude Include="Maths\CollisionResolution\CollisionResolution.h" />
     <ClInclude Include="Maths\CollisionResolution\ConservationOfMomentum.h" />
     <ClInclude Include="Maths\Integration.h" />
+    <ClInclude Include="Maths\Transform.h" />
     <ClInclude Include="Networking\Address.h" />
     <ClInclude Include="Networking\Environment.h" />
     <ClInclude Include="Networking\ListeningSocket.h" />
@@ -38,6 +39,7 @@
   <ItemGroup>
     <ClCompile Include="Maths\CollisionResolution\CollisionResolution.cpp" />
     <ClCompile Include="Maths\Integration.cpp" />
+    <ClCompile Include="Maths\Transform.cpp" />
     <ClCompile Include="Networking\ListeningSocket.cpp" />
     <ClCompile Include="Networking\TCPSocket.cpp" />
     <ClCompile Include="Networking\TCPSocket.h" />
