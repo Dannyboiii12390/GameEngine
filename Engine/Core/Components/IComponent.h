@@ -1,12 +1,4 @@
-/* Pseudocode:
-- Add a None/zero enumerator so the enum can represent "no flags".
-- Provide bitwise operator overloads for EComponentType:
-  - operator|, operator|=, operator&, operator&=, operator^, operator^=, operator~.
-- Implement each operator using std::underlying_type_t to perform bitwise ops on the underlying integer type.
-- Keep functions constexpr and noexcept for compile-time use and performance.
-- Include <type_traits> and <cstdint>.
-- Initialize IComponent::m_Type to Component_None.
-*/
+
 
 #pragma once
 #include <type_traits>

@@ -30,6 +30,8 @@ namespace Physics
         bool isColliding(const Cylinder& other) const override;
         bool isColliding(const Plane& other) const override;
 
+		bool isColliding(const Collider& other) const override { return other.isColliding(*this); }
+
     private:
         glm::vec3 m_a;
         glm::vec3 m_b;

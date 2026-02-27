@@ -3,10 +3,6 @@
 #include <cmath>
 #include <algorithm>
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 // Clamp pitch to avoid gimbal-lock singularity at exactly ±90°.
 static float ClampPitch(float degrees)
 {
@@ -26,18 +22,10 @@ static glm::vec3 ForwardFromPitchYaw(float pitchDeg, float yawDeg)
     ));
 }
 
-// ---------------------------------------------------------------------------
-// Construction
-// ---------------------------------------------------------------------------
-
 Camera::Camera(float fovDegrees, float aspect, float zNear, float zFar)
 {
     SetPerspective(fovDegrees, aspect, zNear, zFar);
 }
-
-// ---------------------------------------------------------------------------
-// Projection
-// ---------------------------------------------------------------------------
 
 void Camera::SetPerspective(float fovDegrees, float aspect, float zNear, float zFar)
 {
@@ -50,10 +38,6 @@ void Camera::SetPerspective(float fovDegrees, float aspect, float zNear, float z
 
 void Camera::SetAspect(float aspect) { m_Aspect = aspect; m_ProjDirty = true; }
 void Camera::SetNearFar(float zNear, float zFar) { m_Near = zNear; m_Far = zFar; m_ProjDirty = true; }
-
-// ---------------------------------------------------------------------------
-// Transform setters
-// ---------------------------------------------------------------------------
 
 void Camera::SetPosition(const glm::vec3& pos) { m_Position = pos; m_ViewDirty = true; }
 const glm::vec3& Camera::GetPosition() const noexcept { return m_Position; }
@@ -88,10 +72,6 @@ void Camera::Rotate(const glm::vec3& deltaEulerDegrees)
     m_ViewDirty = true;
 }
 
-// ---------------------------------------------------------------------------
-// LookAt
-// ---------------------------------------------------------------------------
-
 void Camera::LookAt(const glm::vec3& target, const glm::vec3& /*up*/)
 {
     glm::vec3 dir = target - m_Position;
@@ -109,10 +89,6 @@ void Camera::LookAt(const glm::vec3& target, const glm::vec3& /*up*/)
     m_ViewDirty = true;
 }
 
-// ---------------------------------------------------------------------------
-// Orientation queries
-// ---------------------------------------------------------------------------
-
 glm::vec3 Camera::Forward() const
 {
     return ForwardFromPitchYaw(m_Pitch, m_Yaw);
@@ -129,10 +105,6 @@ glm::vec3 Camera::Up() const
 {
     return glm::normalize(glm::cross(Right(), Forward()));
 }
-
-// ---------------------------------------------------------------------------
-// Matrix accessors (lazy evaluation)
-// ---------------------------------------------------------------------------
 
 const glm::mat4& Camera::GetViewMatrix()
 {
@@ -157,10 +129,6 @@ void Camera::MarkDirty()
 {
     m_ViewDirty = m_ProjDirty = true;
 }
-
-// ---------------------------------------------------------------------------
-// Matrix recomputation
-// ---------------------------------------------------------------------------
 
 void Camera::RecomputeView() const
 {

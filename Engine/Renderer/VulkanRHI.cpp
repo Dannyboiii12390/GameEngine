@@ -1926,7 +1926,6 @@ void VulkanRHI::AllocateDescriptorSets()
 	}
 }
 
-// RegisterTexture: accept a weak_ptr and store it (skip expired / duplicates)
 void VulkanRHI::RegisterTexture(const std::weak_ptr<Texture>& textureWeak)
 {
     auto sp = textureWeak.lock();
@@ -1952,8 +1951,6 @@ void VulkanRHI::RegisterTexture(const std::weak_ptr<Texture>& textureWeak)
         sp->WriteToDescriptorSets(this);
     }
 }
-
-// UnregisterTexture overload taking raw pointer (keeps backward compatibility)
 void VulkanRHI::UnregisterTexture(Texture* texture)
 {
 	if (!texture) return;
@@ -2007,7 +2004,6 @@ void VulkanRHI::UnregisterTexture(Texture* texture)
 		}
 	}
 }
-// UnregisterTexture overload taking weak_ptr
 void VulkanRHI::UnregisterTexture(const std::weak_ptr<Texture>& textureWeak)
 {
     if (std::shared_ptr<Texture> sp = textureWeak.lock()) {
@@ -2033,9 +2029,6 @@ void VulkanRHI::CreateCameraUniformBufferAndWriteDescriptors()
 	// If existing buffer is large enough, reuse it and only re-write descriptors.
 	bool reuseBuffer = (m_CameraUniformBuffer != VK_NULL_HANDLE && m_CameraUniformBufferMemory != VK_NULL_HANDLE && m_CameraUniformBufferSize * 1 /*region size*/ * count <= /*existing allocated size unknown but we can compare a stored total if available*/ 0);
 
-	// Note: we don't have stored previous total size in the header; best-effort:
-	// If buffer exists, try to reuse it to avoid invalidating descriptor sets that may have copied references.
-	// Safer: only recreate if no buffer exists yet.
 	if (m_CameraUniformBuffer != VK_NULL_HANDLE && m_CameraUniformBufferMemory != VK_NULL_HANDLE) {
 		// prefer reuse (avoid destroying the VkBuffer that per-entity descriptor sets may reference)
 		reuseBuffer = true;

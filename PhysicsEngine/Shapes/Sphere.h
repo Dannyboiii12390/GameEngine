@@ -27,7 +27,8 @@ namespace Physics
         bool isColliding(const Plane& other) const override;
 		void setPosition(const glm::vec3& newPos) override { m_pos = newPos; }
 		void setRadius(float newRadius) { m_radius = newRadius; }   
-        //bool isColliding(const Collider& other) const override { other.isColliding(this); }
+        
+        bool isColliding(const Collider& other) const override { return other.isColliding(*this); }
 
     private:
         glm::vec3 m_pos;
