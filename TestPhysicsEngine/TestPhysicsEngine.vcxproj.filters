@@ -61,6 +61,9 @@
     <ClCompile Include="RotationTest.cpp">
       <Filter>Maths</Filter>
     </ClCompile>
+    <ClCompile Include="AngularVelocityTest.cpp">
+      <Filter>Maths</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

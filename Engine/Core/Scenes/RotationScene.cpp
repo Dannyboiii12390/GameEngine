@@ -9,7 +9,6 @@
 #include "../../../PhysicsEngine/Maths/CollisionResolution/ConservationOfMomentum.h"
 #include "../../../PhysicsEngine/Maths/CollisionResolution/CollisionResolution.h"
 #include "../../DebugUtils.h"
-#include "../../../PhysicsEngine/Maths/Transform.h"
 
 static void CollisionResponse(Entity& self, Entity& other)
 {
@@ -301,24 +300,20 @@ void RotationScene::Update(float deltaTime)
 
 	deltaTime = m_paused ? 0.0f : deltaTime;
 
+	// Set rotational velocity (radians/sec) on the second entity (index 1).
+	// SystemVelocity expects rotational velocity in radians/sec.
 	if (m_entities.size() > 1)
 	{
-		ComponentTranslation * xf = m_entities[2].GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
-		if (xf)
+		ComponentVelocity* vel = m_entities[2].GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+		if (vel)
 		{
-			static Physics::Transform demoTransform; // persists across frames
-			glm::vec3 perSecondDeg = glm::vec3(0.0f, 90.0f, 0.0f); // 90 deg/sec around Y
-			//convert to radians
-			//glm::vec3 perSecondRad = glm::radians(perSecondDeg);
-
-			ComponentVelocity* vel = m_entities[2].GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-			if (vel)
-			{
-				vel->SetRotationalVelocity(perSecondDeg);
-			}
+			// 90 degrees per second around Y -> pi/2 radians per second
+			glm::vec3 perSecondDeg = glm::vec3(0.0f, 90.0f, 0.0f);
+			glm::vec3 perSecondRad = glm::radians(perSecondDeg);
+			vel->SetRotationalVelocity(perSecondRad);
 		}
-
 	}
+
 	m_systemManager.Update(m_entities, deltaTime);
 
 }
