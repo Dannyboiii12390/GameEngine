@@ -156,6 +156,7 @@
     <ClCompile Include="Core\Components\ComponentCollision.h" />
     <ClCompile Include="Core\Components\ComponentGeometry.cpp" />
     <ClCompile Include="Core\Components\ComponentPhysics.cpp" />
+    <ClCompile Include="Core\Components\ComponentTranslation.cpp" />
     <ClCompile Include="Core\InputHandler.cpp" />
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
     <ClCompile Include="Core\Managers\SystemManager.cpp" />

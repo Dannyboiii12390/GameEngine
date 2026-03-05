@@ -237,6 +237,23 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	{
 		phys1->SetAffectedByGravity(false);
 		phys1->SetMass(2.0f);
+
+		// If we have a sphere collider, compute solid-sphere inertia I = 2/5 m r^2 and set it on the physics component.
+		ComponentCollision* colComp = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+		if (colComp)
+		{
+			Physics::Collider* collider = colComp->GetCollider();
+			if (collider && collider->getType() == Physics::EColliderType::SPHERE)
+			{
+				auto* sphere = dynamic_cast<Physics::Sphere*>(collider);
+				if (sphere)
+				{
+					float r = sphere->getRadius();
+					float I = 0.4f * phys1->GetMass() * r * r; // 2/5 m r^2
+					phys1->SetMomentOfInertia(glm::vec3(I, I, I));
+				}
+			}
+		}
 	}
 
 	ComponentTranslation* xf1 = entity1.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
@@ -300,9 +317,23 @@ void RotationScene::Update(float deltaTime)
 
 	deltaTime = m_paused ? 0.0f : deltaTime;
 
+	if (!m_paused && m_entities.size() > 0)
+	{
+		// entity1 was added first in the constructor -> index 0
+		ComponentPhysics* phys = m_entities[0].GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+		if (phys)
+		{
+			// Constant torque around Z axis. Do NOT multiply by deltaTime here:
+			// SystemPhysics integrates angular acceleration (tau / I) * dt so keeping torque constant
+			// makes the applied angular acceleration frame-rate independent.
+			const glm::vec3 continuousTorque(0.0f, 0.0f, 50.0f);
+			phys->ApplyTorque(continuousTorque);
+		}
+	}
+
 	// Set rotational velocity (radians/sec) on the second entity (index 1).
 	// SystemVelocity expects rotational velocity in radians/sec.
-	if (m_entities.size() > 1)
+	if (m_entities.size() > 2)
 	{
 		ComponentVelocity* vel = m_entities[2].GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 		if (vel)
