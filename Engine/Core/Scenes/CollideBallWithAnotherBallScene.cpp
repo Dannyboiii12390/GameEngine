@@ -235,7 +235,7 @@ CollideBallWithAnotherBallScene::CollideBallWithAnotherBallScene(Window& p_windo
 	ComponentPhysics* phys1 = entity1.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
 	if (phys1)
 	{
-		phys1->SetAffectedByGravity(false);
+		phys1->SetAffectedByGravity(true);
 		phys1->SetMass(2.0f);
 	}
 	
