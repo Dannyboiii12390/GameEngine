@@ -31,6 +31,7 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 			continue;
 		}
 		ComponentCollision* collisionComp = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+
 		for(Entity& other : entities)
 		{
 			if (&entity == &other) continue; // skip self
