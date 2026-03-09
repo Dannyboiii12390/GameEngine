@@ -17,12 +17,15 @@ public:
 	{
 		for(auto& entity : entities)
 		{
-			EComponentType type = EComponentType::Component_Velocity | EComponentType::Component_Translation;
+			EComponentType type = EComponentType::Component_Velocity | EComponentType::Component_Transform;
 			if(entity.HasComponent(type))
 			{
 				ComponentVelocity* velocity = entity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-				ComponentTranslation* translation = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
-				
+				ComponentTransform* translation = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+
+				// Snapshot position before integration so CollisionResponse can restore it.
+				translation->SavePreviousPosition();
+
 				glm::vec3 deltaPos = velocity->GetPositionVelocity() * static_cast<float>(deltaTime);
 				glm::vec3 deltaRot = velocity->GetRotationalVelocity() * static_cast<float>(deltaTime);
 				glm::vec3 deltaScale = velocity->GetScaleVelocity() * static_cast<float>(deltaTime);

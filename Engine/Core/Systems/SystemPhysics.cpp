@@ -1,7 +1,7 @@
 #include "SystemPhysics.h"
 #include "../Components/ComponentPhysics.h"
 #include "../Components/ComponentVelocity.h"
-#include "../Components/ComponentTranslation.h"
+#include "../Components/ComponentTransform.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -35,11 +35,11 @@ void SystemPhysics::OnUpdate(std::span<Entity> entities, float deltaTime)
 
         // ---- Angular / rotational update (with inertia tensor) ----
         // We need the object's orientation to convert world torque into object (body) space.
-        ComponentTranslation* transform = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+        ComponentTransform* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
         glm::mat3 R = glm::mat3(1.0f);
         if (transform)
         {
-            // Build rotation matrix using same order as ComponentTranslation::GetTransformMatrix:
+            // Build rotation matrix using same order as ComponentTransform::GetTransformMatrix:
             glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), glm::radians(transform->Rotation().x), glm::vec3(1.0f, 0.0f, 0.0f));
             glm::mat4 rotY = glm::rotate(glm::mat4(1.0f), glm::radians(transform->Rotation().y), glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), glm::radians(transform->Rotation().z), glm::vec3(0.0f, 0.0f, 1.0f));

@@ -8,7 +8,7 @@
 class ComponentTransform : public IComponent
 {
 public:
-	ComponentTransform(const glm::vec3& position = glm::vec3(0.0f), const glm::vec3& rotation = glm::vec3(0.0f), const glm::vec3& scale = glm::vec3(1.0f)) : IComponent(EComponentType::Component_Transform), m_Position(position), m_Rotation(rotation), m_Scale(scale) { }
+	ComponentTransform(const glm::vec3& position = glm::vec3(0.0f), const glm::vec3& rotation = glm::vec3(0.0f), const glm::vec3& scale = glm::vec3(1.0f)) : IComponent(EComponentType::Component_Transform), m_Position(position), m_Rotation(rotation), m_Scale(scale), m_PreviousPosition(position) { }
 
 	glm::mat4 GetTransformMatrix() const
 	{
@@ -20,13 +20,13 @@ public:
 		glm::mat4 scale = glm::scale(glm::mat4(1.0f), m_Scale);
 		return translation * rotation * scale;
 	}
-
 	const glm::vec3& Position() const { return m_Position; }
 	const glm::vec3& Rotation() const { return m_Rotation; }
 	const glm::vec3& Scale() const { return m_Scale; }
 
-	// Call SavePreviousPosition() before applying per-frame integration.
-	// CollisionResponse can then restore the entity to its pre-move position.
+	// Previous-position helpers
+	// Call SavePreviousPosition() before applying the per-frame positional integration so the previous
+	// (pre-move) position is available for collision resolution.
 	void SavePreviousPosition() { m_PreviousPosition = m_Position; }
 	const glm::vec3& PreviousPosition() const { return m_PreviousPosition; }
 
@@ -38,9 +38,14 @@ public:
 	void ChangeRotation(const glm::vec3& delta) { m_Rotation += delta; }
 	void ChangeScale(const glm::vec3& delta) { m_Scale += delta; }
 
+
 private:
+
 	glm::vec3 m_Position;
 	glm::vec3 m_Rotation;
 	glm::vec3 m_Scale;
+
+	// store previous-frame position so collision response can restore pre-penetration transform
 	glm::vec3 m_PreviousPosition;
+
 };

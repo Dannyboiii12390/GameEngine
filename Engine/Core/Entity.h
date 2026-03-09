@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "Components/IComponent.h"
-#include "Components/ComponentTranslation.h"
+#include "Components/ComponentTransform.h"
 #include "Components/ComponentVelocity.h"
 #include "Components/ComponentGeometry.h"
 #include "Components/ComponentPhysics.h"
@@ -28,11 +28,11 @@ public:
 	{
 		switch (type)
 		{
-			case EComponentType::Component_Translation:
+			case EComponentType::Component_Transform:
 			{
-				auto component = std::make_unique<ComponentTranslation>(std::forward<Args>(args)...);
+				auto component = std::make_unique<ComponentTransform>(std::forward<Args>(args)...);
 				m_Components[type] = std::move(component);
-				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Translation));
+				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Transform));
 				break;
 			}
 			case EComponentType::Component_Velocity:

@@ -7,7 +7,7 @@
 enum class EComponentType : uint32_t
 {
 	Component_None = 0,
-	Component_Translation = 1u << 0,
+	Component_Transform = 1u << 0,
 	Component_Velocity = 1u << 1,
 	Component_Geometry = 1u << 2,
 	Component_Audio = 1u << 3,

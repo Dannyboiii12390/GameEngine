@@ -4,7 +4,7 @@
 
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
-	EComponentType requiredComponents = EComponentType::Component_Collision | EComponentType::Component_Translation;
+	EComponentType requiredComponents = EComponentType::Component_Collision | EComponentType::Component_Transform;
 
 	for(Entity& entity : entities)
 	{
@@ -22,7 +22,7 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 			}
 			ComponentCollision* otherCollision = other.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 			
-			ComponentTranslation* thisTransform = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+			ComponentTransform* thisTransform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 			glm::vec3 thisNewPos = thisTransform->Position();
 			collisionComp->GetCollider()->setPosition(thisNewPos);
 

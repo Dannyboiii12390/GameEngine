@@ -3,7 +3,7 @@
 #include "../../Renderer/VulkanRHI.h"
 #include "../Entity.h"
 #include "../Components/ComponentGeometry.h"
-#include "../Components/ComponentTranslation.h"
+#include "../Components/ComponentTransform.h"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <Windows.h> // for OutputDebugStringA
@@ -105,9 +105,9 @@ void SystemRenderer::Render(VkCommandBuffer cmd, std::vector<Entity>& entities)
 
 		// Always push a model matrix because the vertex shader expects a push-constant mat4.
 		glm::mat4 transform = glm::mat4(1.0f);
-		if (e.HasComponent(EComponentType::Component_Translation))
+		if (e.HasComponent(EComponentType::Component_Transform))
 		{
-			auto* xf = e.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+			auto* xf = e.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 			if (xf)
 			{
 				transform = xf->GetTransformMatrix();

@@ -31,7 +31,7 @@ static void CollisionResponse(Entity& self, Entity& other)
 		return;
 
 	// Required components on self to update velocity/position
-	ComponentTranslation* transSelf = self.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+	ComponentTransform* transSelf = self.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 	ComponentVelocity* velSelf = self.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 	ComponentPhysics* physSelf = self.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
 
@@ -42,7 +42,7 @@ static void CollisionResponse(Entity& self, Entity& other)
 	glm::vec3 posSelf = transSelf->Position();
 	glm::vec3 vSelf = velSelf->GetPositionVelocity();
 	float massSelf = (physSelf) ? physSelf->GetMass() : 1.0f;
-	float invMassSelf = (physSelf) ? physSelf->GetInverseMass() : 1.0f; // if no physics component, treat as mass 1
+	float invMassSelf = (physSelf) ? physSelf->GetInverseMass() : 1.0f;
 
 	// compute contact normal from other -> points from other surface toward sphere center
 	glm::vec3 contactNormal(0.0f);
@@ -60,7 +60,6 @@ static void CollisionResponse(Entity& self, Entity& other)
 			contactNormal = dir / dist;
 		else
 		{
-			// Degenerate: choose plane normal direction using signed distance sign
 			float signedD = plane->signedDistance(posSelf);
 			contactNormal = (std::abs(signedD) > EPS) ? glm::normalize(posSelf - proj) : glm::vec3(0.0f, 1.0f, 0.0f);
 		}
@@ -84,7 +83,6 @@ static void CollisionResponse(Entity& self, Entity& other)
 		float L = glm::length(AB);
 		if (L <= EPS)
 		{
-			// degenerate -> radial from A
 			glm::vec3 diff = posSelf - A;
 			float dlen = glm::length(diff);
 			contactNormal = (dlen > EPS) ? diff / dlen : glm::vec3(0.0f, 1.0f, 0.0f);
@@ -102,9 +100,14 @@ static void CollisionResponse(Entity& self, Entity& other)
 	}
 	else
 	{
-		// Not handled
 		return;
 	}
+
+	// Only resolve if the entity is actually moving toward the surface.
+	// This prevents re-triggering the response every frame when resting against a surface.
+	const float approachSpeed = glm::dot(vSelf, contactNormal);
+	if (approachSpeed >= 0.0f)
+		return;
 
 	// If the other entity participates in physics with non-zero inverse mass -> two-body resolution
 	ComponentPhysics* physOther = other.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
@@ -116,42 +119,39 @@ static void CollisionResponse(Entity& self, Entity& other)
 		float massOther = physOther->GetMass();
 		glm::vec3 vOther = (velOther) ? velOther->GetPositionVelocity() : glm::vec3(0.0f);
 
-		// Compute elastic collision along the collision normal only:
-		// Project velocities onto the normal and tangential components remain unchanged.
 		glm::vec3 n = contactNormal;
 		glm::vec3 u1n = glm::dot(vSelf, n) * n;
 		glm::vec3 u1t = vSelf - u1n;
 		glm::vec3 u2n = glm::dot(vOther, n) * n;
 		glm::vec3 u2t = vOther - u2n;
 
-		// Solve 1D elastic collision for normal components
 		auto [v1_after, v2_after] = Physics::ElasticCollision(u1n, u2n, massSelf, massOther);
 
-		glm::vec3 newV1 = v1_after + u1t;
-		glm::vec3 newV2 = v2_after + u2t;
-
-		// Apply velocities back
-		velSelf->SetPositionalVelocity(newV1);
+		velSelf->SetPositionalVelocity(v1_after + u1t);
 		if (velOther)
-			velOther->SetPositionalVelocity(newV2);
+			velOther->SetPositionalVelocity(v2_after + u2t);
 	}
 	else
 	{
-		// Treat other as fixed/infinite mass. Use resolver with restitution.
-		// Determine restitution: prefer a restitution stored in physics component if present.
-		float restitution = 1.0f; // default perfectly elastic
-		// If self has a physics component we might expose restitution later; for now use 1.0
+		float restitution = 1.0f;
 		glm::vec3 newV = Physics::ResolveVelocityAgainstFixedObject(vSelf, restitution, contactNormal);
 		velSelf->SetPositionalVelocity(newV);
-
-		// Optional: positional fixup (push sphere out of penetration) could be added here.
 	}
 
-	// Clear accumulated physics forces for self to avoid immediate re-penetration due to stored impulses
+	// Restore the entity to its pre-integration position, then push it a small
+	// epsilon along the contact normal so it starts the next frame clearly outside
+	// the surface and does not immediately re-trigger the collision response.
+	const float separationBias = 0.01f;
+	glm::vec3 resolvedPos = transSelf->PreviousPosition() + contactNormal * separationBias;
+	transSelf->SetPosition(resolvedPos);
+
+	// Keep the collider world position in sync with the corrected transform.
+	col->setPosition(transSelf->Position());
+
+	// Clear accumulated forces to prevent stored impulses from immediately
+	// driving the entity back into penetration on the next physics tick.
 	if (physSelf)
-	{
 		physSelf->ClearForces();
-	}
 }
 
 
@@ -172,7 +172,7 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		{
 			static int entityCount = 0;
 
-			entity.AddComponent(EComponentType::Component_Translation, pos, glm::vec3(0.0f), glm::vec3(1.0f));
+			entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f), glm::vec3(1.0f));
 			entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
 			entity.AddComponent(EComponentType::Component_Geometry);
 			entity.AddComponent(EComponentType::Component_Collision);
@@ -182,21 +182,20 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			{
 				MeshData meshData;
 				ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-				ComponentTranslation* xf;
-				auto* transform = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+				ComponentTransform* xf;
+				auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 				switch (type)
 				{
 				case Physics::EColliderType::SPHERE:
 					meshData = ResourceManager::CreateSphereMesh(16, 16);
-					col->SetCollider(std::make_unique<Physics::Sphere>(pos, 0.5f)); // radius 0.5 to match unit sphere mesh scaled by 0.5 in translation component
+					col->SetCollider(std::make_unique<Physics::Sphere>(pos, 0.5f));
 					break;
 				case Physics::EColliderType::PLANE:
-					xf = entity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
-					xf->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f)); // rotate plane to be horizontal
+					xf = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+					xf->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 					meshData = ResourceManager::CreatePlaneMesh();
 					col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
 					transform->SetScale(glm::vec3(50.0f));
-
 					break;
 				default:
 					LOG_DEBUG("unsupported mesh type for entity");
@@ -238,7 +237,6 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		phys1->SetAffectedByGravity(false);
 		phys1->SetMass(2.0f);
 
-		// If we have a sphere collider, compute solid-sphere inertia I = 2/5 m r^2 and set it on the physics component.
 		ComponentCollision* colComp = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 		if (colComp)
 		{
@@ -249,14 +247,14 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 				if (sphere)
 				{
 					float r = sphere->getRadius();
-					float I = 0.4f * phys1->GetMass() * r * r; // 2/5 m r^2
+					float I = 0.4f * phys1->GetMass() * r * r;
 					phys1->SetMomentOfInertia(glm::vec3(I, I, I));
 				}
 			}
 		}
 	}
 
-	ComponentTranslation* xf1 = entity1.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+	ComponentTransform* xf1 = entity1.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 	xf1->SetScale(glm::vec3(2.0f));
 	ComponentCollision* col1 = entity1.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	Physics::Sphere* sphereColEntity1 = dynamic_cast<Physics::Sphere*>(col1->GetCollider());
@@ -266,7 +264,7 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	ComponentCollision* col2 = entity2.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	col2->SetOnCollision(CollisionResponse);
 
-	ComponentTranslation* xf_floor = floorEntity.GetComponent<ComponentTranslation>(EComponentType::Component_Translation);
+	ComponentTransform* xf_floor = floorEntity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 
 	AddEntity(std::move(entity1));
 	AddEntity(std::move(entity2));
@@ -279,12 +277,10 @@ RotationScene::~RotationScene()
 {
 	if (m_vulkanRHI)
 	{
-		m_vulkanRHI->WaitIdle(); // ensure device idle before destroying GUI resources
+		m_vulkanRHI->WaitIdle();
 
 		for (auto& entity : m_entities)
-		{
 			entity.Destroy();
-		}
 
 		m_systemManager.Shutdown();
 	}
@@ -293,23 +289,19 @@ void RotationScene::Destroy()
 {
 	if (m_vulkanRHI)
 	{
-		m_vulkanRHI->WaitIdle(); // ensure device idle before destroying GUI resources
+		m_vulkanRHI->WaitIdle();
 
 		for (auto& entity : m_entities)
-		{
 			entity.Destroy();
-		}
 
 		m_systemManager.Shutdown();
 	}
 }
 void RotationScene::Start(float deltaTime)
 {
-	// Example: start a timer, play music, trigger an animation.
 }
 void RotationScene::Stop()
 {
-	// Example: pause a timer, stop music, pause an animation.
 }
 void RotationScene::Update(float deltaTime)
 {
@@ -319,26 +311,19 @@ void RotationScene::Update(float deltaTime)
 
 	if (!m_paused && m_entities.size() > 0)
 	{
-		// entity1 was added first in the constructor -> index 0
 		ComponentPhysics* phys = m_entities[0].GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
 		if (phys)
 		{
-			// Constant torque around Z axis. Do NOT multiply by deltaTime here:
-			// SystemPhysics integrates angular acceleration (tau / I) * dt so keeping torque constant
-			// makes the applied angular acceleration frame-rate independent.
 			const glm::vec3 continuousTorque(0.0f, 0.0f, 50.0f);
 			phys->ApplyTorque(continuousTorque);
 		}
 	}
 
-	// Set rotational velocity (radians/sec) on the second entity (index 1).
-	// SystemVelocity expects rotational velocity in radians/sec.
 	if (m_entities.size() > 2)
 	{
 		ComponentVelocity* vel = m_entities[2].GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 		if (vel)
 		{
-			// 90 degrees per second around Y -> pi/2 radians per second
 			glm::vec3 perSecondDeg = glm::vec3(0.0f, 90.0f, 0.0f);
 			glm::vec3 perSecondRad = glm::radians(perSecondDeg);
 			vel->SetRotationalVelocity(perSecondRad);
@@ -346,29 +331,23 @@ void RotationScene::Update(float deltaTime)
 	}
 
 	m_systemManager.Update(m_entities, deltaTime);
-
 }
 void RotationScene::FixedUpdate()
 {
-	// Example: physics updates at fixed timestep.
 }
 void RotationScene::Draw()
 {
 	m_vulkanRHI->BeginFrame();
 
-	// Record draw commands into the currently-acquired command buffer
 	VkCommandBuffer cmd = m_vulkanRHI->GetCurrentCommandBuffer();
 	if (cmd != VK_NULL_HANDLE)
 	{
 		m_systemManager.Render(cmd, m_entities);
 
-
 		if (m_gui)
 		{
-
 			m_gui->NewFrame();
 
-			// Simple main menu bar with File and View menus
 			static bool show_demo_window = false;
 			static bool show_about = true;
 
@@ -377,9 +356,7 @@ void RotationScene::Draw()
 				if (ImGui::BeginMenu("File"))
 				{
 					if (ImGui::MenuItem("Exit", "Esc"))
-					{
 						glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
-					}
 					ImGui::EndMenu();
 				}
 
@@ -394,7 +371,6 @@ void RotationScene::Draw()
 				{
 					if (ImGui::MenuItem("Open Documentation"))
 					{
-						// TODO: open docs or trigger action
 					}
 					ImGui::EndMenu();
 				}
@@ -402,7 +378,6 @@ void RotationScene::Draw()
 				ImGui::EndMainMenuBar();
 			}
 
-			// Optional windows driven by menu toggles
 			if (show_demo_window)
 				ImGui::ShowDemoWindow(&show_demo_window);
 
@@ -412,9 +387,7 @@ void RotationScene::Draw()
 				ImGui::Text("GameEngine - ImGui Menu Bar Example");
 				ImGui::Text("Press Esc or use File -> Exit to quit.");
 				if (ImGui::Button("Start/Stop Simulation"))
-				{
 					m_paused = !m_paused;
-				}
 				ImGui::End();
 			}
 
@@ -424,8 +397,8 @@ void RotationScene::Draw()
 	m_vulkanRHI->EndFrame();
 	m_vulkanRHI->Present();
 }
-void RotationScene::HandleInput(float deltaTime) {
-
+void RotationScene::HandleInput(float deltaTime)
+{
 	if (m_inputHandler.isKeyPressed(GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
 
 	const float cameraMoveSpeed = 1.0f;
@@ -437,17 +410,16 @@ void RotationScene::HandleInput(float deltaTime) {
 }
 void RotationScene::SerializeState()
 {
-	// Example: serialize entity states to a file.
 }
 void RotationScene::DeserializeState()
 {
-	// Example: deserialize entity states from a file.
 }
-
-void RotationScene::AddEntity(Entity&& entity) {
+void RotationScene::AddEntity(Entity&& entity)
+{
 	m_entities.push_back(std::move(entity));
 }
-void RotationScene::RemoveEntity(int index) {
+void RotationScene::RemoveEntity(int index)
+{
 	if (index >= 0 && index < m_entities.size())
 		m_entities.erase(m_entities.begin() + index);
 }
