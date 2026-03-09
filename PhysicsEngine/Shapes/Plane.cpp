@@ -1,17 +1,19 @@
-
 #include "Plane.h"
 #include "Sphere.h"
 #include "LineInf.h"
 #include "Capsule.h"
 #include "Cylinder.h"
+#include <glm/gtx/rotate_vector.hpp>
 
 
 using namespace Physics;
 
-Plane::Plane(const glm::vec3& point, const glm::vec3& u, const glm::vec3& v) : m_point(point), m_u(u), m_v(v), Collider(EColliderType::PLANE)
+Plane::Plane(const glm::vec3& point, const glm::vec3& u, const glm::vec3& v)
+    : m_point(point), m_u(u), m_v(v), Collider(EColliderType::PLANE),
+      m_basePoint(point), m_baseU(u), m_baseV(v)
 {
-	m_normal = glm::cross(m_u, m_v);
-	m_unitNormal = glm::normalize(m_normal);
+    m_normal = glm::cross(m_u, m_v);
+    m_unitNormal = glm::normalize(m_normal);
 }
 
 Plane Plane::FromThreePoints(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2)
@@ -152,4 +154,22 @@ bool Plane::isColliding(const Plane& other) const
 	float d = signedDistance(other.m_point);
 	return std::abs(d) <= EPS;
 }
+void Plane::setPosition(const glm::vec3& newPos)
+{
+	m_point = newPos;
+}
+void Plane::setRotation(const glm::vec3& eulerDegrees)
+{
+	glm::mat4 rot = glm::mat4(1.0f);
+	rot = glm::rotate(rot, glm::radians(eulerDegrees.x), glm::vec3(1, 0, 0));
+	rot = glm::rotate(rot, glm::radians(eulerDegrees.y), glm::vec3(0, 1, 0));
+	rot = glm::rotate(rot, glm::radians(eulerDegrees.z), glm::vec3(0, 0, 1));
 
+	// Only rotate the tangent vectors — the plane's world-space point stays fixed.
+	m_u = glm::vec3(rot * glm::vec4(m_baseU, 0.0f));
+	m_v = glm::vec3(rot * glm::vec4(m_baseV, 0.0f));
+	m_point = m_basePoint; // position is managed by setPosition, not rotation
+
+	m_normal = glm::cross(m_u, m_v);
+	m_unitNormal = glm::normalize(m_normal);
+}

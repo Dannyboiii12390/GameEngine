@@ -134,3 +134,10 @@ bool Sphere::isColliding(const Plane& other) const
     float absDist = std::abs(signedDist);
     return absDist <= m_radius;
 }
+
+void Sphere::setScale(const glm::vec3& newScale) 
+{
+    // Uniformly scale the radius by the largest component of the scale vector.
+    float maxScale = std::max(newScale.x, std::max(newScale.y, newScale.z));
+    m_radius *= maxScale;
+}

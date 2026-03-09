@@ -10,6 +10,9 @@
 #include "../../../PhysicsEngine/Maths/CollisionResolution/CollisionResolution.h"
 #include "../../DebugUtils.h"
 
+# define M_PI           3.14159265358979323846  /* pi */
+
+
 static void CollisionResponse(Entity& self, Entity& other)
 {
 	LOG_DEBUG("Collision detected between entities!");
@@ -194,7 +197,8 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 					xf = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 					xf->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 					meshData = ResourceManager::CreatePlaneMesh();
-					col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
+					// u=(1,0,0), v=(0,1,0) -> normal = cross(u,v) = (0,0,1) rotated by -90 X -> (0,1,0) pointing up
+					col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 					transform->SetScale(glm::vec3(50.0f));
 					break;
 				default:
@@ -264,6 +268,9 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	ComponentCollision* col2 = entity2.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	col2->SetOnCollision(CollisionResponse);
 
+	auto* velFloor = floorEntity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+	velFloor->SetRotationalVelocity(glm::vec3(15.0f, 0.0f, 0.0f));
+
 	ComponentTransform* xf_floor = floorEntity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 
 	AddEntity(std::move(entity1));
@@ -316,17 +323,6 @@ void RotationScene::Update(float deltaTime)
 		{
 			const glm::vec3 continuousTorque(0.0f, 0.0f, 50.0f);
 			phys->ApplyTorque(continuousTorque);
-		}
-	}
-
-	if (m_entities.size() > 2)
-	{
-		ComponentVelocity* vel = m_entities[2].GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-		if (vel)
-		{
-			glm::vec3 perSecondDeg = glm::vec3(0.0f, 90.0f, 0.0f);
-			glm::vec3 perSecondRad = glm::radians(perSecondDeg);
-			vel->SetRotationalVelocity(perSecondRad);
 		}
 	}
 
@@ -384,8 +380,10 @@ void RotationScene::Draw()
 			if (show_about)
 			{
 				ImGui::Begin("About", &show_about);
-				ImGui::Text("GameEngine - ImGui Menu Bar Example");
-				ImGui::Text("Press Esc or use File -> Exit to quit.");
+				auto* col = m_entities[2].GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+				auto collider = col->GetCollider();
+				auto planeCol = dynamic_cast<Physics::Plane*>(collider);
+				ImGui::Text(planeCol->toString().c_str());
 				if (ImGui::Button("Start/Stop Simulation"))
 					m_paused = !m_paused;
 				ImGui::End();
@@ -401,11 +399,23 @@ void RotationScene::HandleInput(float deltaTime)
 {
 	if (m_inputHandler.isKeyPressed(GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
 
-	const float cameraMoveSpeed = 1.0f;
+	float cameraMoveSpeed = 5.0f;
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_LEFT_SHIFT)) cameraMoveSpeed *= 2.0f;
+
 	if (m_inputHandler.isKeyHeld(GLFW_KEY_W)) m_camera.Translate(m_camera.Forward() * cameraMoveSpeed * deltaTime);
 	if (m_inputHandler.isKeyHeld(GLFW_KEY_S)) m_camera.Translate(-m_camera.Forward() * cameraMoveSpeed * deltaTime);
 	if (m_inputHandler.isKeyHeld(GLFW_KEY_A)) m_camera.Translate(-m_camera.Right() * cameraMoveSpeed * deltaTime);
 	if (m_inputHandler.isKeyHeld(GLFW_KEY_D)) m_camera.Translate(m_camera.Right() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_LEFT_CONTROL)) m_camera.Translate(-m_camera.Up() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_SPACE)) m_camera.Translate(m_camera.Up() * cameraMoveSpeed * deltaTime);
+
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_J)) m_camera.Rotate(glm::vec3(0.0f, -90.0f * deltaTime, 0.0f));
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_L)) m_camera.Rotate(glm::vec3(0.0f, 90.0f * deltaTime, 0.0f));
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_K)) m_camera.Rotate(glm::vec3(-90.0f * deltaTime, 0.0f, 0.0f));
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_I)) m_camera.Rotate(glm::vec3(90.0f * deltaTime, 0.0f, 0.0f));
+
+
+
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 }
 void RotationScene::SerializeState()

@@ -1,6 +1,7 @@
 
 
 #pragma once
+#define GLM_ENABLE_EXPERIMENTAL
 
 namespace Physics
 {
@@ -22,9 +23,9 @@ namespace Physics
 
 	class Collider
 	{
-	public: 
+	public:
 		Collider(EColliderType p_type) : m_type(p_type) {};
-		virtual ~Collider() = default; 
+		virtual ~Collider() = default;
 
 		// Use fully-qualified names to avoid ambiguous lookup (e.g. other Sphere symbols in other namespaces).
 		virtual bool isColliding(const ::Physics::Sphere& other) const = 0;
@@ -32,10 +33,13 @@ namespace Physics
 		virtual bool isColliding(const ::Physics::Capsule& other) const = 0;
 		virtual bool isColliding(const ::Physics::Cylinder& other) const = 0;
 		virtual bool isColliding(const ::Physics::Plane& other) const = 0;
-		//virtual bool isColliding(const Collider& other) const = 0;
-		virtual void setPosition(const glm::vec3& newPos) {} // Only relevant for some collider types, so provide a default empty implementation.
-		virtual void setRotation(const glm::vec3& newRot) {} // Only relevant for some collider types, so provide a default empty implementation.
-		virtual void setScale(const glm::vec3& newScale) {} // Only relevant for some collider types, so provide a default empty implementation.
+
+		virtual void setPosition(const glm::vec3& newPos) {}
+		virtual void setRotation(const glm::vec3& newRot) {}
+		virtual void setScale(const glm::vec3& newScale) {}
+
+
+
 		virtual bool isColliding(const Collider& other) const = 0;
 
 		EColliderType getType() const { return m_type; }

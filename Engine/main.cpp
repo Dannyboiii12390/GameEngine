@@ -29,17 +29,7 @@
 #include "flatbuffers/flatbuffers.h"
 #include "Core/Scenes/RotationScene.h"
 
-//  flat buffer serialization - packet should probably use this
-//  .fbs
-//  wireshark - network sniffer
-//  winsock shims
-//  TMNetsim
-
-//  need to implement a UDP Socket class
-//  class UDP socket
-//  unit tests for networking code
-
-//collider in component collider isnt updating rotationally
+// add a toString class to every collider
 
 int clientRequest()
 {

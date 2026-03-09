@@ -1,6 +1,8 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "Collider.h"   
+#include <string>
+#include <sstream>
 
 namespace Physics
 {
@@ -30,6 +32,22 @@ namespace Physics
 
 		bool isColliding(const Collider& other) const override { return other.isColliding(*this); }
 
+        void setPosition(const glm::vec3& newPos) override;
+        void setRotation(const glm::vec3& newRot) override;
+
+        std::string toString()
+        {
+            std::stringstream ss;
+            ss << "Point: " << vectoString(m_point) << "\n";
+            ss << "m_u: " << vectoString(m_u) << "\n";
+            ss << "m_v: " << vectoString(m_v) << "\n";
+            ss << "m_normal: " << vectoString(m_normal) << "\n";
+            ss << "m_unitNormal: " << vectoString(m_unitNormal) << "\n";
+            ss << "m_basePoint: " << vectoString(m_basePoint) << "\n";
+            ss << "m_baseU: " << vectoString(m_baseU) << "\n";
+            ss << "m_baseV: " << vectoString(m_baseV);
+            return ss.str();
+        }
     private:
         glm::vec3 m_point;
 
@@ -38,5 +56,16 @@ namespace Physics
 
         glm::vec3 m_normal;
         glm::vec3 m_unitNormal;
+
+		glm::vec3 m_basePoint;
+		glm::vec3 m_baseU;
+		glm::vec3 m_baseV;
+
+        std::string vectoString(const glm::vec3& v) const
+        {
+            ::std::stringstream ss;
+            ss << "(" << v.x << ", " << v.y << ", " << v.z << ")";
+            return ss.str();
+        }
     };
 };

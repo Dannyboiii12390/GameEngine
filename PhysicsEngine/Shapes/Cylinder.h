@@ -32,6 +32,10 @@ namespace Physics
 
 		bool isColliding(const Collider& other) const override { return other.isColliding(*this); }
 
+        void setPosition(const glm::vec3& newPos) override;
+        void setRotation(const glm::vec3& newRot) override;
+        void setScale(const glm::vec3& newScale) override;
+
     private:
         glm::vec3 m_a;
         glm::vec3 m_b;

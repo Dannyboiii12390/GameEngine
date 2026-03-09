@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <cmath>
+#include <glm/gtx/rotate_vector.hpp>
 
 using namespace Physics;
 
@@ -294,4 +295,39 @@ bool Capsule::isColliding(const Plane& other) const
     if (std::fabs(dB) <= m_radius) return true;
 
     return false;
+}
+
+void Capsule::setPosition(const glm::vec3& newPos)
+{
+    glm::vec3 center = (m_a + m_b) * 0.5f;
+    glm::vec3 offset = newPos - center;
+    m_a += offset;
+    m_b += offset;
+}
+void Capsule::setRotation(const glm::vec3& newRot)
+{
+    glm::vec3 center = (m_a + m_b) * 0.5f;
+    m_a -= center;
+    m_b -= center;
+    m_a = glm::rotate(m_a, newRot.x, glm::vec3(1, 0, 0));
+    m_a = glm::rotate(m_a, newRot.y, glm::vec3(0, 1, 0));
+    m_a = glm::rotate(m_a, newRot.z, glm::vec3(0, 0, 1));
+    m_b = glm::rotate(m_b, newRot.x, glm::vec3(1, 0, 0));
+    m_b = glm::rotate(m_b, newRot.y, glm::vec3(0, 1, 0));
+    m_b = glm::rotate(m_b, newRot.z, glm::vec3(0, 0, 1));
+    m_a += center;
+    m_b += center;
+}
+void Capsule::setScale(const glm::vec3& newScale)
+{
+    // Uniformly scale the capsule by scaling the radius and the length of the axis segment.
+    float scaleFactor = (newScale.x + newScale.y + newScale.z) / 3.0f; // average for uniform scaling
+    m_radius *= scaleFactor;
+    glm::vec3 center = (m_a + m_b) * 0.5f;
+    m_a -= center;
+    m_b -= center;
+    m_a *= scaleFactor;
+    m_b *= scaleFactor;
+    m_a += center;
+    m_b += center;
 }

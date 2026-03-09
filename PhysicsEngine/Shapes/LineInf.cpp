@@ -7,6 +7,7 @@
 
 #include <glm/glm.hpp>
 #include <algorithm>
+#include <glm/gtx/rotate_vector.hpp>
 
 using namespace Physics;
 
@@ -354,4 +355,30 @@ bool LineInf::isColliding(const Cylinder& other) const
 
     // No intersection found
     return false;
+}
+void LineInf::setPosition(const glm::vec3& newPos)
+{
+    glm::vec3 center = (m_a + m_b) * 0.5f;
+    glm::vec3 offset = newPos - center;
+    m_a += offset;
+    m_b += offset;
+}
+void LineInf::setRotation(const glm::vec3& newRot)
+{
+    glm::vec3 center = (m_a + m_b) * 0.5f;
+    m_a -= center;
+    m_b -= center;
+    m_a = glm::rotate(m_a, newRot.x, glm::vec3(1, 0, 0));
+    m_a = glm::rotate(m_a, newRot.y, glm::vec3(0, 1, 0));
+    m_a = glm::rotate(m_a, newRot.z, glm::vec3(0, 0, 1));
+    m_b = glm::rotate(m_b, newRot.x, glm::vec3(1, 0, 0));
+    m_b = glm::rotate(m_b, newRot.y, glm::vec3(0, 1, 0));
+    m_b = glm::rotate(m_b, newRot.z, glm::vec3(0, 0, 1));
+    m_a += center;
+    m_b += center;
+}
+void LineInf::setScale(const glm::vec3& newScale)
+{
+    m_a *= newScale;
+    m_b *= newScale;
 }
