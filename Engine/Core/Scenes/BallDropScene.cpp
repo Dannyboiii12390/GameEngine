@@ -21,7 +21,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	auto createPlaneEntity = [this, &concTex](Entity& entity, glm::vec3 pos, int left)
 		{
-			entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(left * 45.0f, 0.0f, 0.0f), glm::vec3(10.0f,10.0f, 10.0f));
+			entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(left * 45.0f, 0.0f, 0.0f), glm::vec3(100.0f));
 			entity.AddComponent(EComponentType::Component_Geometry);
 			entity.AddComponent(EComponentType::Component_Collision);
 			ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
@@ -42,7 +42,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		};	
 	auto createOtherPlaneEntity = [this, &concTex](Entity& entity, glm::vec3 pos, int left)
 	{
-		entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f, 90.0f, left * 45.0f), glm::vec3(10.0f, 10.0f, 10.0f));
+		entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f, 90.0f, left * 45.0f), glm::vec3(100.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
 		entity.AddComponent(EComponentType::Component_Collision);
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
