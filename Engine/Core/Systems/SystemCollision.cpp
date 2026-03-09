@@ -2,6 +2,9 @@
 #include "../Components/ComponentCollision.h"
 #include "../Entity.h"
 
+
+
+
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
 	EComponentType requiredComponents = EComponentType::Component_Collision | EComponentType::Component_Transform;
@@ -45,3 +48,4 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 		}
 	}
 }
+

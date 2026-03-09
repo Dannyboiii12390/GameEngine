@@ -160,6 +160,7 @@
     <ClCompile Include="Core\InputHandler.cpp" />
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
     <ClCompile Include="Core\Managers\SystemManager.cpp" />
+    <ClCompile Include="Core\Scenes\BallDropScene.cpp" />
     <ClCompile Include="Core\Scenes\CollideBallWithAnotherBallScene.cpp" />
     <ClCompile Include="Core\Scenes\RotationScene.cpp" />
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
@@ -195,6 +196,7 @@
     <ClInclude Include="Core\InputHandler.h" />
     <ClInclude Include="Core\Managers\ResourceManager.h" />
     <ClInclude Include="Core\Managers\SystemManager.h" />
+    <ClInclude Include="Core\Scenes\BallDropScene.h" />
     <ClInclude Include="Core\Scenes\CollideBallWithAnotherBallScene.h" />
     <ClInclude Include="Core\Scenes\IScene.h" />
     <ClInclude Include="Core\Scenes\RotationScene.h" />

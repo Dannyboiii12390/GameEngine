@@ -14,6 +14,8 @@
 
 class Entity;
 
+void CollisionResponse(Entity& self, Entity& other);
+
 class ComponentCollision : public IComponent
 {
 public:
@@ -36,48 +38,6 @@ public:
         if (!m_collider)
             return false; // No collider means we can't collide with anything.
 
-        //switch (other.getType())
-        //{
-        //    case Physics::EColliderType::SPHERE:
-        //    {
-        //        const Physics::Sphere* sphereOther = dynamic_cast<const Physics::Sphere*>(&other);
-        //        if (sphereOther)
-        //        {
-        //            return m_collider->isColliding(*sphereOther);
-        //        }   
-        //        return false;
-        //    }
-        //    case Physics::EColliderType::LINEINF:
-        //    {
-        //        const Physics::LineInf* lineOther = dynamic_cast<const Physics::LineInf*>(&other);
-        //        if (lineOther)
-        //            return m_collider->isColliding(*lineOther);
-        //        return false;
-        //    }
-        //    case Physics::EColliderType::CAPSULE:
-        //    {
-        //        const Physics::Capsule* capOther = dynamic_cast<const Physics::Capsule*>(&other);
-        //        if (capOther)
-        //            return m_collider->isColliding(*capOther);
-        //        return false;
-        //    }
-        //    case Physics::EColliderType::CYLINDER:
-        //    {
-        //        const Physics::Cylinder* cylOther = dynamic_cast<const Physics::Cylinder*>(&other);
-        //        if (cylOther)
-        //            return m_collider->isColliding(*cylOther);
-        //        return false;
-        //    }
-        //    case Physics::EColliderType::PLANE:
-        //    {
-        //        const Physics::Plane* planeOther = dynamic_cast<const Physics::Plane*>(&other);
-        //        if (planeOther)
-        //            return m_collider->isColliding(*planeOther);
-        //        return false;
-        //    }
-        //    default:
-        //        return false; // Unknown collider type, assume no collision.
-        //}
 		return m_collider->isColliding(other);
     }
     void SetCollider(std::unique_ptr<Physics::Collider> collider)
@@ -87,5 +47,7 @@ public:
 private:
 
     std::unique_ptr<Physics::Collider> m_collider;
-    CollisionCallback m_onCollision;
+    CollisionCallback m_onCollision = CollisionResponse;
 };
+
+
