@@ -81,6 +81,8 @@ namespace {
 	std::vector<VkDescriptorSet> s_DescriptorSets;
 	VkPipelineLayout s_PipelineLayout = VK_NULL_HANDLE;
 
+	constexpr uint32_t s_MaxEntityDescriptorSets = 1024;
+
 	// store weak_ptrs to avoid dangling raw pointers
 	static std::vector<std::weak_ptr<Texture>> s_RegisteredTextures;
 
@@ -1854,9 +1856,6 @@ void VulkanRHI::CreateDescriptorPool()
 	if (!m_SwapchainImages.empty())
 		frameCount = std::max<uint32_t>(frameCount, static_cast<uint32_t>(m_SwapchainImages.size()));
 	frameCount = std::max<uint32_t>(frameCount, s_MaxDescriptorFrames);
-
-	// Extra budget for per-entity texture descriptor sets allocated via AllocateTextureDescriptorSet()
-	constexpr uint32_t s_MaxEntityDescriptorSets = 64;
 
 	const uint32_t totalSamplerDescriptors = frameCount + s_MaxEntityDescriptorSets;
 	const uint32_t totalSets = frameCount + s_MaxEntityDescriptorSets;

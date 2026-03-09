@@ -14,7 +14,7 @@
 
 class Entity;
 
-/*
+
 class BallDropScene : public IScene
 {
 public:
@@ -42,6 +42,7 @@ private:
 	void AddEntity(Entity&& entity) override;
 	void RemoveEntity(int index) override;
 
+	void CreateSphere();
 
 	std::vector<Entity> m_entities;
 	Camera m_camera;
@@ -56,5 +57,7 @@ private:
 
 	bool m_paused;
 
+	Texture woodTex;
+	float m_deltaTime;
+
 };
-*/

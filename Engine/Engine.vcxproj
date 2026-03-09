@@ -156,6 +156,7 @@
     <ClCompile Include="Core\Components\ComponentCollision.h" />
     <ClCompile Include="Core\Components\ComponentGeometry.cpp" />
     <ClCompile Include="Core\Components\ComponentPhysics.cpp" />
+    <ClCompile Include="Core\Components\ComponentTransform.cpp" />
     <ClCompile Include="Core\Components\ComponentTranslation.cpp" />
     <ClCompile Include="Core\InputHandler.cpp" />
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
@@ -189,6 +190,7 @@
   <ItemGroup>
     <ClInclude Include="Core\Components\ComponentGeometry.h" />
     <ClInclude Include="Core\Components\ComponentPhysics.h" />
+    <ClInclude Include="Core\Components\ComponentTransform.h" />
     <ClInclude Include="Core\Components\ComponentTranslation.h" />
     <ClInclude Include="Core\Components\ComponentVelocity.h" />
     <ClInclude Include="Core\Components\IComponent.h" />
@@ -267,6 +269,7 @@
     <None Include="Assets\wood_shutter_rough_1k.exr" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\conc_tex.jpg" />
     <Image Include="Assets\red_brick_diff_1k.jpg" />
     <Image Include="Assets\red_brick_disp_1k.png" />
     <Image Include="Assets\wood_shutter_diff_1k.jpg" />

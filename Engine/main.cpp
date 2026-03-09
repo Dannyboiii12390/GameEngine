@@ -28,6 +28,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "Core/Scenes/RotationScene.h"
+#include "Core/Scenes/BallDropScene.h"
 
 // add a toString class to every collider
 
@@ -150,7 +151,7 @@ int main()
 
         GUI gui;
 
-		sceneManager.AddScene(std::make_unique<RotationScene>(window, &vulkanRHI, &gui));
+		sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
 
 		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
 		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
