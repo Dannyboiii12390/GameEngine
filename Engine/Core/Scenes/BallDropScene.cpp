@@ -143,10 +143,9 @@ void BallDropScene::Update(float deltaTime)
 {
 	m_window->PollEvents();
 
-	deltaTime = m_paused ? 0.0f : deltaTime;
-
 	m_deltaTime = deltaTime;
 
+	deltaTime = m_paused ? 0.0f : deltaTime;
 
 	m_systemManager.Update(m_entities, deltaTime);
 }
@@ -201,8 +200,9 @@ void BallDropScene::Draw()
 
 			if (show_about)
 			{
-				ImGui::Begin("About", &show_about);
+				ImGui::Begin("Debug Diagnostics");
 				ImGui::Text("FPS: %.1f", 1.0f / m_deltaTime);
+				ImGui::Text("Sphere Count: %d", m_sphereCount);
 				if (ImGui::Button("Start/Stop Simulation"))
 					m_paused = !m_paused;
 				ImGui::End();
@@ -284,4 +284,6 @@ void BallDropScene::CreateSphere()
 	// random position above the floor within 4 units of the center, and random horizontal velocity( 1, 10) in a random direction
 	createSphereEntity(sphereEntity, glm::vec3((rand() % 800 - 400) / 100.0f, 5.0f + (rand() % 500) / 100.0f, (rand() % 800 - 400) / 100.0f), glm::vec3((rand() % 900 + 100) / 100.0f * (rand() % 2 == 0 ? -1 : 1), 0.0f, (rand() % 900 + 100) / 100.0f * (rand() % 2 == 0 ? -1 : 1)));
 	m_entities.push_back(std::move(sphereEntity));
+
+	m_sphereCount++;
 }

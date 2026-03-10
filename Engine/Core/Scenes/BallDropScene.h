@@ -59,5 +59,6 @@ private:
 
 	Texture woodTex;
 	float m_deltaTime;
+	int m_sphereCount = 0;
 
 };
