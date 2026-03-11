@@ -6,6 +6,9 @@
 #include "../Components/IComponent.h"
 #include "../Entity.h"
 
+#include <algorithm>
+#include <execution>
+
 class Entity;
 
 class SystemVelocity : public ISystem
@@ -15,10 +18,11 @@ public:
 
 	void OnUpdate(std::span<Entity> entities, float deltaTime) override
 	{
-		for(auto& entity : entities)
+
+		auto velForEntity = [deltaTime](Entity& entity)
 		{
 			EComponentType type = EComponentType::Component_Velocity | EComponentType::Component_Transform;
-			if(entity.HasComponent(type))
+			if (entity.HasComponent(type))
 			{
 				ComponentVelocity* velocity = entity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 				ComponentTransform* translation = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
@@ -29,13 +33,15 @@ public:
 				glm::vec3 deltaPos = velocity->GetPositionVelocity() * static_cast<float>(deltaTime);
 				glm::vec3 deltaRot = velocity->GetRotationalVelocity() * static_cast<float>(deltaTime);
 				glm::vec3 deltaScale = velocity->GetScaleVelocity() * static_cast<float>(deltaTime);
-				
+
 				translation->ChangePosition(deltaPos);
 				translation->ChangeRotation(deltaRot);
 				translation->ChangeScale(deltaScale);
 
 				translation->SwapBuffers();
 			}
-		}
+		};
+		std::for_each(std::execution::par_unseq, entities.begin(), entities.end(), velForEntity);
+		
 	}
 };

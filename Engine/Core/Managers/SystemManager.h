@@ -10,7 +10,8 @@
 #include "../Scenes/IScene.h"
 #include "../../Renderer/VulkanRHI.h"
 
-// Forward declarations
+#include "../PhysicsEngine/Threading/ThreadPool.h"	
+
 #include "../Entity.h"
 
 class SystemManager
