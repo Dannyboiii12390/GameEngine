@@ -274,9 +274,6 @@
     <Image Include="Assets\wood_shutter_disp_1k.png" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Physics Engine\Physics Engine.vcxproj">
-      <Project>{7c638cb6-7803-46f8-9d78-47a6c14110ae}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\PhysicsEngine\PhysicsEngine.vcxproj">
       <Project>{7c638cb6-7803-46f8-9d78-47a6c14110ae}</Project>
     </ProjectReference>
