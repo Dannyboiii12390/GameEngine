@@ -33,6 +33,8 @@ public:
 				translation->ChangePosition(deltaPos);
 				translation->ChangeRotation(deltaRot);
 				translation->ChangeScale(deltaScale);
+
+				translation->SwapBuffers();
 			}
 		}
 	}

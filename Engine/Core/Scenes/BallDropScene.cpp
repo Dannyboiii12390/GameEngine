@@ -148,6 +148,7 @@ void BallDropScene::Update(float deltaTime)
 	deltaTime = m_paused ? 0.0f : deltaTime;
 
 	m_systemManager.Update(m_entities, deltaTime);
+
 }
 void BallDropScene::FixedUpdate()
 {
