@@ -30,6 +30,8 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 			continue;
 		}
 		ComponentCollision* collisionComp = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+		ComponentTransform* thisTransform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+		auto* collider = collisionComp->GetCollider();
 
 		for(Entity& other : entities)
 		{
