@@ -94,16 +94,16 @@ void CollisionResponse(Entity& self, Entity& other)
 	if (approachSpeed >= 0.0f)
 		return;
 
-	constexpr float k_velocityRetention = 0.9f;
-	constexpr float k_forceRetention = 0.8f;
-	constexpr float k_velocityStopThreshold = 0.5f;
-	constexpr float k_normalStopThreshold = 0.08f;
-	constexpr float k_forceNormalStopThreshold = 0.2f;
+	constexpr float k_velocityRetention        = 0.9f;
+	constexpr float k_forceRetention           = 0.8f;
+	constexpr float k_velocityStopThreshold    = 0.5f;
+	constexpr float k_normalStopThreshold      = 0.5f;
+	constexpr float k_forceNormalStopThreshold = 0.7f;
 
-	glm::vec3 savedForceSelf = (physSelf) ? physSelf->getTotalForce() : glm::vec3(0.0f);
+	glm::vec3 savedForceSelf  = (physSelf)  ? physSelf->getTotalForce()  : glm::vec3(0.0f);
 
-	ComponentPhysics* physOther = other.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
-	ComponentVelocity* velOther = other.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+	ComponentPhysics*  physOther = other.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+	ComponentVelocity* velOther  = other.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 
 	glm::vec3 savedForceOther = (physOther) ? physOther->getTotalForce() : glm::vec3(0.0f);
 
@@ -115,8 +115,8 @@ void CollisionResponse(Entity& self, Entity& other)
 		float massOther = physOther->GetMass();
 		glm::vec3 vOther = (velOther) ? velOther->GetPositionVelocity() : glm::vec3(0.0f);
 
-		glm::vec3 u1n = glm::dot(vSelf, n) * n;
-		glm::vec3 u1t = vSelf - u1n;
+		glm::vec3 u1n = glm::dot(vSelf,  n) * n;
+		glm::vec3 u1t = vSelf  - u1n;
 		glm::vec3 u2n = glm::dot(vOther, n) * n;
 		glm::vec3 u2t = vOther - u2n;
 
@@ -149,16 +149,13 @@ void CollisionResponse(Entity& self, Entity& other)
 			velOther->SetPositionalVelocity(newV2);
 		}
 
-		// Separate the other sphere's transform too, so it doesn't remain in penetration.
 		ComponentTransform* transOther = other.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 		if (transOther)
 		{
 			const float separationBias = 0.01f;
 			glm::vec3 resolvedPosOther = transOther->PreviousPosition() - contactNormal * separationBias;
 			transOther->SetPosition(resolvedPosOther);
-			// Commit the corrected position into the read buffer so Position() reflects it immediately.
-			transOther->SwapBuffers();
-			otherCollider->setPosition(transOther->Position());
+			otherCollider->setPosition(resolvedPosOther);
 		}
 	}
 	else
@@ -179,17 +176,12 @@ void CollisionResponse(Entity& self, Entity& other)
 		velSelf->SetPositionalVelocity(newV);
 	}
 
-	// Restore self to pre-penetration position, push out by a small bias, then
-	// commit into the read buffer so the next frame starts from the correct position.
+	// Write depenetrated position into the write buffer.
+	// SystemCollision will call SwapBuffers() after all responses fire.
 	const float separationBias = 0.01f;
 	glm::vec3 resolvedPos = transSelf->PreviousPosition() + contactNormal * separationBias;
 	transSelf->SetPosition(resolvedPos);
-	// *** This was the missing call — without it Position() still returns the
-	//     penetrating read-buffer value, causing the sphere to appear stuck. ***
-	transSelf->SwapBuffers();
-
-	// Keep collider in sync with the now-committed corrected position.
-	col->setPosition(transSelf->Position());
+	col->setPosition(resolvedPos);
 
 	if (physSelf)
 	{

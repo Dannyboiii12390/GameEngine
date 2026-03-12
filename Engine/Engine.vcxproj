@@ -168,6 +168,8 @@
     <ClCompile Include="Core\Systems\SystemCollision.h" />
     <ClCompile Include="Core\Systems\SystemPhysics.cpp" />
     <ClCompile Include="Core\Systems\SystemRenderer.cpp" />
+    <ClCompile Include="Core\Systems\SystemSwapBuffers.cpp" />
+    <ClCompile Include="Core\Systems\SystemSwapBuffers.h" />
     <ClCompile Include="IMGUI\imgui.cpp" />
     <ClCompile Include="IMGUI\imgui_demo.cpp" />
     <ClCompile Include="IMGUI\imgui_draw.cpp" />

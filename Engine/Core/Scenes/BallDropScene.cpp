@@ -1,6 +1,7 @@
 #include "BallDropScene.h"
 #include "../Managers/ResourceManager.h"
 #include "../../IMGUI/imgui.h"
+#include "../Systems/SystemSwapBuffers.h"
 
 
 
@@ -11,6 +12,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 

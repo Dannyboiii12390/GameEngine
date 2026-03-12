@@ -15,27 +15,32 @@ public:
 
 	void OnUpdate(std::span<Entity> entities, float deltaTime) override
 	{
-		for(auto& entity : entities)
+		for (auto& entity : entities)
 		{
 			EComponentType type = EComponentType::Component_Velocity | EComponentType::Component_Transform;
-			if(entity.HasComponent(type))
-			{
-				ComponentVelocity* velocity = entity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-				ComponentTransform* translation = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+			if (!entity.HasComponent(type))
+				continue;
 
-				// Snapshot position before integration so CollisionResponse can restore it.
-				translation->SavePreviousPosition();
+			ComponentVelocity* velocity     = entity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+			ComponentTransform* translation = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 
-				glm::vec3 deltaPos = velocity->GetPositionVelocity() * static_cast<float>(deltaTime);
-				glm::vec3 deltaRot = velocity->GetRotationalVelocity() * static_cast<float>(deltaTime);
-				glm::vec3 deltaScale = velocity->GetScaleVelocity() * static_cast<float>(deltaTime);
-				
-				translation->ChangePosition(deltaPos);
-				translation->ChangeRotation(deltaRot);
-				translation->ChangeScale(deltaScale);
+			// Snapshot position before integration so CollisionResponse can restore it.
+			translation->SavePreviousPosition();
 
-				translation->SwapBuffers();
-			}
+			glm::vec3 deltaPos   = velocity->GetPositionVelocity()   * static_cast<float>(deltaTime);
+			glm::vec3 deltaRot   = velocity->GetRotationalVelocity() * static_cast<float>(deltaTime);
+			glm::vec3 deltaScale = velocity->GetScaleVelocity()      * static_cast<float>(deltaTime);
+
+			translation->ChangePosition(deltaPos);
+			translation->ChangeRotation(deltaRot);
+			translation->ChangeScale(deltaScale);
+
+			// Seed the velocity write buffer from the current read buffer so
+			// SystemPhysics always starts from the last committed velocity.
+			// SystemPhysics writes its result on top and owns the velocity swap.
+			velocity->SetPositionalVelocity(velocity->GetPositionVelocity());
+			velocity->SetRotationalVelocity(velocity->GetRotationalVelocity());
+			velocity->SetScalarVelocity(velocity->GetScaleVelocity());
 		}
 	}
 };
