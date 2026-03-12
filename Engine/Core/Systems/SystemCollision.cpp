@@ -3,14 +3,21 @@
 #include "../Components/ComponentTransform.h"
 #include "../Components/ComponentVelocity.h"
 #include "../Entity.h"
+#include <omp.h>
 
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
 	EComponentType requiredComponents = EComponentType::Component_Collision | EComponentType::Component_Transform;
 
+	const int count = static_cast<int>(entities.size());
+
 	// Sync collider positions from the committed (read) transform buffer.
-	for (Entity& entity : entities)
+	// Each entity is independent — safe to parallelise.
+	#pragma omp parallel for
+	for (int i = 0; i < count; ++i)
 	{
+		Entity& entity = entities[i];
+
 		if (!entity.HasComponent(requiredComponents))
 			continue;
 
@@ -24,23 +31,34 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 	// Detect and respond. CollisionResponse writes corrections into the write
 	// buffer. SystemVelocity owns all buffer swapping at the start of the
 	// next frame, so no swaps are needed here.
-	for (Entity& entity : entities)
+	// The outer loop is parallelised; collision callbacks are guarded with a
+	// critical section to prevent concurrent writes to shared velocity state.
+	#pragma omp parallel for 
+	for (int i = 0; i < count; ++i)
 	{
+		Entity& entity = entities[i];
+
 		if (!entity.HasComponent(requiredComponents))
 			continue;
 
 		ComponentCollision* collisionComp = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 
-		for (Entity& other : entities)
+		for (int j = 0; j < count; ++j)
 		{
-			if (&entity == &other) continue;
+			if (i == j) continue;
+
+			Entity& other = entities[j];
+
 			if (!other.HasComponent(EComponentType::Component_Collision))
 				continue;
 
 			ComponentCollision* otherCollision = other.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 
 			if (collisionComp->Collided(*otherCollision->GetCollider()))
+			{
+				#pragma omp critical
 				collisionComp->InvokeCollision(entity, other);
+			}
 		}
 	}
 }

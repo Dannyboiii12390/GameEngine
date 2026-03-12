@@ -103,6 +103,9 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_entities.push_back(std::move(frontWall));
 	m_entities.push_back(std::move(floor));
 
+	for(int i = 0; i < 100; i++)
+		CreateSphere();
+
 
 	m_camera.SetPosition(glm::vec3(-5.0f, 5.0f, 0.0f));
 	m_camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));

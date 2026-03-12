@@ -5,6 +5,7 @@
 #include <span>
 #include "../Components/IComponent.h"
 #include "../Entity.h"
+#include <omp.h>
 
 class Entity;
 
@@ -15,8 +16,14 @@ public:
 
 	void OnUpdate(std::span<Entity> entities, float deltaTime) override
 	{
-		for (auto& entity : entities)
+		const int count = static_cast<int>(entities.size());
+
+		// Each entity's velocity/transform state is independent — safe to parallelise.
+		#pragma omp parallel for
+		for (int i = 0; i < count; ++i)
 		{
+			auto& entity = entities[i];
+
 			EComponentType type = EComponentType::Component_Velocity | EComponentType::Component_Transform;
 			if (!entity.HasComponent(type))
 				continue;

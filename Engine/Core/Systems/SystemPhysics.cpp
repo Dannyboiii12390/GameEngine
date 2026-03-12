@@ -4,18 +4,25 @@
 #include "../Components/ComponentTransform.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+#include <omp.h>
 
 
 void SystemPhysics::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
     EComponentType requiredComponents = EComponentType::Component_Physics | EComponentType::Component_Velocity;
 
-    for (auto& entity : entities)
+    const int count = static_cast<int>(entities.size());
+
+    // Each entity's physics state is independent — safe to parallelise.
+    #pragma omp parallel for
+    for (int i = 0; i < count; ++i)
     {
+        auto& entity = entities[i];
+
         if (!entity.HasComponent(requiredComponents))
             continue;
 
-        ComponentPhysics* physics  = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+        ComponentPhysics* physics   = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
         ComponentVelocity* velocity = entity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 
         if (physics->IsAffectedByGravity())
