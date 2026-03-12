@@ -4,6 +4,11 @@
 #include "../Systems/SystemSwapBuffers.h"
 
 
+#ifdef _DEBUG
+constexpr int NUM_BALLS = 30;
+#else
+constexpr int NUM_BALLS = 1000;
+#endif
 
 BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi),
@@ -103,7 +108,10 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_entities.push_back(std::move(frontWall));
 	m_entities.push_back(std::move(floor));
 
-	for(int i = 0; i < 100; i++)
+
+
+
+	for(int i = 0; i < NUM_BALLS; i++)
 		CreateSphere();
 
 

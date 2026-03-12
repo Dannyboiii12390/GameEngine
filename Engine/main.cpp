@@ -29,6 +29,7 @@
 #include "flatbuffers/flatbuffers.h"
 #include "Core/Scenes/RotationScene.h"
 #include "Core/Scenes/BallDropScene.h"
+#include <numeric>
 
 // add a toString class to every collider
 
@@ -193,10 +194,21 @@ int main()
         gui.Shutdown();
         vulkanRHI.Shutdown();
         window.Shutdown();
-        for(auto it = fpsHistory.begin(); it != fpsHistory.end(); it++)
+
+
+        unsigned int count = 0;
+		float sum = 0.0f;
+        for(float fps : fpsHistory)
         {
-            if(*it) std::cout << "FPS: " << *it << std::endl;
+            if(fps > 0.0f) // filter out any zero or uninitialized values
+            {
+                count++;
+				sum += fps;
+			}
 		}
+
+
+		std::cout << "Average FPS: " << sum / static_cast<float>(count) << "\n";
     }
 
 
