@@ -8,7 +8,7 @@
 #ifdef _DEBUG
 constexpr int NUM_BALLS = 30;
 #else
-constexpr int NUM_BALLS = 100;
+constexpr int NUM_BALLS = 1000;
 #endif
 
 BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
@@ -85,7 +85,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		{
 			col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 		}
-		};
+	};
 	auto createFloorEntity = [this, &entTex](Entity& entity)
 	{
 		entity.AddComponent(EComponentType::Component_Transform, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(10.0f, 10.0f, 10.0f));

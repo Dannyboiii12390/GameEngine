@@ -14,6 +14,14 @@ Plane::Plane(const glm::vec3& point, const glm::vec3& u, const glm::vec3& v)
 {
     m_normal = glm::cross(m_u, m_v);
     m_unitNormal = glm::normalize(m_normal);
+
+    // snap tiny values to zero to avoid confusing debugger output
+    auto snap = [](glm::vec3& v, float eps = 1e-6f) {
+        v.x = (std::abs(v.x) < eps) ? 0.0f : v.x;
+        v.y = (std::abs(v.y) < eps) ? 0.0f : v.y;
+        v.z = (std::abs(v.z) < eps) ? 0.0f : v.z;
+    };
+    snap(m_u); snap(m_v); snap(m_normal); snap(m_unitNormal);
 }
 
 Plane Plane::FromThreePoints(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2)
