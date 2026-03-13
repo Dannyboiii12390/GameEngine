@@ -1,5 +1,3 @@
-
-
 #include "ResourceManager.h"
 #include <cmath>
 
@@ -330,49 +328,50 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
     float halfCyl = cylHeight * 0.5f;
 
     // Generate rings for hemisphere (top) including equator (stackHalf segments)
-    uint32_t halfStacks = stacks / 2;
+    uint32_t halfStacks = std::max<uint32_t>(1, stacks / 2);
 
     // helper to add hemisphere (0..halfStacks) for top, offsetY should be +halfCyl
     auto buildHemisphere = [&](bool top, float offsetY)
+    {
+        // stack from 0..halfStacks (0 = pole, halfStacks = equator)
+        for (uint32_t i = 0; i <= halfStacks; ++i)
         {
-            // stack from 0..halfStacks (0 = pole, halfStacks = equator)
-            for (uint32_t i = 0; i <= halfStacks; ++i)
+            float stackAngle = (static_cast<float>(i) / static_cast<float>(halfStacks)) * (PI * 0.5f); // 0..pi/2
+            float sinS = std::sin(stackAngle);
+            float cosS = std::cos(stackAngle);
+            float y = radius * cosS; // distance above/below equator
+            float ringRadius = radius * sinS;
+
+            float py = (top ? 1.0f : -1.0f) * y + offsetY;
+
+            for (uint32_t j = 0; j <= sectors; ++j)
             {
-                float stackAngle = (static_cast<float>(i) / static_cast<float>(halfStacks)) * (PI * 0.5f); // 0..pi/2
-                float sinS = std::sin(stackAngle);
-                float cosS = std::cos(stackAngle);
-                float y = radius * cosS; // distance above/below equator
-                float ringRadius = radius * sinS;
+                float sectorAngle = static_cast<float>(j) * 2.0f * PI / static_cast<float>(sectors);
+                float x = ringRadius * std::cos(sectorAngle);
+                float z = ringRadius * std::sin(sectorAngle);
 
-                float py = (top ? 1.0f : -1.0f) * y + offsetY;
+                // normal is vector from sphere center of hemisphere
+                float nx = x / radius;
+                float ny = (top ? 1.0f : -1.0f) * (y / radius);
+                float nz = z / radius;
 
-                for (uint32_t j = 0; j <= sectors; ++j)
-                {
-                    float sectorAngle = static_cast<float>(j) * 2.0f * PI / static_cast<float>(sectors);
-                    float x = ringRadius * std::cos(sectorAngle);
-                    float z = ringRadius * std::sin(sectorAngle);
+                float u = static_cast<float>(j) / static_cast<float>(sectors);
+                float v = top ? (1.0f - (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f) :
+                    (0.5f + (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f);
 
-                    // normal is vector from sphere center of hemisphere
-                    float nx = x / radius;
-                    float ny = (top ? 1.0f : -1.0f) * (y / radius);
-                    float nz = z / radius;
-
-                    float u = static_cast<float>(j) / static_cast<float>(sectors);
-                    float v = top ? (1.0f - (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f) :
-                        (0.5f + (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f);
-
-                    verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
-                }
+                verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
             }
-        };
+        }
+    };
 
     // top hemisphere centered at +halfCyl
     buildHemisphere(true, halfCyl);
     // remember index where equator of top hemisphere begins (last ring)
-    uint32_t topEquatorStart = static_cast<uint32_t>(verts.size()) - (sectors + 1);
+    uint32_t vertsPerRing = sectors + 1;
+    uint32_t topHemRings = halfStacks + 1;
+    uint32_t topEquatorStart = static_cast<uint32_t>(verts.size()) - vertsPerRing;
 
-    // cylinder rings: top equator (we will reuse one ring) and bottom equator
-    // Add cylinder rings (top to bottom)
+    // cylinder rings: top and bottom (always add them as distinct rings so normals are correct)
     for (uint32_t i = 0; i <= 1; ++i)
     {
         float py = (i == 0) ? halfCyl : -halfCyl; // top ring at +halfCyl, bottom at -halfCyl
@@ -388,22 +387,45 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
             verts.push_back(MakeVertex(x, py, z, nx, 0.0f, nz, u, v));
         }
     }
-    uint32_t cylTopStart = topEquatorStart; // top equator ring may overlap with cylinder top ring positions
-    uint32_t cylBottomStart = static_cast<uint32_t>(verts.size()) - (sectors + 1);
+    // IMPORTANT FIX:
+    // cylinder top ring start is the first of the two rings we just appended.
+    // compute top and bottom ring starts based on vertsPerRing and current verts size.
+    uint32_t cylBottomStart = static_cast<uint32_t>(verts.size()) - vertsPerRing;
+    uint32_t cylTopStart = cylBottomStart - vertsPerRing;
 
-    // bottom hemisphere (mirror)
-    // store starting index for bottom hemisphere
+    // bottom hemisphere (build equator -> pole to make indexing symmetrical)
     uint32_t bottomHemStart = static_cast<uint32_t>(verts.size());
-    buildHemisphere(false, -halfCyl);
+    for (int i = static_cast<int>(halfStacks); i >= 0; --i)
+    {
+        float stackAngle = (static_cast<float>(i) / static_cast<float>(halfStacks)) * (PI * 0.5f); // 0..pi/2
+        float sinS = std::sin(stackAngle);
+        float cosS = std::cos(stackAngle);
+        float y = radius * cosS;
+        float ringRadius = radius * sinS;
 
-    // Build indices connecting top hemisphere -> cylinder
-    // Top hemisphere: stacks: 0..halfStacks-1 triangles toward equator
-    uint32_t vertsPerRing = sectors + 1;
-    // number of rings in top hemisphere = halfStacks + 1
-    uint32_t topHemRings = halfStacks + 1;
+        float py = -y - halfCyl; // offsetY = -halfCyl for bottom
+
+        for (uint32_t j = 0; j <= sectors; ++j)
+        {
+            float sectorAngle = static_cast<float>(j) * 2.0f * PI / static_cast<float>(sectors);
+            float x = ringRadius * std::cos(sectorAngle);
+            float z = ringRadius * std::sin(sectorAngle);
+
+            float nx = x / radius;
+            float ny = - (y / radius);
+            float nz = z / radius;
+
+            float u = static_cast<float>(j) / static_cast<float>(sectors);
+            float v = (0.5f + (static_cast<float>(halfStacks - i) / static_cast<float>(halfStacks)) * 0.5f);
+
+            verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
+        }
+    }
+    uint32_t bottomHemRings = halfStacks + 1;
+    uint32_t bottomHemEquatorStart = bottomHemStart; // we built bottom hemisphere from equator down
+
+    // Build indices for top hemisphere (pole -> equator)
     uint32_t startTopHem = 0;
-
-    // top hemisphere indices
     for (uint32_t i = 0; i < topHemRings - 1; ++i)
     {
         uint32_t ringStart = startTopHem + i * vertsPerRing;
@@ -431,20 +453,22 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
     }
 
     // connect top hemisphere equator to cylinder top ring
-    // top hemisphere equator start:
-    uint32_t equatorTop = startTopHem + (topHemRings - 1) * vertsPerRing;
-    uint32_t cylTopRing = cylTopStart; // we intentionally planned that earlier; if not exact, still valid indices
-    // If indices overlap (they often will), this still triangulates correctly.
-
-    // Build side quads between cylinder top ring and cylinder bottom ring
-    uint32_t cylStart = cylTopRing;
-    // the cylinder rings we added are placed one after another; compute their start indices:
-    // cylTopRing is at cylTopStart, cylBottomRing at cylBottomStart.
-
     for (uint32_t j = 0; j < sectors; ++j)
     {
-        uint32_t topA = cylTopRing + j;
-        uint32_t topB = cylTopRing + j + 1;
+        indices.push_back(topEquatorStart + j);
+        indices.push_back(cylTopStart + j);
+        indices.push_back(topEquatorStart + j + 1);
+
+        indices.push_back(topEquatorStart + j + 1);
+        indices.push_back(cylTopStart + j);
+        indices.push_back(cylTopStart + j + 1);
+    }
+
+    // Build side quads between cylinder top ring and cylinder bottom ring
+    for (uint32_t j = 0; j < sectors; ++j)
+    {
+        uint32_t topA = cylTopStart + j;
+        uint32_t topB = cylTopStart + j + 1;
         uint32_t bottomA = cylBottomStart + j;
         uint32_t bottomB = cylBottomStart + j + 1;
 
@@ -457,11 +481,20 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
         indices.push_back(bottomB);
     }
 
-    // bottom hemisphere indices (we added bottom hemisphere after cylinder)
-    uint32_t startBottomHem = bottomHemStart;
-    uint32_t bottomHemRings = halfStacks + 1;
     // connect cylinder bottom ring to bottom hemisphere equator
-    // bottom hemisphere is built with stacks from pole to equator; its first ring is pole
+    for (uint32_t j = 0; j < sectors; ++j)
+    {
+        indices.push_back(cylBottomStart + j);
+        indices.push_back(bottomHemEquatorStart + j + 1);
+        indices.push_back(cylBottomStart + j + 1);
+
+        indices.push_back(cylBottomStart + j);
+        indices.push_back(bottomHemEquatorStart + j);
+        indices.push_back(bottomHemEquatorStart + j + 1);
+    }
+
+    // bottom hemisphere indices (equator -> pole)
+    uint32_t startBottomHem = bottomHemStart;
     for (uint32_t i = 0; i < bottomHemRings - 1; ++i)
     {
         uint32_t ringStart = startBottomHem + i * vertsPerRing;

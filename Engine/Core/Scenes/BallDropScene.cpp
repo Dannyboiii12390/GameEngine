@@ -120,11 +120,53 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	Entity floor;
 	createFloorEntity(floor);
 
+    // Plan (pseudocode):
+    // - Make the capsule visually obvious by ensuring the mesh and transform align with the capsule dimensions.
+    // - Use a taller mesh height and a larger radius so the shape reads clearly as a capsule.
+    // - Set transform scale to uniform (1,1,1) because the mesh will already represent the desired height & radius.
+    // - Ensure the physics collider uses the same radius and height so collisions match the visual mesh.
+    //
+    // Implementation details:
+    // - CreateCapsuleMesh(radius = 1.0f, height = 10.0f, sectorCount = 16)
+    // - Transform scale = vec3(1.0f) (no additional non-uniform scaling)
+    // - Physics capsule: radius = 1.0f, height = 10.0f, endpoints computed from center +/- height/2 along Y
+
+	Entity capsuleEntity;
+	capsuleEntity.AddComponent(EComponentType::Component_Transform, glm::vec3(0.0f, 20.0f, 0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+	capsuleEntity.AddComponent(EComponentType::Component_Geometry);
+	capsuleEntity.AddComponent(EComponentType::Component_Collision);
+	ComponentGeometry* geom = capsuleEntity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+	if (geom)
+	{
+		// Create a noticeably tall capsule mesh: radius 1.0, height 10.0
+		MeshData meshData = ResourceManager::CreateCapsuleMesh(1.0f, 10.0f, 16);
+		auto [verts, indices] = meshData;
+		// Initialize mesh so the renderer has a valid Mesh to bind/draw
+		geom->InitializeMesh(m_vulkanRHI, verts, indices);
+		geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
+		geom->AddTexture(m_vulkanRHI, entTex);
+	}
+	ComponentCollision* col = capsuleEntity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	if (col)
+	{
+		// Physics::Capsule expects two endpoints (a,b) and a radius.
+		// Use the same height and radius as the mesh so visual and physical match.
+		const glm::vec3 center(0.0f, 20.0f, 0.0f);
+		const float radius = 1.0f;
+		const float height = 10.0f;
+		const glm::vec3 a = center + glm::vec3(0.0f, -height * 0.5f, 0.0f);
+		const glm::vec3 b = center + glm::vec3(0.0f,  height * 0.5f, 0.0f);
+		col->SetCollider(std::make_unique<Physics::Capsule>(a, b, radius));
+	}
+
+
+
 	m_entities.push_back(std::move(leftWall));
 	m_entities.push_back(std::move(rightWall));
 	m_entities.push_back(std::move(backWall));
 	m_entities.push_back(std::move(frontWall));
 	m_entities.push_back(std::move(floor));
+	m_entities.push_back(std::move(capsuleEntity));
 
 
 
