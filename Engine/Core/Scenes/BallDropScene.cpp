@@ -3,6 +3,7 @@
 #include "../../IMGUI/imgui.h"
 #include "../Systems/SystemSwapBuffers.h"
 
+#include <fstream>
 
 #ifdef _DEBUG
 constexpr int NUM_BALLS = 30;
@@ -25,6 +26,23 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	const Texture entTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	const Texture concTex(m_vulkanRHI, "Assets/conc_tex.jpg", TextureType::Albedo, true);
+
+	//load camera position and rotation from file if it exists, otherwise use defaults
+	std::ifstream file("camera_state.txt");
+	if(file.is_open())
+	{
+		glm::vec3 pos, rot;
+		file >> pos.x >> pos.y >> pos.z;
+		file >> rot.x >> rot.y >> rot.z;
+		m_camera.SetPosition(pos);
+		m_camera.SetRotation(rot);
+		file.close();
+	}
+	else
+	{
+		m_camera.SetPosition(glm::vec3(-5.0f, 5.0f, 0.0f));
+		m_camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+	}
 
 	auto createPlaneEntity = [this, &concTex](Entity& entity, glm::vec3 pos, int left)
 		{
@@ -115,13 +133,22 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		CreateSphere();
 
 
-	m_camera.SetPosition(glm::vec3(-5.0f, 5.0f, 0.0f));
-	m_camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
-
 	m_paused = false;
 }
 BallDropScene::~BallDropScene()
 {
+
+	//save camera position and rotation to file for next time
+	auto file = std::ofstream("camera_state.txt");
+	if(file.is_open())
+	{
+		glm::vec3 pos = m_camera.GetPosition();
+		glm::vec3 rot = m_camera.GetRotation();
+		file << pos.x << " " << pos.y << " " << pos.z << std::endl;
+		file << rot.x << " " << rot.y << " " << rot.z << std::endl;
+		file.close();
+	}
+
 	if (m_vulkanRHI)
 	{
 		m_vulkanRHI->WaitIdle();
