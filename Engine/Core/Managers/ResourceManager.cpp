@@ -234,6 +234,13 @@ MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_
     uint32_t sectors = std::max<uint32_t>(3, sectorCount);
     float halfH = height * 0.5f;
 
+    // Choose cylinder v-range so it stitches consistently with the capsule hemisphere
+    // (matches the v mapping used by CreateCapsuleMesh: top hemisphere equator at v=0.75,
+    // cylinder occupies the middle band). These values (0.75 / 0.25) produce a continuous
+    // vertical tiling appearance between hemisphere and cylinder.
+    const float vTop = 0.75f;
+    const float vBottom = 0.25f;
+
     // side vertices (two rings)
     for (uint32_t i = 0; i <= sectors; ++i)
     {
@@ -244,14 +251,14 @@ MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_
         float nz = std::sin(theta);
         float u = static_cast<float>(i) / static_cast<float>(sectors);
 
-        // top ring
-        verts.push_back(MakeVertex(x, halfH, z, nx, 0.0f, nz, u, 1.0f));
-        // bottom ring
-        verts.push_back(MakeVertex(x, -halfH, z, nx, 0.0f, nz, u, 0.0f));
+        // top ring (use vTop)
+        verts.push_back(MakeVertex(x, halfH, z, nx, 0.0f, nz, u, vTop));
+        // bottom ring (use vBottom)
+        verts.push_back(MakeVertex(x, -halfH, z, nx, 0.0f, nz, u, vBottom));
     }
 
     // side indices
-    // each sector uses two vertices per ring -> 2* (sectors+1) verts created above
+    // each sector uses two vertices per ring -> 2 * (sectors + 1) verts created above
     for (uint32_t i = 0; i < sectors; ++i)
     {
         uint32_t top1 = i * 2;
@@ -356,8 +363,15 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
                 float nz = z / radius;
 
                 float u = static_cast<float>(j) / static_cast<float>(sectors);
-                float v = top ? (1.0f - (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f) :
-                    (0.5f + (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.5f);
+
+                // Adjust vertical UVs so hemisphere equator stitches to cylinder v-range [0.75, 0.25].
+                // Top hemisphere: pole v=1.0 -> equator v=0.75
+                // Bottom hemisphere (if built via this helper) would be mapped similarly.
+                float v;
+                if (top)
+                    v = 1.0f - (static_cast<float>(i) / static_cast<float>(halfStacks)) * 0.25f; // 1.0 -> 0.75
+                else
+                    v = 0.25f - (static_cast<float>(halfStacks - i) / static_cast<float>(halfStacks)) * 0.25f; // 0.25 -> 0.0
 
                 verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
             }
@@ -375,7 +389,7 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
     for (uint32_t i = 0; i <= 1; ++i)
     {
         float py = (i == 0) ? halfCyl : -halfCyl; // top ring at +halfCyl, bottom at -halfCyl
-        float v = (i == 0) ? 0.75f : 0.25f; // arbitrary uv v
+        float v = (i == 0) ? 0.75f : 0.25f; // cylinder occupies middle band [0.75 .. 0.25]
         for (uint32_t j = 0; j <= sectors; ++j)
         {
             float sectorAngle = static_cast<float>(j) * 2.0f * PI / static_cast<float>(sectors);
@@ -416,7 +430,9 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
             float nz = z / radius;
 
             float u = static_cast<float>(j) / static_cast<float>(sectors);
-            float v = (0.5f + (static_cast<float>(halfStacks - i) / static_cast<float>(halfStacks)) * 0.5f);
+
+            // Map bottom hemisphere v so equator = 0.25 and pole = 0.0
+            float v = 0.25f - (static_cast<float>(halfStacks - i) / static_cast<float>(halfStacks)) * 0.25f; // 0.25 -> 0.0
 
             verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
         }

@@ -85,6 +85,35 @@ void CollisionResponse(Entity& self, Entity& other)
 			contactNormal = (dlen > EPS) ? diff / dlen : glm::vec3(0.0f, 1.0f, 0.0f);
 		}
 	}
+	else if (otherCollider->getType() == Physics::EColliderType::CAPSULE)
+	{
+		// Capsule collision support: find closest point on capsule segment (including spherical ends)
+		auto* cap = dynamic_cast<Physics::Capsule*>(otherCollider);
+		if (!cap) return;
+
+		glm::vec3 A = cap->getA();
+		glm::vec3 B = cap->getB();
+		glm::vec3 AB = B - A;
+		float L = glm::length(AB);
+		if (L <= EPS)
+		{
+			// Degenerate capsule -> treat as sphere at A
+			glm::vec3 diff = posSelf - A;
+			float dlen = glm::length(diff);
+			contactNormal = (dlen > EPS) ? diff / dlen : glm::vec3(0.0f, 1.0f, 0.0f);
+		}
+		else
+		{
+			// Project point onto segment, clamp to segment endpoints and compute radial direction
+			glm::vec3 u = AB / L;
+			float t_raw = glm::dot(posSelf - A, u);
+			float t_clamped = std::clamp(t_raw, 0.0f, L);
+			glm::vec3 closest = A + u * t_clamped;
+			glm::vec3 diff = posSelf - closest;
+			float dlen = glm::length(diff);
+			contactNormal = (dlen > EPS) ? diff / dlen : glm::vec3(0.0f, 1.0f, 0.0f);
+		}
+	}
 	else
 	{
 		return;

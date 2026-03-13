@@ -8,7 +8,7 @@
 #ifdef _DEBUG
 constexpr int NUM_BALLS = 30;
 #else
-constexpr int NUM_BALLS = 1000;
+constexpr int NUM_BALLS = 100;
 #endif
 
 BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
@@ -132,7 +132,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
     // - Physics capsule: radius = 1.0f, height = 10.0f, endpoints computed from center +/- height/2 along Y
 
 	Entity capsuleEntity;
-	capsuleEntity.AddComponent(EComponentType::Component_Transform, glm::vec3(0.0f, 20.0f, 0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+	capsuleEntity.AddComponent(EComponentType::Component_Transform, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 45.0f), glm::vec3(1.0f));
 	capsuleEntity.AddComponent(EComponentType::Component_Geometry);
 	capsuleEntity.AddComponent(EComponentType::Component_Collision);
 	ComponentGeometry* geom = capsuleEntity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
