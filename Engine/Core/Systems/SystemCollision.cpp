@@ -7,7 +7,7 @@
 
 
 
-#ifdef USE_GPU
+#ifdef USE_COMPUTE
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
 
