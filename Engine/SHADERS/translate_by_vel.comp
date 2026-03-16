@@ -1,0 +1,28 @@
+#version 450
+
+// Workgroup size must match Dispatch localSizeX used from CPU
+layout(local_size_x = 256) in;
+
+// Input buffers (binding 0 = inPos, 1 = inVel) - vec4 arrays matching glm::vec4 on host
+layout(std430, binding = 0) readonly buffer InPos { vec4 inPos[]; };
+layout(std430, binding = 1) readonly buffer InVel { vec4 inVel[]; };
+
+// Output buffer (binding 2 = outPos)
+layout(std430, binding = 2) writeonly buffer OutPos { vec4 outPos[]; };
+
+// Element count passed via push-constant (matches existing ComputeShader pipeline layout)
+layout(push_constant) uniform Push {
+    uint count;
+} pc;
+
+// Use a hard-coded dt so the shader matches the existing ComputeShader implementation
+// (ComputeShader currently only provides a uint push-constant for count).
+const float dt = 1.0 / 60.0;
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.count) return;
+
+    outPos[idx] = inPos[idx] + inVel[idx] * dt;
+}

@@ -179,6 +179,7 @@
     <ClCompile Include="IMGUI\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Renderer\Camera.cpp" />
+    <ClCompile Include="Renderer\ComputeShader.cpp" />
     <ClCompile Include="Renderer\GUI.cpp" />
     <ClCompile Include="Renderer\Mesh.cpp" />
     <ClCompile Include="Renderer\Pipeline.cpp" />
@@ -208,6 +209,7 @@
     <ClInclude Include="Core\Systems\SystemRenderer.h" />
     <ClInclude Include="Core\Systems\SystemVelocity.h" />
     <ClInclude Include="Renderer\Camera.h" />
+    <ClInclude Include="Renderer\ComputeShader.h" />
     <ClInclude Include="Renderer\GUI.h" />
     <ClInclude Include="Renderer\Mesh.h" />
     <ClInclude Include="Renderer\Pipeline.h" />
@@ -272,6 +274,17 @@
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).comp" -o "$(ProjectDir)SHADERS\%(Filename).comp.spv</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).comp.spv;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).comp" -o "$(ProjectDir)SHADERS\%(Filename).comp.spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).comp.spv;%(Outputs)</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="SHADERS\translate_by_vel.comp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).comp.spv;%(Outputs)</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).comp.spv;%(Outputs)</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).comp" -o "$(ProjectDir)SHADERS\%(Filename).comp.spv</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).comp" -o "$(ProjectDir)SHADERS\%(Filename).comp.spv</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

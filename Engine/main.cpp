@@ -30,6 +30,7 @@
 #include "Core/Scenes/RotationScene.h"
 #include "Core/Scenes/BallDropScene.h"
 #include <numeric>
+#include "Renderer/ComputeShader.h"
 
 // add a toString class to every collider
 
@@ -105,8 +106,100 @@ int clientRequest()
     return 0;
 }
 
-void runComputeShader(VulkanRHI& rhi)
+void runComputeShader(VulkanRHI& vulkanRHI)
 {
+	glm::vec3 zeroVec(0.0f);
+        constexpr uint32_t numEntities = 1024;
+        const float dt = 1.0f; // simulate a single frame step
+
+        std::vector<Entity> entities;
+        entities.reserve(numEntities);
+
+        // Host-side contiguous GPU-friendly arrays
+        std::vector<glm::vec4> positions;
+        std::vector<glm::vec4> velocities;
+        positions.reserve(numEntities);
+        velocities.reserve(numEntities);
+
+        // Create entities and populate host arrays
+        for (uint32_t i = 0; i < numEntities; ++i)
+        {
+            glm::vec3 pos(static_cast<float>(i), 0.0f, 0.0f);
+            glm::vec3 vel(0.0f, static_cast<float>(i) * 0.1f, 0.0f);
+
+            Entity e;
+            e.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f), glm::vec3(1.0f));
+            e.AddComponent(EComponentType::Component_Velocity, vel, glm::vec3(0.0f), glm::vec3(1.0f));
+            entities.push_back(std::move(e));
+
+            positions.emplace_back(pos.x, pos.y, pos.z, 0.0f);
+            velocities.emplace_back(vel.x, vel.y, vel.z, 0.0f);
+        }
+
+        // Output buffer for GPU results
+        std::vector<glm::vec4> positionsOut;
+        positionsOut.resize(numEntities);
+
+        // Create and configure compute shader
+        ComputeShader cs(&vulkanRHI);
+        cs.LoadShader("SHADERS/translate_by_vel.comp.spv"); // shader must implement out[i] = inPos[i] + inVel[i] * dt
+
+        VkDeviceSize bufSize = sizeof(glm::vec4) * numEntities;
+        // Bindings: 0 = inPos, 1 = inVel, 2 = outPos
+        cs.CreateBuffers({ bufSize, bufSize, bufSize });
+
+        // Upload initial data
+        cs.Upload(0, positions.data(), bufSize);
+        cs.Upload(1, velocities.data(), bufSize);
+
+        // If shader expects dt as push-constant you would set it via the ComputeShader API.
+        // For this example we assume the shader uses a specialization constant or a hardcoded dt.
+        // If the ComputeShader supports push-constants, you would call something like:
+        // cs.PushConstants(&dt, sizeof(dt));
+
+        // Dispatch: choose local size consistent with shader. Use 256 as a common local size.
+        constexpr uint32_t localSizeX = 256;
+        cs.Dispatch(numEntities, localSizeX);
+
+        // Read back results
+        cs.Readback(2, positionsOut.data(), bufSize);
+
+        // Apply results back to components. For portability, remove and re-add transform component with new position.
+        for (uint32_t i = 0; i < numEntities; ++i)
+        {
+            const glm::vec4& p = positionsOut[i];
+            glm::vec3 newPos(p.x, p.y, p.z);
+
+            // Replace transform component with updated position (preserve rotation/scale defaults)
+            auto* transform = entities[i].GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+            transform->SetPosition(newPos);
+        }
+
+        for(auto& entity : entities)
+        {
+            auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+            auto* velocity = entity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+
+            transform->SwapBuffers();
+            velocity->SwapBuffers();
+        }
+        
+        // Example debug print of first few results
+        std::cout << "Translated positions (first 8):\n";
+        for (uint32_t i = 0; i < std::min<uint32_t>(8, numEntities); ++i)
+        {
+            const glm::vec4& p = positionsOut[i];
+            std::cout << i << ": (" << p.x << ", " << p.y << ", " << p.z << ")\n";
+        }
+
+        //cs.Destroy();
+    
+    
+
+
+
+
+    // Example usage of ComputeShader class to add two int arrays
     constexpr uint32_t numElements = 1024;
     std::vector<int> elements(numElements);
     std::vector<int> elements2(numElements);
@@ -117,276 +210,41 @@ void runComputeShader(VulkanRHI& rhi)
     }
     std::vector<int> elementsOut(numElements, 0);
 
-    VkDevice device = rhi.GetDevice();
-    VkPhysicalDevice physical = rhi.GetPhysicalDevice();
-    VkQueue queue = rhi.GetGraphicsQueue();
-    VkCommandPool cmdPool = rhi.GetCommandPool();
+    //ComputeShader cs(&vulkanRHI);
+    cs.LoadShader("SHADERS/add.comp.spv");
 
-    if (device == VK_NULL_HANDLE || physical == VK_NULL_HANDLE)
-        throw std::runtime_error("runComputeShader: VulkanRHI not initialised");
+    bufSize = sizeof(int) * numElements;
+    cs.CreateBuffers({ bufSize, bufSize, bufSize }); // inA, inB, out
 
-    auto findMemoryType = [&](uint32_t typeFilter, VkMemoryPropertyFlags properties) -> uint32_t
-        {
-            VkPhysicalDeviceMemoryProperties memProperties;
-            vkGetPhysicalDeviceMemoryProperties(physical, &memProperties);
-            for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
-            {
-                if ((typeFilter & (1u << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-                    return i;
-            }
-            throw std::runtime_error("runComputeShader: Failed to find suitable memory type");
-        };
+    cs.Upload(0, elements.data(), bufSize);
+    cs.Upload(1, elements2.data(), bufSize);
 
-    auto createHostBuffer = [&](VkDeviceSize size, VkBuffer& buffer, VkDeviceMemory& memory)
-        {
-            VkBufferCreateInfo bufInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-            bufInfo.size = size;
-            bufInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-            bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    // Dispatch and read back
+    //constexpr uint32_t localSizeX = 256; // must match shader local_size_x
+    cs.Dispatch(numElements, localSizeX);
 
-            if (vkCreateBuffer(device, &bufInfo, nullptr, &buffer) != VK_SUCCESS)
-                throw std::runtime_error("runComputeShader: failed to create buffer");
+    cs.Readback(2, elementsOut.data(), bufSize);
 
-            VkMemoryRequirements memReq;
-            vkGetBufferMemoryRequirements(device, buffer, &memReq);
-
-            VkMemoryAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-            allocInfo.allocationSize = memReq.size;
-            allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-            if (vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS)
-                throw std::runtime_error("runComputeShader: failed to allocate buffer memory");
-
-            vkBindBufferMemory(device, buffer, memory, 0);
-        };
-
-    const VkDeviceSize bufferSize = sizeof(int) * numElements;
-
-    VkBuffer bufA = VK_NULL_HANDLE, bufB = VK_NULL_HANDLE, bufOut = VK_NULL_HANDLE;
-    VkDeviceMemory memA = VK_NULL_HANDLE, memB = VK_NULL_HANDLE, memOut = VK_NULL_HANDLE;
-
-    createHostBuffer(bufferSize, bufA, memA);
-    createHostBuffer(bufferSize, bufB, memB);
-    createHostBuffer(bufferSize, bufOut, memOut);
-
-    // Upload input data
-    void* mapped = nullptr;
-    vkMapMemory(device, memA, 0, bufferSize, 0, &mapped);
-    memcpy(mapped, elements.data(), static_cast<size_t>(bufferSize));
-    vkUnmapMemory(device, memA);
-
-    vkMapMemory(device, memB, 0, bufferSize, 0, &mapped);
-    memcpy(mapped, elements2.data(), static_cast<size_t>(bufferSize));
-    vkUnmapMemory(device, memB);
-
-    // output already zeroed by vector; nothing to upload
-
-    // Load SPIR-V
-    std::ifstream file("SHADERS/add.comp.spv", std::ios::binary | std::ios::ate);
-    if (!file.is_open())
-        throw std::runtime_error("runComputeShader: failed to open shader SPV (Engine/SHADERS/add.comp.spv)");
-    size_t codeSize = (size_t)file.tellg();
-    file.seekg(0);
-    std::vector<char> code(codeSize);
-    file.read(code.data(), codeSize);
-    file.close();
-
-    VkShaderModule shaderModule = VK_NULL_HANDLE;
-    {
-        VkShaderModuleCreateInfo smci{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        smci.codeSize = code.size();
-        smci.pCode = reinterpret_cast<const uint32_t*>(code.data());
-        if (vkCreateShaderModule(device, &smci, nullptr, &shaderModule) != VK_SUCCESS)
-            throw std::runtime_error("runComputeShader: failed to create shader module");
-    }
-
-    // Descriptor set layout: 3 storage buffers
-    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-    {
-        std::array<VkDescriptorSetLayoutBinding, 3> bindings{};
-        for (uint32_t i = 0; i < bindings.size(); ++i)
-        {
-            bindings[i].binding = i;
-            bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            bindings[i].descriptorCount = 1;
-            bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-            bindings[i].pImmutableSamplers = nullptr;
-        }
-        VkDescriptorSetLayoutCreateInfo dslci{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        dslci.bindingCount = static_cast<uint32_t>(bindings.size());
-        dslci.pBindings = bindings.data();
-        if (vkCreateDescriptorSetLayout(device, &dslci, nullptr, &descriptorSetLayout) != VK_SUCCESS)
-            throw std::runtime_error("runComputeShader: failed to create descriptor set layout");
-    }
-
-    // Pipeline layout with push constant for uint count
-    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-    {
-        VkPushConstantRange pcr{};
-        pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        pcr.offset = 0;
-        pcr.size = sizeof(uint32_t);
-
-        VkPipelineLayoutCreateInfo plci{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        plci.setLayoutCount = 1;
-        plci.pSetLayouts = &descriptorSetLayout;
-        plci.pushConstantRangeCount = 1;
-        plci.pPushConstantRanges = &pcr;
-        if (vkCreatePipelineLayout(device, &plci, nullptr, &pipelineLayout) != VK_SUCCESS)
-            throw std::runtime_error("runComputeShader: failed to create pipeline layout");
-    }
-
-    // Compute pipeline
-    VkPipeline pipeline = VK_NULL_HANDLE;
-    {
-        VkPipelineShaderStageCreateInfo stage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        stage.module = shaderModule;
-        stage.pName = "main";
-
-        VkComputePipelineCreateInfo cpci{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-        cpci.stage = stage;
-        cpci.layout = pipelineLayout;
-
-        if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &cpci, nullptr, &pipeline) != VK_SUCCESS)
-            throw std::runtime_error("runComputeShader: failed to create compute pipeline");
-    }
-
-    // Descriptor pool & set
-    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-    {
-        VkDescriptorPoolSize poolSize{};
-        poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSize.descriptorCount = 3;
-
-        VkDescriptorPoolCreateInfo dpci{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-        dpci.maxSets = 1;
-        dpci.poolSizeCount = 1;
-        dpci.pPoolSizes = &poolSize;
-        if (vkCreateDescriptorPool(device, &dpci, nullptr, &descriptorPool) != VK_SUCCESS)
-            throw std::runtime_error("runComputeShader: failed to create descriptor pool");
-
-        VkDescriptorSetAllocateInfo dsai{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        dsai.descriptorPool = descriptorPool;
-        dsai.descriptorSetCount = 1;
-        dsai.pSetLayouts = &descriptorSetLayout;
-        if (vkAllocateDescriptorSets(device, &dsai, &descriptorSet) != VK_SUCCESS)
-            throw std::runtime_error("runComputeShader: failed to allocate descriptor set");
-
-        VkDescriptorBufferInfo bufInfos[3];
-        bufInfos[0].buffer = bufA; bufInfos[0].offset = 0; bufInfos[0].range = bufferSize;
-        bufInfos[1].buffer = bufB; bufInfos[1].offset = 0; bufInfos[1].range = bufferSize;
-        bufInfos[2].buffer = bufOut; bufInfos[2].offset = 0; bufInfos[2].range = bufferSize;
-
-        std::array<VkWriteDescriptorSet, 3> writes{};
-        for (uint32_t i = 0; i < writes.size(); ++i)
-        {
-            writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[i].dstSet = descriptorSet;
-            writes[i].dstBinding = i;
-            writes[i].dstArrayElement = 0;
-            writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            writes[i].descriptorCount = 1;
-            writes[i].pBufferInfo = &bufInfos[i];
-        }
-        vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
-    }
-
-    // Command buffer
-    VkCommandBufferAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = cmdPool;
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer cmd = VK_NULL_HANDLE;
-    if (vkAllocateCommandBuffers(device, &allocInfo, &cmd) != VK_SUCCESS)
-        throw std::runtime_error("runComputeShader: failed to allocate command buffer");
-
-    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(cmd, &beginInfo);
-
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-
-    // push constant = numElements
-    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &numElements);
-
-    // Dispatch
-    constexpr uint32_t localSizeX = 256; // must match your compute shader's local_size_x
-    uint32_t groups = (numElements + localSizeX - 1) / localSizeX;
-    vkCmdDispatch(cmd, groups, 1, 1);
-
-    // Barrier so host can read buffer after shader writes
-    VkBufferMemoryBarrier bufferBarrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
-    bufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    bufferBarrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
-    bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    bufferBarrier.buffer = bufOut;
-    bufferBarrier.offset = 0;
-    bufferBarrier.size = bufferSize;
-
-    vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
-        0, 0, nullptr, 1, &bufferBarrier, 0, nullptr);
-
-    vkEndCommandBuffer(cmd);
-
-    // Submit and wait
-    VkFence fence = VK_NULL_HANDLE;
-    VkFenceCreateInfo fci{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-    vkCreateFence(device, &fci, nullptr, &fence);
-
-    VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &cmd;
-
-    if (vkQueueSubmit(queue, 1, &submitInfo, fence) != VK_SUCCESS)
-        throw std::runtime_error("runComputeShader: failed to submit compute work");
-
-    vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-    vkDestroyFence(device, fence, nullptr);
-
-    // Read back results
-    vkMapMemory(device, memOut, 0, bufferSize, 0, &mapped);
-    memcpy(elementsOut.data(), mapped, static_cast<size_t>(bufferSize));
-    vkUnmapMemory(device, memOut);
-
-    // Print a few results
+    // Print some results
     std::cout << "Compute shader results (first 8):\n";
     for (uint32_t i = 0; i < std::min<uint32_t>(8, numElements); ++i)
     {
         std::cout << i << ": " << elements[i] << " + " << elements2[i] << " = " << elementsOut[i] << "\n";
     }
 
-    // Cleanup
-    vkFreeCommandBuffers(device, cmdPool, 1, &cmd);
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-    vkDestroyPipeline(device, pipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-    vkDestroyShaderModule(device, shaderModule, nullptr);
-
-    vkDestroyBuffer(device, bufA, nullptr);
-    vkFreeMemory(device, memA, nullptr);
-    vkDestroyBuffer(device, bufB, nullptr);
-    vkFreeMemory(device, memB, nullptr);
-    vkDestroyBuffer(device, bufOut, nullptr);
-    vkFreeMemory(device, memOut, nullptr);
+    cs.Destroy();
 }
+
+
 int main()
 {
-
     try
     {
-
         #ifdef _OPENMP
         LOG_DEBUG("OpenMP is enabled! Max threads: " << omp_get_max_threads());
         #endif
 
-		//clientRequest();    
+        //clientRequest();    
 
         if (!glfwInit())
         {
@@ -394,13 +252,13 @@ int main()
         }
 
         auto getDeltaTime = []()
-            {
-                static auto timeLastFrame = std::chrono::high_resolution_clock::now();
-                auto timeNow = std::chrono::high_resolution_clock::now();
-                float deltaTime = std::chrono::duration<float>(timeNow - timeLastFrame).count();
-                timeLastFrame = timeNow;
-                return deltaTime;
-            };
+        {
+            static auto timeLastFrame = std::chrono::high_resolution_clock::now();
+            auto timeNow = std::chrono::high_resolution_clock::now();
+            float deltaTime = std::chrono::duration<float>(timeNow - timeLastFrame).count();
+            timeLastFrame = timeNow;
+            return deltaTime;
+        };
 
         const int width = 1280;
         const int height = 720;
@@ -415,20 +273,20 @@ int main()
             vulkanRHI.EnableValidationLayers(false);
             constexpr bool VsyncOn = false; 
         #else
-		    constexpr bool VsyncOn = true; // Enable VSync in debug builds to cap FPS and make debugging easier 
+            constexpr bool VsyncOn = true; // Enable VSync in debug builds to cap FPS and make debugging easier 
         #endif
 
-		vulkanRHI.Initialise(&window);
+        vulkanRHI.Initialise(&window);
         vulkanRHI.ToggleVSync(VsyncOn);    
 
         runComputeShader(vulkanRHI);
 
         GUI gui;
 
-		sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
+        sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
 
-		Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
-		Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
+        Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
+        Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
 
         std::vector<float> fpsHistory(100);
 
@@ -436,29 +294,29 @@ int main()
         {
             float deltaTime = getDeltaTime();
 
-			IScene* scene = sceneManager.GetCurrentScene();
+            IScene* scene = sceneManager.GetCurrentScene();
             scene->Update(deltaTime);
             scene->HandleInput(deltaTime);
             scene->Draw();
 
-			static float timeAccumulator = 0.0f;
-			static int frameCount = 0;
-			static float framTimeAccumulator = 0.0f;
+            static float timeAccumulator = 0.0f;
+            static int frameCount = 0;
+            static float framTimeAccumulator = 0.0f;
 
-			// Log FPS every second
-			timeAccumulator += deltaTime;
-			framTimeAccumulator += deltaTime;
+            // Log FPS every second
+            timeAccumulator += deltaTime;
+            framTimeAccumulator += deltaTime;
             frameCount++; 
             if (framTimeAccumulator >= 1.0f)
             { 
                 float fps = frameCount / framTimeAccumulator;
-				fpsHistory.push_back(fps);
+                fpsHistory.push_back(fps);
                 framTimeAccumulator = 0.0f;
                 frameCount = 0; 
             }
         }
 
-		vulkanRHI.WaitIdle();
+        vulkanRHI.WaitIdle();
         
         // IMPORTANT: Destroy all scenes BEFORE shutting down GUI and VulkanRHI
         // This ensures all texture resources are cleaned up while the device is still valid
@@ -470,22 +328,22 @@ int main()
 
 
         unsigned int count = 0;
-		float sum = 0.0f;
+        float sum = 0.0f;
         for(float fps : fpsHistory)
         {
             if(fps > 0.0f) // filter out any zero or uninitialized values
             {
                 count++;
-				sum += fps;
-			}
-		}
+                sum += fps;
+            }
+        }
 
 
-		std::cout << "Average FPS: " << sum / static_cast<float>(count) << "\n";
+        std::cout << "Average FPS: " << sum / static_cast<float>(count) << "\n";
     }
 
 
-  
+
     catch (const std::exception& e)
     {
         std::cerr << "Fatal error: " << e.what() << std::endl;
