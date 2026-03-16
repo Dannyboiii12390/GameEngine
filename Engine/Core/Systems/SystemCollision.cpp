@@ -6,7 +6,7 @@
 #include <omp.h>
 #include "../../DebugUtils.h"
 
-#define USE_COMPUTE // Comment out to use CPU-based collision detection instead of GPU compute shader
+//#define USE_COMPUTE // Comment out to use CPU-based collision detection instead of GPU compute shader
 
 #ifdef USE_COMPUTE
 
@@ -146,10 +146,6 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 			vel->SetPositionalVelocity(glm::vec3(gpuOut[src].velocity));
 		}
 	}
-	//LOG_DEBUG("SystemCollision: Processed " << collCount << " collidable entities with GPU compute shader.");
-	//LOG_DEBUG("Entity 1: New Position = (" << gpuOut[0].position.x << ", " << gpuOut[0].position.y << ", " << gpuOut[0].position.z << ")");
-	//LOG_DEBUG("Entity 1 vel = (" << gpuOut[0].velocity.x << "," << gpuOut[0].velocity.y << "," << gpuOut[0].velocity.z << ")");
-	// Note: SwapBuffers of transform/velocity is owned by other systems. Ensure those swaps run after this system.
 }
 #else
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
