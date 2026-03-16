@@ -18,7 +18,7 @@ RotationScene::RotationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 {
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>());
-	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(50, rhi));
 
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 

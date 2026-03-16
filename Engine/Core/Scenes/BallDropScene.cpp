@@ -15,10 +15,6 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi),
 	m_gui(p_gui), m_systemManager(rhi, 2), woodTex(m_vulkanRHI, "Assets/wood_shutter_diff_1k.jpg", TextureType::Albedo, true)
 {
-	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
-	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>());
-	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_vulkanRHI));
-	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 
@@ -168,12 +164,13 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_entities.push_back(std::move(floor));
 	m_entities.push_back(std::move(capsuleEntity));
 
-
-
-
 	for(int i = 0; i < NUM_BALLS; i++)
 		CreateSphere();
 
+	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
+	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 
 	m_paused = false;
 }

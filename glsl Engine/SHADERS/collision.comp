@@ -36,10 +36,7 @@ void main()
     // Simple integration
     pos += vel * pc.dt;
 
-    // Naive sphere-sphere collision handling:
-    // If both entities have a positive radius we treat them as spheres.
-    // This is a conservative, local-only response: we modify only this entity's
-    // position/velocity (no interlocked updates to the other entity).
+    // Naive sphere-sphere collision handling (local-only)
     const float separationBias = 0.01;
     const float restitution = 0.9; // simple energy retention on bounce
     for (uint j = 0u; j < pc.entityCount; ++j)
@@ -82,6 +79,35 @@ void main()
                 vel = v_tangent - v_normal * restitution;
             }
         }
+    }
+
+    // Keep balls inside a 30x30x30 area centered at origin (half-extent = 15)
+    // If an entity goes outside, clamp position to the boundary and reflect velocity with some restitution.
+    const vec3 halfBounds = vec3(5.0);
+    const float wallRestitution = 0.8;
+    // X axis
+    if (pos.x > halfBounds.x) {
+        pos.x = halfBounds.x;
+        if (vel.x > 0.0) vel.x = -vel.x * wallRestitution;
+    } else if (pos.x < -halfBounds.x) {
+        pos.x = -halfBounds.x;
+        if (vel.x < 0.0) vel.x = -vel.x * wallRestitution;
+    }
+    // Y axis
+    if (pos.y > halfBounds.y) {
+        pos.y = halfBounds.y;
+        if (vel.y > 0.0) vel.y = -vel.y * wallRestitution;
+    } else if (pos.y < -halfBounds.y) {
+        pos.y = -halfBounds.y;
+        if (vel.y < 0.0) vel.y = -vel.y * wallRestitution;
+    }
+    // Z axis
+    if (pos.z > halfBounds.z) {
+        pos.z = halfBounds.z;
+        if (vel.z > 0.0) vel.z = -vel.z * wallRestitution;
+    } else if (pos.z < -halfBounds.z) {
+        pos.z = -halfBounds.z;
+        if (vel.z < 0.0) vel.z = -vel.z * wallRestitution;
     }
 
     // Write back results (preserve collider metadata as input)

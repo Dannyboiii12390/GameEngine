@@ -14,7 +14,7 @@
 
 TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) : 
 	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi),
-	m_gui(p_gui)
+	m_gui(p_gui), m_collisionSystem(50, rhi)
 {
 	// Initialize VulkanRHI and Renderer here if needed
 	m_renderer.Initialize(m_vulkanRHI);
