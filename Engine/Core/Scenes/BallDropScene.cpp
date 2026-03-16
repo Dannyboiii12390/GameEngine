@@ -22,6 +22,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	const Texture entTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	const Texture concTex(m_vulkanRHI, "Assets/conc_tex.jpg", TextureType::Albedo, true);
+	const Texture cobbleTex(m_vulkanRHI, "Assets/cobblestone_diff.jpg", TextureType::Albedo, true);
 
 	//load camera position and rotation from file if it exists, otherwise use defaults
 	std::ifstream file("camera_state.txt");
@@ -61,7 +62,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 				col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 			}
 		};	
-	auto createOtherPlaneEntity = [this, &concTex](Entity& entity, glm::vec3 pos, int left)
+	auto createOtherPlaneEntity = [this, &cobbleTex](Entity& entity, glm::vec3 pos, int left)
 	{
 		entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f, 90.0f, left * 45.0f), glm::vec3(100.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
@@ -74,7 +75,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			// IMPORTANT: initialize mesh before creating pipeline/adding texture
 			geom->InitializeMesh(m_vulkanRHI, verts, indices);
 			geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
-			geom->AddTexture(m_vulkanRHI, concTex);
+			geom->AddTexture(m_vulkanRHI, cobbleTex);
 		}
 		ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 		if (col)

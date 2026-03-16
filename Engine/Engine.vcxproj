@@ -297,6 +297,7 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\cobblestone_diff.jpg" />
     <Image Include="Assets\conc_tex.jpg" />
     <Image Include="Assets\red_brick_diff_1k.jpg" />
     <Image Include="Assets\red_brick_disp_1k.png" />
