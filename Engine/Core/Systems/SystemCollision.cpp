@@ -5,6 +5,14 @@
 #include "../Entity.h"
 #include <omp.h>
 
+
+
+#ifdef USE_GPU
+void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
+{
+
+}
+#else
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
 	EComponentType requiredComponents = EComponentType::Component_Collision | EComponentType::Component_Transform;
@@ -62,4 +70,6 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 		}
 	}
 }
+#endif
+
 
