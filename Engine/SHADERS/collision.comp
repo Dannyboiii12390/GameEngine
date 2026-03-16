@@ -1,0 +1,79 @@
+#version 450
+
+// Using standard sizing matching standard shader layout structures
+layout (local_size_x = 256) in;
+
+struct CollisionData {
+    vec3 position;
+    float radius;
+    vec3 velocity;
+    int entityId;
+    int colliderType; // 0 = Sphere, 1 = Plane...
+    vec3 params;      // Extra mapping data
+};
+
+layout(std140, binding = 0) readonly buffer InputBuffer {
+    CollisionData inData[];
+};
+
+layout(std140, binding = 1) buffer OutputBuffer {
+    CollisionData outData[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint numElements;
+    float deltaTime;
+} pc;
+
+void checkAndResolveCollision(inout CollisionData a, CollisionData b) {
+    // Both Spheres
+    if (a.colliderType == 0 && b.colliderType == 0) {
+        float dist = distance(a.position, b.position);
+        float minPenetration = a.radius + b.radius;
+        
+        if (dist < minPenetration && dist > 0.0001) {
+            vec3 dir = (a.position - b.position) / dist;
+            float overlap = minPenetration - dist;
+            
+            // Apply simple position correction out of the target mass
+            a.position += dir * (overlap * 0.5);
+            
+            // Basic elastic bounce
+            a.velocity = reflect(a.velocity, dir) * 0.8;
+        }
+    }
+    // Sphere vs Plane (Assuming a is plane (Type 1), b is sphere (Type 0))
+    // Note: params can represent the plane normal in this system.
+    else if (a.colliderType == 0 && b.colliderType == 1) {
+        vec3 planeNormal = b.params;
+        float dist = dot(a.position - b.position, planeNormal);
+        
+        if (dist < a.radius) {
+            float overlap = a.radius - dist;
+            // Push sphere up plane
+            a.position += planeNormal * overlap; 
+            // Reflect velocity along normal
+            a.velocity = reflect(a.velocity, planeNormal) * 0.8; 
+        }
+    }
+    // You can implement Sphere/Capsule, Capsule/Capsule checks extending the conditional setup.
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.numElements) return;
+
+    // Local copy to calculate modifications
+    CollisionData me = inData[idx];
+    
+    // Naïve global N^2 broad phase & resolution step
+    for (uint i = 0; i < pc.numElements; ++i) {
+        if (i == idx) continue;
+        
+        CollisionData other = inData[i];
+        checkAndResolveCollision(me, other);
+    }
+    
+    // Write out the integrated entity
+    outData[idx] = me;
+}

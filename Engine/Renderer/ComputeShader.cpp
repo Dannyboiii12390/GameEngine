@@ -73,8 +73,6 @@ void ComputeShader::CleanupCreatedResources()
     m_BufferSizes.clear();
 
     m_DescriptorSet = VK_NULL_HANDLE;
-    m_PushConstants.clear();
-    m_PushConstantSize = sizeof(uint32_t);
 }
 
 void ComputeShader::LoadShader(const std::string& spvPath)

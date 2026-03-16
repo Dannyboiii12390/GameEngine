@@ -4,10 +4,15 @@
 #include "../Components/ComponentVelocity.h"
 #include "../Entity.h"
 #include <omp.h>
+#include "../../DebugUtils.h"
 
-
+//#define USE_COMPUTE // Comment out to use CPU-based collision detection instead of GPU compute shader
 
 #ifdef USE_COMPUTE
+
+#include "../../Renderer/VulkanRHI.h"
+#include "../../Renderer/ComputeShader.h"
+
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
 
@@ -39,8 +44,6 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 	// Detect and respond. CollisionResponse writes corrections into the write
 	// buffer. SystemVelocity owns all buffer swapping at the start of the
 	// next frame, so no swaps are needed here.
-	// The outer loop is parallelised; collision callbacks are guarded with a
-	// critical section to prevent concurrent writes to shared velocity state.
 	#pragma omp parallel for 
 	for (int i = 0; i < count; ++i)
 	{
