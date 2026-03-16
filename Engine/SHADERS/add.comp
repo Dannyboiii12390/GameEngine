@@ -1,0 +1,23 @@
+#version 450
+
+// Workgroup size - tune to your GPU (256 is common)
+layout(local_size_x = 256) in;
+
+// Input buffers (binding 0 and 1)
+layout(std430, binding = 0) readonly buffer InA { int elements[]; };
+layout(std430, binding = 1) readonly buffer InB { int elements2[]; };
+
+// Output buffer (binding 2)
+layout(std430, binding = 2) writeonly buffer Out { int elementsOut[]; };
+
+// We pass element count via push constant to avoid out-of-bounds
+layout(push_constant) uniform Push {
+    uint count;
+} pc;
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.count) return;
+    elementsOut[idx] = elements[idx] + elements2[idx];
+}

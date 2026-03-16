@@ -267,6 +267,12 @@
     <None Include="Assets\red_brick_rough_1k.exr" />
     <None Include="Assets\wood_shutter_nor_gl_1k.exr" />
     <None Include="Assets\wood_shutter_rough_1k.exr" />
+    <CustomBuild Include="SHADERS\add.comp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"%VULKAN_SDK%\bin\glslangValidator.exe" -V "$(ProjectDir)SHADERS\%(Filename).comp" -o "$(ProjectDir)SHADERS\%(Filename).comp.spv</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).comp.spv;%(Outputs)</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\conc_tex.jpg" />
