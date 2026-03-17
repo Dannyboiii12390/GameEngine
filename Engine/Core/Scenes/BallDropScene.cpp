@@ -43,7 +43,8 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	auto createPlaneEntity = [this, &concTex](Entity& entity, glm::vec3 pos, int left)
 		{
-			entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(left * 45.0f, 0.0f, 0.0f), glm::vec3(100.0f));
+			glm::vec3 rotDegrees = glm::vec3(left * 45.0f, 0.0f, 0.0f);
+			entity.AddComponent(EComponentType::Component_Transform, pos, rotDegrees, glm::vec3(100.0f));
 			entity.AddComponent(EComponentType::Component_Geometry);
 			entity.AddComponent(EComponentType::Component_Collision);
 			ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
@@ -51,7 +52,6 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			{
 				MeshData meshData = ResourceManager::CreatePlaneMesh();
 				auto [verts, indices] = meshData;
-				// IMPORTANT: initialize mesh before creating pipeline/adding texture
 				geom->InitializeMesh(m_vulkanRHI, verts, indices);
 				geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
 				geom->AddTexture(m_vulkanRHI, concTex);
@@ -59,12 +59,15 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 			if (col)
 			{
+				// Provide the fully default (unrotated) XY plane vectors. 
+				// SystemCollision will sync the actual collider rotation with ComponentTransform!
 				col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 			}
 		};	
 	auto createOtherPlaneEntity = [this, &cobbleTex](Entity& entity, glm::vec3 pos, int left)
 	{
-		entity.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f, 90.0f, left * 45.0f), glm::vec3(100.0f));
+		glm::vec3 rotDegrees = glm::vec3(0.0f, 270.0f, left * 45.0f);
+		entity.AddComponent(EComponentType::Component_Transform, pos, rotDegrees, glm::vec3(100.0f));
 		entity.AddComponent(EComponentType::Component_Geometry);
 		entity.AddComponent(EComponentType::Component_Collision);
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
@@ -72,7 +75,6 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		{
 			MeshData meshData = ResourceManager::CreatePlaneMesh();
 			auto [verts, indices] = meshData;
-			// IMPORTANT: initialize mesh before creating pipeline/adding texture
 			geom->InitializeMesh(m_vulkanRHI, verts, indices);
 			geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
 			geom->AddTexture(m_vulkanRHI, cobbleTex);
@@ -80,6 +82,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		ComponentCollision* col = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 		if (col)
 		{
+			// Provide the fully default (unrotated) XY plane vectors.
 			col->SetCollider(std::make_unique<Physics::Plane>(pos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 		}
 	};
@@ -129,34 +132,34 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
     // - Physics capsule: radius = 1.0f, height = 10.0f, endpoints computed from center +/- height/2 along Y
 
 	Entity capsuleEntity;
-	capsuleEntity.AddComponent(EComponentType::Component_Transform, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 45.0f), glm::vec3(1.0f));
+	glm::vec3 capsulePos = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 capsuleRot = glm::vec3(0.0f, 0.0f, 45.0f); // 45 degree tilt
+	capsuleEntity.AddComponent(EComponentType::Component_Transform, capsulePos, capsuleRot, glm::vec3(1.0f));
 	capsuleEntity.AddComponent(EComponentType::Component_Geometry);
 	capsuleEntity.AddComponent(EComponentType::Component_Collision);
-	ComponentGeometry* geom = capsuleEntity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
-	if (geom)
+	ComponentGeometry* geom2 = capsuleEntity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+	if (geom2)
 	{
-		// Create a noticeably tall capsule mesh: radius 1.0, height 10.0
 		MeshData meshData = ResourceManager::CreateCapsuleMesh(1.0f, 10.0f, 16);
 		auto [verts, indices] = meshData;
-		// Initialize mesh so the renderer has a valid Mesh to bind/draw
-		geom->InitializeMesh(m_vulkanRHI, verts, indices);
-		geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
-		geom->AddTexture(m_vulkanRHI, entTex);
+		geom2->InitializeMesh(m_vulkanRHI, verts, indices);
+		geom2->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
+		geom2->AddTexture(m_vulkanRHI, entTex);
 	}
-	ComponentCollision* col = capsuleEntity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-	if (col)
+	ComponentCollision* col2 = capsuleEntity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	if (col2)
 	{
-		// Physics::Capsule expects two endpoints (a,b) and a radius.
-		// Use the same height and radius as the mesh so visual and physical match.
-		const glm::vec3 center(0.0f, 20.0f, 0.0f);
 		const float radius = 1.0f;
 		const float height = 10.0f;
-		const glm::vec3 a = center + glm::vec3(0.0f, -height * 0.5f, 0.0f);
-		const glm::vec3 b = center + glm::vec3(0.0f,  height * 0.5f, 0.0f);
-		col->SetCollider(std::make_unique<Physics::Capsule>(a, b, radius));
+		
+		// Provide perfectly unrotated Y-up capsule endpoints.
+		// SystemCollision will take these A & B points and tilt them 45 degrees 
+		// automatically based on the Transform we attached to this entity!
+		glm::vec3 unrotatedA = capsulePos + glm::vec3(0.0f, -height * 0.5f, 0.0f);
+		glm::vec3 unrotatedB = capsulePos + glm::vec3(0.0f,  height * 0.5f, 0.0f);
+
+		col2->SetCollider(std::make_unique<Physics::Capsule>(unrotatedA, unrotatedB, radius));
 	}
-
-
 
 	m_entities.push_back(std::move(leftWall));
 	m_entities.push_back(std::move(rightWall));

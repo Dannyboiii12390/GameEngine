@@ -168,15 +168,19 @@ void Plane::setPosition(const glm::vec3& newPos)
 }
 void Plane::setRotation(const glm::vec3& eulerDegrees)
 {
-	glm::mat4 rot = glm::mat4(1.0f);
-	rot = glm::rotate(rot, glm::radians(eulerDegrees.x), glm::vec3(1, 0, 0));
-	rot = glm::rotate(rot, glm::radians(eulerDegrees.y), glm::vec3(0, 1, 0));
-	rot = glm::rotate(rot, glm::radians(eulerDegrees.z), glm::vec3(0, 0, 1));
+	// Build explicit rotation matrices and multiply in the same order
+	// ComponentTransform uses rotation = Rz * Ry * Rx when building the model matrix:
+	//   glm::mat4 rotation = rotationZ * rotationY * rotationX;
+	// Match that order here so collider tangent vectors rotate the same way as the visual transform.
+	glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), glm::radians(eulerDegrees.x), glm::vec3(1, 0, 0));
+	glm::mat4 rotY = glm::rotate(glm::mat4(1.0f), glm::radians(eulerDegrees.y), glm::vec3(0, 1, 0));
+	glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), glm::radians(eulerDegrees.z), glm::vec3(0, 0, 1));
 
-	// Only rotate the tangent vectors — the plane's world-space point stays fixed.
+	glm::mat4 rot = rotZ * rotY * rotX; // match ComponentTransform rotation order (Z * Y * X)
+
+	// Rotate the base tangent vectors; do NOT overwrite m_point here (setPosition manages that).
 	m_u = glm::vec3(rot * glm::vec4(m_baseU, 0.0f));
 	m_v = glm::vec3(rot * glm::vec4(m_baseV, 0.0f));
-	m_point = m_basePoint; // position is managed by setPosition, not rotation
 
 	m_normal = glm::cross(m_u, m_v);
 	m_unitNormal = glm::normalize(m_normal);

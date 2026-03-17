@@ -59,7 +59,8 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 			if (collisionComp->Collided(*otherCollision->GetCollider()))
 			{
 				#pragma omp critical
-				collisionComp->InvokeCollision(entity, other);
+				collisionComp->InvokeCollision(entity, other); // this is the main bottleneck when using CPU-based collision detection, as the collision response may write to shared buffers. 
+				//In a real implementation, we would want to design this to minimize contention (e.g. by accumulating responses in thread-local storage and applying them after the parallel loop).
 			}
 		}
 	}
