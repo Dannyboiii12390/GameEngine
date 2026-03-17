@@ -8,7 +8,7 @@
 #ifdef _DEBUG
 constexpr int NUM_BALLS = 30;
 #else
-constexpr int NUM_BALLS = 1000;
+constexpr int NUM_BALLS = 10;
 #endif
 
 BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
@@ -22,7 +22,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	const Texture entTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	const Texture concTex(m_vulkanRHI, "Assets/conc_tex.jpg", TextureType::Albedo, true);
-	const Texture cobbleTex(m_vulkanRHI, "Assets/cobblestone_diff.jpg", TextureType::Albedo, true);
+	const Texture cobbleTex(m_vulkanRHI, "Assets/mossy_cobblestone_diff_1k.jpg", TextureType::Albedo, true);
 
 	//load camera position and rotation from file if it exists, otherwise use defaults
 	std::ifstream file("camera_state.txt");
@@ -50,7 +50,15 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 			ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 			if (geom)
 			{
-				MeshData meshData = ResourceManager::CreatePlaneMesh();
+				// Mesh local width/height used by CreatePlaneMesh default is 1.0
+				const float meshWidth = 1.0f;
+				const glm::vec3 entityScale = glm::vec3(10.0f);
+				const float tileSizeWorld = 1.0f; // desired world-space size for one texture tile (change to taste)
+
+				// Compute uv repeats so each tile is ~tileSizeWorld in world units:
+				float uvRepeats = (meshWidth * entityScale.x) / tileSizeWorld;
+
+				MeshData meshData = ResourceManager::CreatePlaneMesh(uvRepeats, meshWidth, /*height=*/1.0f);
 				auto [verts, indices] = meshData;
 				geom->InitializeMesh(m_vulkanRHI, verts, indices);
 				geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
@@ -73,7 +81,13 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 		if (geom)
 		{
-			MeshData meshData = ResourceManager::CreatePlaneMesh();
+			const float meshWidth = 1.0f;
+			const glm::vec3 entityScale = glm::vec3(10.0f);
+			const float tileSizeWorld = 1.0f; // or 0.5 to make tiles smaller
+
+			float uvRepeats = (meshWidth * entityScale.x) / tileSizeWorld;
+
+			MeshData meshData = ResourceManager::CreatePlaneMesh(uvRepeats, meshWidth, /*height=*/1.0f);
 			auto [verts, indices] = meshData;
 			geom->InitializeMesh(m_vulkanRHI, verts, indices);
 			geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
@@ -94,9 +108,14 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 		if (geom)
 		{
-			MeshData meshData = ResourceManager::CreatePlaneMesh();
+			const float meshWidth = 1.0f;
+			const glm::vec3 entityScale = glm::vec3(1.0f); // you used glm::vec3(10.0f,...)
+			const float tileSizeWorld = 1.0f; // make 1.0 world unit per tile
+
+			float uvRepeats = (meshWidth * entityScale.x) / tileSizeWorld;
+
+			MeshData meshData = ResourceManager::CreatePlaneMesh(uvRepeats, meshWidth, /*height=*/1.0f);
 			auto [verts, indices] = meshData;
-			// Initialize mesh so the renderer has a valid Mesh to bind/draw
 			geom->InitializeMesh(m_vulkanRHI, verts, indices);
 			geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
 			geom->AddTexture(m_vulkanRHI, entTex);
@@ -140,7 +159,7 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	ComponentGeometry* geom2 = capsuleEntity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 	if (geom2)
 	{
-		MeshData meshData = ResourceManager::CreateCapsuleMesh(1.0f, 10.0f, 16);
+		MeshData meshData = ResourceManager::CreateCapsuleMesh(1.0f, 1.0f, 10.0f, 16);
 		auto [verts, indices] = meshData;
 		geom2->InitializeMesh(m_vulkanRHI, verts, indices);
 		geom2->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
@@ -351,7 +370,7 @@ void BallDropScene::CreateSphere()
 			ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 			if (geom)
 			{
-				MeshData meshData = ResourceManager::CreateSphereMesh(16, 16);
+				MeshData meshData = ResourceManager::CreateSphereMesh(1.0f, 16, 16);
 				auto [verts, indices] = meshData;
 				// Initialize mesh so mesh buffers exist for draw calls
 				geom->InitializeMesh(m_vulkanRHI, verts, indices);

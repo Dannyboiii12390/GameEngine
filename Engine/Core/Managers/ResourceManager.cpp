@@ -111,7 +111,7 @@ MeshData ResourceManager::CreateCubeMesh()
     return { verts, indices };
 }
 
-MeshData ResourceManager::CreateSphereMesh(uint32_t sectorCount, uint32_t stackCount)
+MeshData ResourceManager::CreateSphereMesh(float uv, uint32_t sectorCount, uint32_t stackCount)
 {
     std::vector<Mesh::Vertex> verts;
     std::vector<uint32_t> indices;
@@ -138,6 +138,10 @@ MeshData ResourceManager::CreateSphereMesh(uint32_t sectorCount, uint32_t stackC
 
             float u = static_cast<float>(j) / static_cast<float>(sectorCount);
             float v = static_cast<float>(i) / static_cast<float>(stackCount);
+
+            // apply uv tiling
+            u *= uv;
+            v *= uv;
 
             verts.push_back(MakeVertex(x, y, z, nx, ny, nz, u, v));
         }
@@ -169,7 +173,7 @@ MeshData ResourceManager::CreateSphereMesh(uint32_t sectorCount, uint32_t stackC
 
     return { verts, indices };
 }
-MeshData ResourceManager::CreatePlaneMesh(float width, float height, uint32_t widthSegments, uint32_t heightSegments)
+MeshData ResourceManager::CreatePlaneMesh(float uv, float width, float height, uint32_t widthSegments, uint32_t heightSegments)
 {
     std::vector<Mesh::Vertex> verts;
     std::vector<uint32_t> indices;
@@ -197,7 +201,11 @@ MeshData ResourceManager::CreatePlaneMesh(float width, float height, uint32_t wi
         {
             float u = static_cast<float>(x) / static_cast<float>(wSeg);
             float px = -halfW + u * width;
-            verts.push_back(MakeVertex(px, py, 0.0f, 0.0f, 0.0f, 1.0f, u, 1.0f - v));
+
+            float tu = u * uv;
+            float tv = (1.0f - v) * uv; // keep same vertical orientation but apply tiling
+
+            verts.push_back(MakeVertex(px, py, 0.0f, 0.0f, 0.0f, 1.0f, tu, tv));
         }
     }
 
@@ -226,7 +234,7 @@ MeshData ResourceManager::CreatePlaneMesh(float width, float height, uint32_t wi
     }
     return { verts, indices };
 }
-MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_t sectorCount)
+MeshData ResourceManager::CreateCylinderMesh(float uv, float radius, float height, uint32_t sectorCount)
 {
     std::vector<Mesh::Vertex> verts;
     std::vector<uint32_t> indices;
@@ -251,10 +259,13 @@ MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_
         float nz = std::sin(theta);
         float u = static_cast<float>(i) / static_cast<float>(sectors);
 
+        // apply uv tiling for side
+        float tu = u * uv;
+
         // top ring (use vTop)
-        verts.push_back(MakeVertex(x, halfH, z, nx, 0.0f, nz, u, vTop));
+        verts.push_back(MakeVertex(x, halfH, z, nx, 0.0f, nz, tu, vTop * uv));
         // bottom ring (use vBottom)
-        verts.push_back(MakeVertex(x, -halfH, z, nx, 0.0f, nz, u, vBottom));
+        verts.push_back(MakeVertex(x, -halfH, z, nx, 0.0f, nz, tu, vBottom * uv));
     }
 
     // side indices
@@ -278,14 +289,14 @@ MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_
     // caps (fan)
     // top center
     uint32_t topCenterIndex = static_cast<uint32_t>(verts.size());
-    verts.push_back(MakeVertex(0.0f, halfH, 0.0f, 0, 1, 0, 0.5f, 0.5f));
+    verts.push_back(MakeVertex(0.0f, halfH, 0.0f, 0, 1, 0, 0.5f * uv, 0.5f * uv));
 
     for (uint32_t i = 0; i < sectors; ++i)
     {
         float theta = static_cast<float>(i) * 2.0f * PI / static_cast<float>(sectors);
         float x = radius * std::cos(theta);
         float z = radius * std::sin(theta);
-        verts.push_back(MakeVertex(x, halfH, z, 0, 1, 0, (std::cos(theta) + 1.0f) * 0.5f, (std::sin(theta) + 1.0f) * 0.5f));
+        verts.push_back(MakeVertex(x, halfH, z, 0, 1, 0, (std::cos(theta) + 1.0f) * 0.5f * uv, (std::sin(theta) + 1.0f) * 0.5f * uv));
     }
     // build top fan
     for (uint32_t i = 0; i < sectors; ++i)
@@ -300,13 +311,13 @@ MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_
 
     // bottom center
     uint32_t bottomCenterIndex = static_cast<uint32_t>(verts.size());
-    verts.push_back(MakeVertex(0.0f, -halfH, 0.0f, 0, -1, 0, 0.5f, 0.5f));
+    verts.push_back(MakeVertex(0.0f, -halfH, 0.0f, 0, -1, 0, 0.5f * uv, 0.5f * uv));
     for (uint32_t i = 0; i < sectors; ++i)
     {
         float theta = static_cast<float>(i) * 2.0f * PI / static_cast<float>(sectors);
         float x = radius * std::cos(theta);
         float z = radius * std::sin(theta);
-        verts.push_back(MakeVertex(x, -halfH, z, 0, -1, 0, (std::cos(theta) + 1.0f) * 0.5f, (std::sin(theta) + 1.0f) * 0.5f));
+        verts.push_back(MakeVertex(x, -halfH, z, 0, -1, 0, (std::cos(theta) + 1.0f) * 0.5f * uv, (std::sin(theta) + 1.0f) * 0.5f * uv));
     }
     // build bottom fan (note winding reversed to face outward)
     for (uint32_t i = 0; i < sectors; ++i)
@@ -321,7 +332,7 @@ MeshData ResourceManager::CreateCylinderMesh(float radius, float height, uint32_
 
     return { verts, indices };
 }
-MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t sectorCount, uint32_t stackCount)
+MeshData ResourceManager::CreateCapsuleMesh(float uv, float radius, float height, uint32_t sectorCount, uint32_t stackCount)
 {
     // Capsule: cylinder of (height - 2*radius) with hemispheres top and bottom.
     std::vector<Mesh::Vertex> verts;
@@ -373,7 +384,11 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
                 else
                     v = 0.25f - (static_cast<float>(halfStacks - i) / static_cast<float>(halfStacks)) * 0.25f; // 0.25 -> 0.0
 
-                verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
+                // apply tiling
+                float tu = u * uv;
+                float tv = v * uv;
+
+                verts.push_back(MakeVertex(x, py, z, nx, ny, nz, tu, tv));
             }
         }
     };
@@ -398,7 +413,11 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
             float nx = std::cos(sectorAngle);
             float nz = std::sin(sectorAngle);
             float u = static_cast<float>(j) / static_cast<float>(sectors);
-            verts.push_back(MakeVertex(x, py, z, nx, 0.0f, nz, u, v));
+
+            float tu = u * uv;
+            float tv = v * uv;
+
+            verts.push_back(MakeVertex(x, py, z, nx, 0.0f, nz, tu, tv));
         }
     }
     // IMPORTANT FIX:
@@ -434,7 +453,10 @@ MeshData ResourceManager::CreateCapsuleMesh(float radius, float height, uint32_t
             // Map bottom hemisphere v so equator = 0.25 and pole = 0.0
             float v = 0.25f - (static_cast<float>(halfStacks - i) / static_cast<float>(halfStacks)) * 0.25f; // 0.25 -> 0.0
 
-            verts.push_back(MakeVertex(x, py, z, nx, ny, nz, u, v));
+            float tu = u * uv;
+            float tv = v * uv;
+
+            verts.push_back(MakeVertex(x, py, z, nx, ny, nz, tu, tv));
         }
     }
     uint32_t bottomHemRings = halfStacks + 1;

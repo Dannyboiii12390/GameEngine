@@ -1135,32 +1135,35 @@ void VulkanRHI::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width
 VkSampler VulkanRHI::CreateSampler()
 {
 	if (m_Device == VK_NULL_HANDLE || m_PhysicalDevice == VK_NULL_HANDLE)
-		throw std::runtime_error("CreateSampler called but device or physical device is not initialized");
+		return VK_NULL_HANDLE;
 
-	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(m_PhysicalDevice, &properties);
+	VkPhysicalDeviceProperties props{};
+	vkGetPhysicalDeviceProperties(m_PhysicalDevice, &props);
 
 	VkSamplerCreateInfo samplerInfo{};
 	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 	samplerInfo.magFilter = VK_FILTER_LINEAR;
 	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	samplerInfo.anisotropyEnable = VK_TRUE;
-	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy > 1.0f ? properties.limits.maxSamplerAnisotropy : 1.0f;
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	// clamp anisotropy to device max
+	samplerInfo.maxAnisotropy = std::min<float>(16.0f, props.limits.maxSamplerAnisotropy);
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK; // unused with REPEAT
 	samplerInfo.unnormalizedCoordinates = VK_FALSE;
 	samplerInfo.compareEnable = VK_FALSE;
 	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0f;
 	samplerInfo.minLod = 0.0f;
 	samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
-	samplerInfo.mipLodBias = 0.0f;
 
 	VkSampler sampler = VK_NULL_HANDLE;
-	if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create texture sampler");
+	if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
+	{
+		std::cerr << "VulkanRHI::CreateSampler - failed to create sampler\n";
+		return VK_NULL_HANDLE;
 	}
 	return sampler;
 }

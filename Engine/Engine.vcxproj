@@ -233,6 +233,8 @@
     <ClInclude Include="Core\Managers\SceneManager.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Assets\mossy_cobblestone_nor_gl_1k.exr" />
+    <None Include="Assets\mossy_cobblestone_rough_1k.exr" />
     <None Include="DebugUtils.h" />
     <None Include="packages.config" />
     <CustomBuild Include="SHADERS\object.frag">
@@ -297,8 +299,9 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Assets\cobblestone_diff.jpg" />
     <Image Include="Assets\conc_tex.jpg" />
+    <Image Include="Assets\mossy_cobblestone_diff_1k.jpg" />
+    <Image Include="Assets\mossy_cobblestone_disp_1k.png" />
     <Image Include="Assets\red_brick_diff_1k.jpg" />
     <Image Include="Assets\red_brick_disp_1k.png" />
     <Image Include="Assets\wood_shutter_diff_1k.jpg" />
