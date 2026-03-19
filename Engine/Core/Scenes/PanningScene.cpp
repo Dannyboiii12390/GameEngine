@@ -1,4 +1,4 @@
-#include "TemplateScene.h"
+#include "PanningScene.h"
 #include "../Managers/ResourceManager.h"
 #include "../../IMGUI/imgui.h"
 #include "../Systems/SystemSwapBuffers.h"
@@ -11,7 +11,7 @@
 #include "../../Renderer/Window.h"
 
 
-TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
+PanningScene::PanningScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi),
 	m_gui(p_gui), m_systemManager(rhi, 2)
 {
@@ -21,14 +21,51 @@ TemplateScene::TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_gui->Create(*rhi, *m_window);
 	m_camera.SetPosition(glm::vec3(-5.0f, 5.0f, 0.0f));
 	m_camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+	m_camera.SetNearFar(0.1f, 10000.0f);
 
 	// Load textures
+	const Texture red_brick(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
+	//const Texture mossy_cobblestone(m_vulkanRHI, "Assets/mossy_cobblestone_diff_1k.jpg", TextureType::Albedo, true);
+
 	// Add Entities
+	Entity planeEntity;
+	planeEntity.AddComponent(EComponentType::Component_Transform, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(1000.0f));
+	planeEntity.AddComponent(EComponentType::Component_Geometry);
+	planeEntity.AddComponent(EComponentType::Component_Collision);
+	ComponentGeometry* geom = planeEntity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+	if (geom)
+	{
+		const float meshWidth = 1.0f;
+		const glm::vec3 entityScale = glm::vec3(1000.0f); // you used glm::vec3(10.0f,...)
+		const float tileSizeWorld = 1.0f; // make 1.0 world unit per tile
+
+		float uvRepeats = (meshWidth * entityScale.x) / tileSizeWorld;
+
+		MeshData meshData = ResourceManager::CreatePlaneMesh(uvRepeats, meshWidth, /*height=*/1.0f);
+		auto [verts, indices] = meshData;
+		geom->InitializeMesh(m_vulkanRHI, verts, indices);
+		geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
+		geom->AddTexture(m_vulkanRHI, red_brick);
+	}
+	ComponentCollision* col = planeEntity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+	if (col)
+	{
+		col->SetCollider(std::make_unique<Physics::Plane>(glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+	}
+
+
+	m_entities.push_back(std::move(planeEntity));
 	// Add Systems
+	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
+	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
+
+
 
 	m_paused = false;
 }
-TemplateScene::~TemplateScene()
+PanningScene::~PanningScene()
 {
 	if (m_vulkanRHI)
 	{
@@ -40,7 +77,7 @@ TemplateScene::~TemplateScene()
 		m_systemManager.Shutdown();
 	}
 }
-void TemplateScene::Destroy()
+void PanningScene::Destroy()
 {
 	if (m_vulkanRHI)
 	{
@@ -52,13 +89,13 @@ void TemplateScene::Destroy()
 		m_systemManager.Shutdown();
 	}
 }
-void TemplateScene::Start(float deltaTime)
+void PanningScene::Start(float deltaTime)
 {
 }
-void TemplateScene::Stop()
+void PanningScene::Stop()
 {
 }
-void TemplateScene::Update(float deltaTime)
+void PanningScene::Update(float deltaTime)
 {
 	m_window->PollEvents();
 
@@ -69,10 +106,10 @@ void TemplateScene::Update(float deltaTime)
 	m_systemManager.Update(m_entities, deltaTime);
 
 }
-void TemplateScene::FixedUpdate()
+void PanningScene::FixedUpdate()
 {
 }
-void TemplateScene::Draw()
+void PanningScene::Draw()
 {
 	m_vulkanRHI->BeginFrame();
 
@@ -134,7 +171,7 @@ void TemplateScene::Draw()
 	m_vulkanRHI->EndFrame();
 	m_vulkanRHI->Present();
 }
-void TemplateScene::HandleInput(float deltaTime)
+void PanningScene::HandleInput(float deltaTime)
 {
 	if (m_inputHandler.isKeyPressed(GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
 
@@ -155,17 +192,17 @@ void TemplateScene::HandleInput(float deltaTime)
 
 	m_vulkanRHI->SetActiveCamera(&m_camera);
 }
-void TemplateScene::SerializeState()
+void PanningScene::SerializeState()
 {
 }
-void TemplateScene::DeserializeState()
+void PanningScene::DeserializeState()
 {
 }
-void TemplateScene::AddEntity(Entity&& entity)
+void PanningScene::AddEntity(Entity&& entity)
 {
 	m_entities.push_back(std::move(entity));
 }
-void TemplateScene::RemoveEntity(int index)
+void PanningScene::RemoveEntity(int index)
 {
 	if (index >= 0 && index < m_entities.size())
 		m_entities.erase(m_entities.begin() + index);

@@ -11,7 +11,7 @@ class Entity;
 class Window;
 
 
-class TemplateScene : public IScene
+class PanningScene : public IScene
 {
 public:
 	// Inherited via IScene
@@ -27,8 +27,8 @@ public:
 	void AddEntity(Entity&& entity) override;
 	void RemoveEntity(int index) override;
 
-	TemplateScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
-	~TemplateScene() override;
+	PanningScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
+	~PanningScene() override;
 
 private:
 

@@ -31,7 +31,7 @@
 #include "Core/Scenes/BallDropScene.h"
 #include <numeric>
 #include "Renderer/ComputeShader.h"
-
+#include "Core/Scenes/PanningScene.h"
 // add a toString class to every collider
 
 int clientRequest()
@@ -283,7 +283,7 @@ int main()
 
         GUI gui;
 
-        sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
+        sceneManager.AddScene(std::make_unique<PanningScene>(window, &vulkanRHI, &gui));
 
         Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
         Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
