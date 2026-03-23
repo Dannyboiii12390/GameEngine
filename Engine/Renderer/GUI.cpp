@@ -98,9 +98,28 @@ bool GUI::Create(VulkanRHI& rhi, Window& window)
         2u,
         nullptr);
 }
-void GUI::NewFrame() const
+void GUI::NewFrame(Window& window) const
 {
     if (!m_initialized) return;
+
+    // Forward raw GLFW mouse state to ImGui every frame.
+    // This ensures ImGui sees mouse position/buttons even if GLFW callbacks
+    // were not installed or were overwritten by other code.
+    {
+        GLFWwindow* win = window.getGLFWwindow();
+        if (win)
+        {
+            double mx, my;
+            glfwGetCursorPos(win, &mx, &my);
+            ImGuiIO& io = ImGui::GetIO();
+            io.AddMousePosEvent(static_cast<float>(mx), static_cast<float>(my));
+            io.AddMouseButtonEvent(0, glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+            io.AddMouseButtonEvent(1, glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+            io.AddMouseButtonEvent(2, glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
+        }
+    }
+
+
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();

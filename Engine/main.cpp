@@ -17,7 +17,6 @@
 - Render Graph
 */
 #include <vector>
-#include "Core/Scenes/CollideBallWithAnotherBallScene.h"
 
 #include "DebugUtils.h"
 #include "../PhysicsEngine/Networking/Environment.h"
@@ -27,11 +26,11 @@
 #include <thread>
 
 #include "flatbuffers/flatbuffers.h"
-#include "Core/Scenes/RotationScene.h"
 #include "Core/Scenes/BallDropScene.h"
 #include <numeric>
 #include "Renderer/ComputeShader.h"
 #include "Core/Scenes/PanningScene.h"
+#include "IMGUI/imgui.h"
 // add a toString class to every collider
 
 int clientRequest()
@@ -235,7 +234,6 @@ void runComputeShader(VulkanRHI& vulkanRHI)
     cs.Destroy();
 }
 
-
 int main()
 {
     try
@@ -264,7 +262,7 @@ int main()
         const int height = 1080;
         Window window(width, height, "Vulkan Engine");
 
-        SceneManager sceneManager;
+        //SceneManager sceneManager;
 
         VulkanRHI vulkanRHI;
 
@@ -282,8 +280,11 @@ int main()
         runComputeShader(vulkanRHI);
 
         GUI gui;
+        gui.Create(vulkanRHI, window);
 
-        sceneManager.AddScene(std::make_unique<PanningScene>(window, &vulkanRHI, &gui));
+        //sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
+		SceneManager& sceneManager = SceneManager::Instance();
+		sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
 
         Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
         Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
@@ -296,8 +297,23 @@ int main()
 
             IScene* scene = sceneManager.GetCurrentScene();
             scene->Update(deltaTime);
+
             scene->HandleInput(deltaTime);
             scene->Draw();
+
+			sceneManager.ApplyPending();
+
+            {
+                // temporary diagnostics — remove after debugging
+                GLFWwindow* win = window.getGLFWwindow();
+                double cx, cy;
+                glfwGetCursorPos(win, &cx, &cy);
+                int focused = glfwGetWindowAttrib(win, GLFW_FOCUSED);
+                int cursorMode = glfwGetInputMode(win, GLFW_CURSOR);
+                ImGuiIO& io = ImGui::GetIO();
+                LOG_DEBUG("GLFW: focused=" << focused << " cursorMode=" << cursorMode << " glfwCursor=(" << cx << "," << cy << ")");
+                LOG_DEBUG("ImGui: WantCaptureMouse=" << (int)io.WantCaptureMouse << " MousePos=(" << io.MousePos.x << "," << io.MousePos.y << ")");
+            }
 
             static float timeAccumulator = 0.0f;
             static int frameCount = 0;

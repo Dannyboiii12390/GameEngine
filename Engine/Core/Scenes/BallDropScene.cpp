@@ -2,13 +2,16 @@
 #include "../Managers/ResourceManager.h"
 #include "../../IMGUI/imgui.h"
 #include "../Systems/SystemSwapBuffers.h"
+#include "../Managers/SceneManager.h"
+#include "PanningScene.h"
+#include "TemplateScene.h"
 
 #include <fstream>
 
 #ifdef _DEBUG
 constexpr int NUM_BALLS = 30;
 #else
-constexpr int NUM_BALLS = 1000;
+constexpr int NUM_BALLS = 100;
 #endif
 
 BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
@@ -17,8 +20,6 @@ BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 {
 
 	m_vulkanRHI->SetActiveCamera(&m_camera);
-
-	m_gui->Create(*rhi, *m_window);
 
 	const Texture entTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	const Texture concTex(m_vulkanRHI, "Assets/conc_tex.jpg", TextureType::Albedo, true);
@@ -266,38 +267,37 @@ void BallDropScene::Draw()
 
 		if (m_gui)
 		{
-			m_gui->NewFrame();
+			m_gui->NewFrame(*m_window);
 
 			static bool show_demo_window = false;
 			static bool show_about = true;
 
+			// Build main menu bar only (no other windows inside it)
 			if (ImGui::BeginMainMenuBar())
 			{
-				if (ImGui::BeginMenu("File"))
+				if (ImGui::BeginMenu("Scenes"))
 				{
-					if (ImGui::MenuItem("Exit", "Esc"))
-						glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
-					ImGui::EndMenu();
-				}
-
-				if (ImGui::BeginMenu("View"))
-				{
-					ImGui::MenuItem("Show ImGui Demo", nullptr, &show_demo_window);
-					ImGui::MenuItem("About", nullptr, &show_about);
-					ImGui::EndMenu();
-				}
-
-				if (ImGui::BeginMenu("Help"))
-				{
-					if (ImGui::MenuItem("Open Documentation"))
+					if (ImGui::MenuItem("Ball Drop"))
 					{
+						// Replace with a fresh BallDropScene
+						SceneManager::Instance().RequestReplaceScene(std::make_unique<BallDropScene>(*m_window, m_vulkanRHI, m_gui));
 					}
+					if (ImGui::MenuItem("Panning"))
+					{
+						SceneManager::Instance().RequestReplaceScene(std::make_unique<PanningScene>(*m_window, m_vulkanRHI, m_gui));
+					}
+					if (ImGui::MenuItem("Template"))
+					{
+						SceneManager::Instance().RequestReplaceScene(std::make_unique<TemplateScene>(*m_window, m_vulkanRHI, m_gui));
+					}
+					
 					ImGui::EndMenu();
 				}
 
 				ImGui::EndMainMenuBar();
 			}
 
+			// Other windows must be created after closing the menu bar
 			if (show_demo_window)
 				ImGui::ShowDemoWindow(&show_demo_window);
 
@@ -311,11 +311,12 @@ void BallDropScene::Draw()
 				ImGui::End();
 			}
 
+			// Render ImGui once per frame after all ImGui calls
 			m_gui->Render(cmd);
 		}
+		m_vulkanRHI->EndFrame();
+		m_vulkanRHI->Present();
 	}
-	m_vulkanRHI->EndFrame();
-	m_vulkanRHI->Present();
 }
 void BallDropScene::HandleInput(float deltaTime)
 {

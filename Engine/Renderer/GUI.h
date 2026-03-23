@@ -26,9 +26,11 @@ public:
 
     bool Create(VulkanRHI& rhi, Window& window);
 
-    void NewFrame() const;
+    void NewFrame(Window& window) const;
     void Render(VkCommandBuffer commandBuffer) const;
     void Shutdown() noexcept;
+
+	bool IsInitialized() const { return m_initialized; }
 
     // Prevent copying
     GUI(const GUI&) = delete;

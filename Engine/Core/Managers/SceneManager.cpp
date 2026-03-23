@@ -2,6 +2,12 @@
 #include <iostream>
 #include "../../DebugUtils.h"
 
+SceneManager& SceneManager::Instance()
+{
+	static SceneManager instance;
+	return instance;
+}
+
 void SceneManager::AddScene(std::unique_ptr<IScene>&& scene)
 {
 	m_scenes.push(std::move(scene));
@@ -19,6 +25,37 @@ IScene* SceneManager::GetCurrentScene() const
 	if (m_scenes.empty())
 		return nullptr;
 	return m_scenes.top().get();
+}
+
+void SceneManager::RequestReplaceScene(std::unique_ptr<IScene>&& scene)
+{
+	// Queue the scene; don't destroy or swap now (unsafe mid-frame)
+	m_pendingScene = std::move(scene);
+}
+
+void SceneManager::ApplyPending()
+{
+	if (!m_pendingScene)
+		return;
+
+	// Destroy current scene resources (safe because we call this after render/present)
+	if (!m_scenes.empty())
+	{
+		try
+		{
+			m_scenes.top()->Destroy();
+		}
+		catch (...)
+		{
+			LOG_DEBUG("Exception during scene Destroy() in ApplyPending");
+		}
+		m_scenes.pop();
+	}
+
+	if (m_pendingScene)
+	{
+		m_scenes.push(std::move(m_pendingScene));
+	}
 }
 
 void SceneManager::Shutdown()
