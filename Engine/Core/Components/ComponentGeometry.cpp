@@ -1,4 +1,4 @@
-	#include "ComponentGeometry.h"
+#include "ComponentGeometry.h"
 
 ComponentGeometry::ComponentGeometry()
 	: IComponent(EComponentType::Component_Geometry)
@@ -54,10 +54,14 @@ bool ComponentGeometry::CreateTexture(VulkanRHI* rhi, const std::string& path, T
 {
 	if (!rhi) return false;
 
-	// Load texture from file
-	m_Texture = std::make_unique<Texture>(rhi, path, type, srgb);
+	// Load texture from file as a shared_ptr so RHI can register its weak_ptr
+	m_Texture = std::make_shared<Texture>(rhi, path, type, srgb);
 
-	// Write the texture into RHI descriptor sets (binding = 1 in RHI layout)
+	// Ensure RHI knows about this texture (Texture::LoadFromFile will try to register only if shared_from_this is valid).
+	// Register again defensively with a weak_ptr to the shared_ptr.
+	rhi->RegisterTexture(std::weak_ptr<Texture>(m_Texture));
+
+	// Write the texture into RHI descriptor sets (binding = 1 in RHI layout) for current descriptor sets.
 	m_Texture->WriteToDescriptorSets(rhi);
 
 	// remember RHI for later destroy
@@ -68,8 +72,12 @@ bool ComponentGeometry::AddTexture(VulkanRHI* rhi, const Texture& texture)
 {
 	if (!rhi) return false;
 
-	m_Texture = std::make_unique<Texture>(texture);
+	// Create a shared copy so we can register it with the RHI for descriptor re-writes.
+	m_Texture = std::make_shared<Texture>(texture);
 	m_RHI = rhi;
+
+	// Register texture with RHI so future descriptor re-allocations will get binding 1 re-applied.
+	rhi->RegisterTexture(std::weak_ptr<Texture>(m_Texture));
 
 	// Allocate a dedicated descriptor set for this entity.
 	m_DescriptorSet = rhi->AllocateTextureDescriptorSet();
@@ -80,7 +88,7 @@ bool ComponentGeometry::AddTexture(VulkanRHI* rhi, const Texture& texture)
 
 	// --- Binding 0: camera UBO ---
 	// Copy the UBO buffer info from the first global descriptor set so this
-	// per-entity set has a valid camera binding at set=0, binding=0.
+	// per-entity set has a valid camera binding at set=0.
 	const auto& globalSets = rhi->GetDescriptorSets();
 	if (!globalSets.empty())
 	{
@@ -121,8 +129,9 @@ bool ComponentGeometry::AddTexture(VulkanRHI* rhi, const Texture& texture)
 }
 Texture ComponentGeometry::GetTexture() const
 {
-	auto* texPtr = m_Texture.get();
-	return Texture(*texPtr);
+	if (!m_Texture) return Texture();
+	// return a copy
+	return Texture(*m_Texture);
 }
 void ComponentGeometry::BindAndDraw(VkCommandBuffer cmd) const
 {
@@ -150,6 +159,15 @@ void ComponentGeometry::Destroy()
 			m_Texture->Destroy(m_RHI);
 			// Release ownership so we don't hold stale pointers after destruction
 			m_Texture.reset();
+		}
+
+		// If this component allocated a per-entity descriptor set, free it now.
+		// This ensures per-scene entity descriptor sets are released when the scene (and entities) are destroyed,
+		// while leaving the VulkanRHI instance itself intact.
+		if (m_DescriptorSet != VK_NULL_HANDLE)
+		{
+			m_RHI->FreeEntityDescriptorSet(m_DescriptorSet);
+			m_DescriptorSet = VK_NULL_HANDLE;
 		}
 
 		// Destroy mesh GPU buffers

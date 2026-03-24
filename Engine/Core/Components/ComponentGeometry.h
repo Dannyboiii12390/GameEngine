@@ -57,7 +57,8 @@ public:
 private:
 	std::unique_ptr<Mesh> m_Mesh;
 	std::unique_ptr<Pipeline> m_Pipeline;
-	std::unique_ptr<Texture> m_Texture;
+	// Changed to shared_ptr so textures can register with RHI using weak_from_this().
+	std::shared_ptr<Texture> m_Texture;
 
 	VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE; // per-entity descriptor set
 

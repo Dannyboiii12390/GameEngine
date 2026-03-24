@@ -62,8 +62,15 @@ public:
     const std::vector<VkDescriptorSet>& GetDescriptorSets() const;
 
 	// Allocate a new per-entity descriptor set from the pool using the RHI layout.
-// Returns VK_NULL_HANDLE on failure.
+	// Returns VK_NULL_HANDLE on failure.
 	VkDescriptorSet AllocateTextureDescriptorSet();
+
+	// Free a previously-allocated per-entity descriptor set (and remove it from RHI bookkeeping).
+	// Call from higher-level code (e.g. Scene/Component Destroy) when an entity is torn down.
+	// This does not destroy the VulkanRHI instance itself.
+	void FreeEntityDescriptorSet(VkDescriptorSet set);
+	// Bulk variant
+	void FreeEntityDescriptorSets(const std::vector<VkDescriptorSet>& sets);
 
 	VkSampler CreateSampler();
 

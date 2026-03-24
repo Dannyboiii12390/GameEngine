@@ -81,7 +81,7 @@ namespace {
 	std::vector<VkDescriptorSet> s_DescriptorSets;
 	VkPipelineLayout s_PipelineLayout = VK_NULL_HANDLE;
 
-	constexpr uint32_t s_MaxEntityDescriptorSets = 1024;
+	constexpr uint32_t s_MaxEntityDescriptorSets = 2048;
 
 	// store weak_ptrs to avoid dangling raw pointers
 	static std::vector<std::weak_ptr<Texture>> s_RegisteredTextures;
@@ -529,6 +529,40 @@ VkDescriptorSet VulkanRHI::AllocateTextureDescriptorSet()
 
 	return set;
 }
+void VulkanRHI::FreeEntityDescriptorSet(VkDescriptorSet set)
+{
+	if (set == VK_NULL_HANDLE)
+		return;
+	// Remove from internal bookkeeping first (so we don't keep a stale entry if vkFree fails).
+	auto it = std::find(s_EntityDescriptorSets.begin(), s_EntityDescriptorSets.end(), set);
+	if (it != s_EntityDescriptorSets.end())
+		s_EntityDescriptorSets.erase(it);
+	// If pool/device are valid, free the descriptor set back to the pool.
+	// If the pool or device are not available (e.g. during shutdown), just removing the entry above is sufficient.
+	if (m_Device != VK_NULL_HANDLE && s_DescriptorPool != VK_NULL_HANDLE)
+	{
+		vkFreeDescriptorSets(m_Device, s_DescriptorPool, 1, &set);
+	}
+}
+void VulkanRHI::FreeEntityDescriptorSets(const std::vector<VkDescriptorSet>&sets)
+{
+	if (sets.empty()) return;
+	// Remove all from internal bookkeeping
+	for (auto s : sets)
+	{
+		auto it = std::find(s_EntityDescriptorSets.begin(), s_EntityDescriptorSets.end(), s);
+		if (it != s_EntityDescriptorSets.end())
+		s_EntityDescriptorSets.erase(it);
+	}
+	// Free against pool if available
+	if (m_Device != VK_NULL_HANDLE && s_DescriptorPool != VK_NULL_HANDLE)
+	{
+		vkFreeDescriptorSets(m_Device, s_DescriptorPool, static_cast<uint32_t>(sets.size()), sets.data());
+	}
+}
+
+
+
 void VulkanRHI::HandleWindowResize()
 {
 	// Wait for device idle then recreate swapchain resources.
