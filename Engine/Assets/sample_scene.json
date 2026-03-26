@@ -1,0 +1,37 @@
+{
+  "name": "Test Scene Data",
+  "description": "A sample scene showing 3 cameras loaded via FlatBuffers",
+  "gravity_on": true,
+  "cameras": [
+    {
+      "name": "Main Perspective Camera",
+      "transform": {
+        "position": { "x": 0.0, "y": 5.0, "z": -10.0 },
+        "orientation": { "yaw": 0.0, "pitch": 0.0, "roll": 0.0 },
+        "scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
+      },
+      "camera_type_type": "PerspectiveCamera",
+      "camera_type": { "fov": 90.0, "near": 0.1, "far": 1000.0 }
+    },
+    {
+      "name": "Minimap Ortho Camera",
+      "transform": {
+        "position": { "x": 0.0, "y": 100.0, "z": 0.0 },
+        "orientation": { "yaw": 0.0, "pitch": -90.0, "roll": 0.0 },
+        "scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
+      },
+      "camera_type_type": "OrthographicCamera",
+      "camera_type": { "size": 50.0, "near": 0.1, "far": 500.0 }
+    },
+    {
+      "name": "Side View Camera",
+      "transform": {
+        "position": { "x": 25.0, "y": 5.0, "z": 0.0 },
+        "orientation": { "yaw": -90.0, "pitch": 0.0, "roll": 0.0 },
+        "scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
+      },
+      "camera_type_type": "PerspectiveCamera",
+      "camera_type": { "fov": 60.0, "near": 0.1, "far": 800.0 }
+    }
+  ]
+}

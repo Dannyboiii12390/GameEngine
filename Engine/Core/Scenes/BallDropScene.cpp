@@ -11,7 +11,7 @@
 #ifdef _DEBUG
 constexpr int NUM_BALLS = 30;
 #else
-constexpr int NUM_BALLS = 100;
+constexpr int NUM_BALLS = 1000;
 #endif
 
 BallDropScene::BallDropScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :

@@ -113,7 +113,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>DEBUG;_CONSOLE;%(PreprocessorDefinitions);NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Dependencies\GLFW\include;$(SolutionDir)Dependencies\GLM\include;C:\VulkanSDK\1.4.313.2\Include;$(SolutionDir)Dependencies;$(SolutionDir)Dependencies\IMGUI;$(SolutionDir)Dependencies\stb_image\stb-master;$(SolutionDir)packages\Assimp.3.0.0\build\native\include;$(SolutionDir)Dependencies\ImGUI;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Dependencies\GLFW\include;$(SolutionDir)Dependencies\GLM\include;C:\VulkanSDK\1.4.313.2\Include;$(SolutionDir)Dependencies;$(SolutionDir)Dependencies\IMGUI;$(SolutionDir)Dependencies\stb_image\stb-master;$(SolutionDir)packages\Assimp.3.0.0\build\native\include;C:\Users\711805.ADIR\source\repos\GameEngine\Dependencies\stb_image\stb-master</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
@@ -136,7 +136,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Dependencies\GLFW\include;$(SolutionDir)Dependencies\GLM\include;C:\VulkanSDK\1.4.313.2\Include;$(SolutionDir)Dependencies;$(SolutionDir)Dependencies\IMGUI;$(SolutionDir)Dependencies\stb_image\stb-master;$(SolutionDir)packages\Assimp.3.0.0\build\native\include;$(SolutionDir)Dependencies\ImGui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Dependencies\GLFW\include;$(SolutionDir)Dependencies\GLM\include;C:\VulkanSDK\1.4.313.2\Include;$(SolutionDir)Dependencies;$(SolutionDir)Dependencies\IMGUI;$(SolutionDir)Dependencies\stb_image\stb-master;$(SolutionDir)packages\Assimp.3.0.0\build\native\include;C:\Users\711805.ADIR\source\repos\GameEngine\Dependencies\stb_image\stb-master</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
@@ -233,6 +233,8 @@
   <ItemGroup>
     <None Include="Assets\mossy_cobblestone_nor_gl_1k.exr" />
     <None Include="Assets\mossy_cobblestone_rough_1k.exr" />
+    <None Include="Assets\sample_scene.json" />
+    <None Include="Assets\Scene.fbs" />
     <None Include="DebugUtils.h" />
     <None Include="packages.config" />
     <CustomBuild Include="SHADERS\object.frag">
