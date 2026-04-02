@@ -31,11 +31,12 @@
 #include "Renderer/ComputeShader.h"
 #include "Core/Scenes/PanningScene.h"
 #include "IMGUI/imgui.h"
+#include "Core/Scenes/FlatBufferScene.h"
+
+
+
 
 //#include "../Engine/Assets/Scene_generated.h"
-#include <fstream>
-#include <iostream>
-#include <vector>
 
 //void TestLoadSampleScene() {
 //    std::cout << "\n--- Testing FlatBuffers Loading ---" << std::endl;
@@ -332,7 +333,7 @@ int main()
 
         //sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
 		SceneManager& sceneManager = SceneManager::Instance();
-		sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
+		sceneManager.AddScene(std::make_unique<FlatBufferScene>(window, &vulkanRHI, &gui));
 
         Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
         Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
@@ -359,8 +360,8 @@ int main()
                 int focused = glfwGetWindowAttrib(win, GLFW_FOCUSED);
                 int cursorMode = glfwGetInputMode(win, GLFW_CURSOR);
                 ImGuiIO& io = ImGui::GetIO();
-                LOG_DEBUG("GLFW: focused=" << focused << " cursorMode=" << cursorMode << " glfwCursor=(" << cx << "," << cy << ")");
-                LOG_DEBUG("ImGui: WantCaptureMouse=" << (int)io.WantCaptureMouse << " MousePos=(" << io.MousePos.x << "," << io.MousePos.y << ")");
+                //LOG_DEBUG("GLFW: focused=" << focused << " cursorMode=" << cursorMode << " glfwCursor=(" << cx << "," << cy << ")");
+                //LOG_DEBUG("ImGui: WantCaptureMouse=" << (int)io.WantCaptureMouse << " MousePos=(" << io.MousePos.x << "," << io.MousePos.y << ")");
             }
 
             static float timeAccumulator = 0.0f;

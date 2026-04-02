@@ -161,6 +161,7 @@
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
     <ClCompile Include="Core\Managers\SystemManager.cpp" />
     <ClCompile Include="Core\Scenes\BallDropScene.cpp" />
+    <ClCompile Include="Core\Scenes\FlatBufferScene.cpp" />
     <ClCompile Include="Core\Scenes\PanningScene.cpp" />
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.cpp" />
@@ -199,6 +200,7 @@
     <ClInclude Include="Core\Managers\ResourceManager.h" />
     <ClInclude Include="Core\Managers\SystemManager.h" />
     <ClInclude Include="Core\Scenes\BallDropScene.h" />
+    <ClInclude Include="Core\Scenes\FlatBufferScene.h" />
     <ClInclude Include="Core\Scenes\IScene.h" />
     <ClInclude Include="Core\Scenes\PanningScene.h" />
     <ClInclude Include="Core\Scenes\TemplateScene.h" />
@@ -235,6 +237,7 @@
     <None Include="Assets\mossy_cobblestone_rough_1k.exr" />
     <None Include="Assets\sample_scene.json" />
     <None Include="Assets\Scene.fbs" />
+    <None Include="check_list.md" />
     <None Include="DebugUtils.h" />
     <None Include="packages.config" />
     <CustomBuild Include="SHADERS\object.frag">
