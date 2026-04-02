@@ -34,57 +34,13 @@
 #include "Core/Scenes/FlatBufferScene.h"
 
 
+/*
+Todo List
+- get multiple cameras to work - have multiple instances of Camera class and have pointer to the active one - friday
+- networking - next week
+- flocking - using compute shader - week after next
+*/
 
-
-//#include "../Engine/Assets/Scene_generated.h"
-
-//void TestLoadSampleScene() {
-//    std::cout << "\n--- Testing FlatBuffers Loading ---" << std::endl;
-//
-//    // Open file in binary mode
-//    std::ifstream infile("Assets/sample_scene.bin", std::ios::binary);
-//    if (!infile.is_open()) {
-//        std::cerr << "Failed to open Assets/sample_scene.bin! Make sure to compile the JSON to binary first." << std::endl;
-//        return;
-//    }
-//
-//    // Read file contents to a buffer
-//    infile.seekg(0, std::ios::end);
-//    size_t length = infile.tellg();
-//    infile.seekg(0, std::ios::beg);
-//    std::vector<char> buffer(length);
-//    infile.read(buffer.data(), length);
-//    infile.close();
-//
-//    // Verify and Get Root generated from schema using the 'Simulation' namespace
-//    auto scene = Simulation::GetScene(buffer.data());
-//
-//    std::cout << "Scene Name: " << scene->name()->c_str() << "\n";
-//    std::cout << "Description: " << scene->description()->c_str() << "\n";
-//    std::cout << "Gravity On: " << (scene->gravity_on() ? "Yes" : "No") << "\n";
-//
-//    if (scene->cameras() && scene->cameras()->size() > 0) {
-//        std::cout << "Found " << scene->cameras()->size() << " Cameras:\n";
-//        for (const auto* camera : *scene->cameras()) {
-//            std::cout << "  - Camera Name: " << camera->name()->c_str() << "\n";
-//            
-//            auto pos = camera->transform()->position();
-//            std::cout << "    Position: (" << pos.x() << ", " << pos.y() << ", " << pos.z() << ")\n";
-//
-//            // Use Simulation namespace for enum checks and casts
-//            if (camera->camera_type_type() == Simulation::CameraType_PerspectiveCamera) {
-//                auto persp = static_cast<const Simulation::PerspectiveCamera*>(camera->camera_type());
-//                std::cout << "    Type: Perspective (FOV: " << persp->fov() << ")\n";
-//            } else if (camera->camera_type_type() == Simulation::CameraType_OrthographicCamera) {
-//                auto ortho = static_cast<const Simulation::OrthographicCamera*>(camera->camera_type());
-//                std::cout << "    Type: Orthographic (Size: " << ortho->size() << ")\n";
-//            }
-//        }
-//    } else {
-//        std::cout << "No cameras found in scene.\n";
-//    }
-//    std::cout << "-----------------------------------\n\n";
-//}
 
 int clientRequest()
 {

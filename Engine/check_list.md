@@ -3,7 +3,7 @@
 ## Level 1: Core Features (60%)
 
 ### Scenes
-- [ ] Load scenes from FlatBuffers
+- [x] Load scenes from FlatBuffers
 - [ ] Assign default values for missing FlatBuffer fields
 - [ ] Scene properties:
   - [ ] Unique name
@@ -28,9 +28,9 @@
 ### Physics Objects
 - [ ] Object properties:
   - [ ] Name (generate unique if missing)
-  - [ ] Transform: position, orientation, scale
+  - [x] Transform: position, orientation, scale
   - [ ] Material
-  - [ ] Shape: Sphere, Capsule, Cylinder, Plane, Cuboid
+  - [x] Shape: Sphere, Capsule, Cylinder, Plane, Cuboid
   - [ ] Behaviour: Static, Animated, Simulated
   - [ ] Collision type (SOLID or CONTAINER)
 - [ ] Color-code objects by owner (Red, Green, Blue, Yellow)
@@ -100,7 +100,7 @@
 - [ ] Ease of network configuration demonstrated
 
 ### Parallel Architecture
-- [ ] Major components operate asynchronously
+- [x] Major components operate asynchronously
 - [ ] Different update frequencies for:
   - [ ] Graphics (e.g., 30 Hz)
   - [ ] Physics simulation (e.g., 1000 Hz)
@@ -148,11 +148,11 @@
 ---
 
 ## Implementation Requirements
-- [ ] Vulkan graphics with ImGui UI
-- [ ] Physics implemented (example code allowed)
-- [ ] glm math library only
-- [ ] Winsock 2 networking only
-- [ ] Win32 or C++23 threads only
+- [x] Vulkan graphics with ImGui UI
+- [x] Physics implemented (example code allowed)
+- [x] glm math library only
+- [x] Winsock 2 networking only
+- [x] Win32 or C++23 threads only
 - [ ] Demonstrable on RBB-335 PCs
 
 ---
