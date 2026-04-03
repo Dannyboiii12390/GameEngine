@@ -46,5 +46,6 @@ private:
 
 	InputHandler m_inputHandler;
 
-	Camera m_camera;
+	std::vector<Camera> m_cameras;
+	Camera* m_activeCamera = nullptr;
 };

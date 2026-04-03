@@ -17,6 +17,12 @@ public:
     void SetAspect(float aspect);
     void SetNearFar(float zNear, float zFar);
 
+    // Get projection parameters
+    float GetFovDeg() const noexcept { return m_FovDeg; }
+    float GetAspect() const noexcept { return m_Aspect; }
+    float GetNear() const noexcept { return m_Near; }
+    float GetFar() const noexcept { return m_Far; }
+
     // Transform
     void SetPosition(const glm::vec3& pos);
     const glm::vec3& GetPosition() const noexcept;

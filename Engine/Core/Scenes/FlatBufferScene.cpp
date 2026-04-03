@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 #include <filesystem>
+#include <string>
 
 #include "../Systems/SystemVelocity.h"
 #include "../Systems/SystemPhysics.h"
@@ -21,13 +22,16 @@
 #include "../../DebugUtils.h"
 
 FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
-	m_window(&p_window), m_inputHandler(p_window), m_camera(90, 16.0f / 9.0f, 0.1f, 100.0f), m_vulkanRHI(rhi),
+	m_window(&p_window), m_inputHandler(p_window), m_vulkanRHI(rhi),
 	m_gui(p_gui), m_systemManager(rhi, 2)
 {
 	// Camera, vulkan, and imgui Initialisation
-	m_vulkanRHI->SetActiveCamera(&m_camera);
-	m_camera.SetPosition(glm::vec3(-5.0f, 5.0f, 0.0f));
-	m_camera.LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+	m_cameras.reserve(100);
+	//m_cameras.emplace_back(90, 16.0f / 9.0f, 0.1f, 100.0f);
+	//m_activeCamera = &m_cameras[0];
+	//m_vulkanRHI->SetActiveCamera(m_activeCamera);
+	//m_activeCamera->SetPosition(glm::vec3(-5.0f, 5.0f, 0.0f));
+	//m_activeCamera->LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	m_paused = false;
 
@@ -40,6 +44,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	// 2. Load properties directly into the scene
 	DeserializeState();
+	m_activeCamera = &m_cameras[0];
 
 	//// 3. TEMPORARY: Manually Add a Cube Entity so we have something to render
 	auto createEntity = [&](glm::vec3 pos)
@@ -145,15 +150,126 @@ void FlatBufferScene::Draw()
 				{
 					if (ImGui::MenuItem("Ball Drop"))
 						SceneManager::Instance().RequestReplaceScene(std::make_unique<BallDropScene>(*m_window, m_vulkanRHI, m_gui));
-					
+
 					if (ImGui::MenuItem("Panning"))
 						SceneManager::Instance().RequestReplaceScene(std::make_unique<PanningScene>(*m_window, m_vulkanRHI, m_gui));
-					
+
 					if (ImGui::MenuItem("Template"))
 						SceneManager::Instance().RequestReplaceScene(std::make_unique<TemplateScene>(*m_window, m_vulkanRHI, m_gui));
 
 					if (ImGui::MenuItem("Reload FlatBuffer Scene"))
 						SceneManager::Instance().RequestReplaceScene(std::make_unique<FlatBufferScene>(*m_window, m_vulkanRHI, m_gui));
+
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Cameras"))
+				{
+					// List available cameras and allow selecting an active one
+					for (size_t i = 0; i < m_cameras.size(); ++i)
+					{
+						std::string label = "Camera " + std::to_string(i);
+						bool isActive = (m_activeCamera == &m_cameras[i]);
+						if (ImGui::MenuItem(label.c_str(), nullptr, isActive))
+						{
+							m_activeCamera = &m_cameras[i];
+							if (m_vulkanRHI) m_vulkanRHI->SetActiveCamera(m_activeCamera);
+						}
+					}
+
+					if (ImGui::MenuItem("Add Camera"))
+					{
+						float aspect = 16.0f / 9.0f;
+						if (m_vulkanRHI)
+						{
+							auto extent = m_vulkanRHI->GetSwapchainExtent();
+							if (extent.height != 0)
+								aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+						}
+						m_cameras.emplace_back(60.0f, aspect, 0.1f, 1000.0f);
+						m_activeCamera = &m_cameras.back();
+						if (m_vulkanRHI) m_vulkanRHI->SetActiveCamera(m_activeCamera);
+					}
+
+					if (!m_cameras.empty())
+					{
+						ImGui::Separator();
+						ImGui::Text("Active Camera");
+
+						// Show editable position / rotation / projection for the active camera
+						if (m_activeCamera)
+						{
+							// Position
+							glm::vec3 pos = m_activeCamera->GetPosition();
+							float posArr[3] = { pos.x, pos.y, pos.z };
+							if (ImGui::DragFloat3("Position", posArr, 0.1f))
+							{
+								m_activeCamera->SetPosition(glm::vec3(posArr[0], posArr[1], posArr[2]));
+								m_activeCamera->MarkDirty();
+							}
+
+							// Rotation (pitch,x) (yaw,y) (roll,z)
+							glm::vec3 rot = m_activeCamera->GetRotation();
+							float rotArr[3] = { rot.x, rot.y, rot.z };
+							if (ImGui::DragFloat3("Rotation (deg)", rotArr, 1.0f))
+							{
+								m_activeCamera->SetRotation(glm::vec3(rotArr[0], rotArr[1], rotArr[2]));
+								m_activeCamera->MarkDirty();
+							}
+
+							// Projection parameters for perspective cameras
+							float fov = m_activeCamera->GetFovDeg();
+							if (ImGui::DragFloat("FOV (deg)", &fov, 0.25f, 1.0f, 179.0f))
+							{
+								m_activeCamera->SetPerspective(fov, m_activeCamera->GetAspect(), m_activeCamera->GetNear(), m_activeCamera->GetFar());
+								m_activeCamera->MarkDirty();
+							}
+
+							float nearVal = m_activeCamera->GetNear();
+							float farVal = m_activeCamera->GetFar();
+							if (ImGui::DragFloat("Near", &nearVal, 0.01f, 0.001f, farVal - 0.001f))
+							{
+								m_activeCamera->SetNearFar(nearVal, farVal);
+								m_activeCamera->MarkDirty();
+							}
+							if (ImGui::DragFloat("Far", &farVal, 1.0f, nearVal + 0.1f, 100000.0f))
+							{
+								m_activeCamera->SetNearFar(nearVal, farVal);
+								m_activeCamera->MarkDirty();
+							}
+
+							ImGui::Spacing();
+							if (ImGui::Button("Save Cameras to Scene"))
+							{
+								SerializeState();
+							}
+							ImGui::SameLine();
+							if (ImGui::Button("Remove Active"))
+							{
+								// remove selected camera; reset active to first if possible
+								ptrdiff_t idx = m_activeCamera ? (m_activeCamera - &m_cameras[0]) : -1;
+								if (idx >= 0 && idx < (ptrdiff_t)m_cameras.size())
+								{
+									m_cameras.erase(m_cameras.begin() + idx);
+									if (!m_cameras.empty())
+										m_activeCamera = &m_cameras[0];
+									else
+									{
+										// ensure at least one camera
+										float aspect = 16.0f / 9.0f;
+										if (m_vulkanRHI)
+										{
+											auto extent = m_vulkanRHI->GetSwapchainExtent();
+											if (extent.height != 0)
+												aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+										}
+										m_cameras.emplace_back(60.0f, aspect, 0.1f, 1000.0f);
+										m_activeCamera = &m_cameras[0];
+									}
+									if (m_vulkanRHI) m_vulkanRHI->SetActiveCamera(m_activeCamera);
+								}
+							}
+						}
+					}
 
 					ImGui::EndMenu();
 				}
@@ -190,19 +306,19 @@ void FlatBufferScene::HandleInput(float deltaTime)
 	float cameraMoveSpeed = 5.0f;
 	if (m_inputHandler.isKeyHeld(GLFW_KEY_LEFT_SHIFT)) cameraMoveSpeed *= 2.0f;
 
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_W)) m_camera.Translate(m_camera.Forward() * cameraMoveSpeed * deltaTime);
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_S)) m_camera.Translate(-m_camera.Forward() * cameraMoveSpeed * deltaTime);
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_A)) m_camera.Translate(-m_camera.Right() * cameraMoveSpeed * deltaTime);
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_D)) m_camera.Translate(m_camera.Right() * cameraMoveSpeed * deltaTime);
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_LEFT_CONTROL)) m_camera.Translate(-m_camera.Up() * cameraMoveSpeed * deltaTime);
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_SPACE)) m_camera.Translate(m_camera.Up() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_W)) m_activeCamera->Translate(m_activeCamera->Forward() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_S)) m_activeCamera->Translate(-m_activeCamera->Forward() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_A)) m_activeCamera->Translate(-m_activeCamera->Right() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_D)) m_activeCamera->Translate(m_activeCamera->Right() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_LEFT_CONTROL)) m_activeCamera->Translate(-m_activeCamera->Up() * cameraMoveSpeed * deltaTime);
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_SPACE)) m_activeCamera->Translate(m_activeCamera->Up() * cameraMoveSpeed * deltaTime);
 
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_J)) m_camera.Rotate(glm::vec3(0.0f, -90.0f * deltaTime, 0.0f));
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_L)) m_camera.Rotate(glm::vec3(0.0f, 90.0f * deltaTime, 0.0f));
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_K)) m_camera.Rotate(glm::vec3(-90.0f * deltaTime, 0.0f, 0.0f));
-	if (m_inputHandler.isKeyHeld(GLFW_KEY_I)) m_camera.Rotate(glm::vec3(90.0f * deltaTime, 0.0f, 0.0f));
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_J)) m_activeCamera->Rotate(glm::vec3(0.0f, -90.0f * deltaTime, 0.0f));
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_L)) m_activeCamera->Rotate(glm::vec3(0.0f, 90.0f * deltaTime, 0.0f));
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_K)) m_activeCamera->Rotate(glm::vec3(-90.0f * deltaTime, 0.0f, 0.0f));
+	if (m_inputHandler.isKeyHeld(GLFW_KEY_I)) m_activeCamera->Rotate(glm::vec3(90.0f * deltaTime, 0.0f, 0.0f));
 
-	m_vulkanRHI->SetActiveCamera(&m_camera);
+	m_vulkanRHI->SetActiveCamera(m_activeCamera);
 }
 
 void FlatBufferScene::SerializeState()
@@ -217,19 +333,40 @@ void FlatBufferScene::SerializeState()
 
 	// Cameras - save current active camera (m_camera)
 	{
-		glm::vec3 camPos = m_camera.GetPosition();
-		glm::vec3 camRot = m_camera.GetRotation(); // x = pitch, y = yaw, z = roll
-
-		Simulation::Vec3 camPosStruct(camPos.x, camPos.y, camPos.z);
-		Simulation::RotationEuler camOrientStruct(camRot.y /*yaw*/, camRot.x /*pitch*/, camRot.z /*roll*/);
-		Simulation::Vec3 camScaleStruct(1.0f, 1.0f, 1.0f); // cameras don't use scale but Transform requires it
-		Simulation::Transform camTransform(camPosStruct, camOrientStruct, camScaleStruct);
-
-		auto camName = builder.CreateString("MainCamera");
-		auto camOffset = Simulation::CreateCamera(builder, camName, &camTransform, Simulation::CameraType_NONE, 0);
-
+		// Build camera flatbuffer list from all cameras
 		std::vector<flatbuffers::Offset<Simulation::Camera>> cams;
-		cams.push_back(camOffset);
+		for (size_t i = 0; i < m_cameras.size(); ++i)
+		{
+			const Camera& cam = m_cameras[i];
+			glm::vec3 camPos = cam.GetPosition();
+			glm::vec3 camRot = cam.GetRotation(); // x = pitch, y = yaw, z = roll
+
+			Simulation::Vec3 camPosStruct(camPos.x, camPos.y, camPos.z);
+			Simulation::RotationEuler camOrientStruct(camRot.y /*yaw*/, camRot.x /*pitch*/, camRot.z /*roll*/);
+			Simulation::Vec3 camScaleStruct(1.0f, 1.0f, 1.0f); // cameras don't use scale but Transform requires it
+			Simulation::Transform camTransform(camPosStruct, camOrientStruct, camScaleStruct);
+
+			auto camName = builder.CreateString(("Camera" + std::to_string(i)).c_str());
+
+			// Use perspective camera type and write projection params
+			auto perspectiveOffset = Simulation::CreatePerspectiveCamera(
+				builder,
+				cam.GetFovDeg(),
+				cam.GetNear(),
+				cam.GetFar()
+			);
+
+			auto camOffset = Simulation::CreateCamera(
+				builder,
+				camName,
+				&camTransform,
+				Simulation::CameraType_PerspectiveCamera,
+				perspectiveOffset.Union()
+			);
+
+			cams.push_back(camOffset);
+		}
+
 		auto camerasVec = builder.CreateVector(cams);
 
 		// Objects vector will be created below; temporarily collect objects first.
@@ -328,20 +465,78 @@ void FlatBufferScene::DeserializeState()
 		return;
 	}
 
-	// Load camera (first camera)
+	// Clear any existing cameras loaded previously
+	m_cameras.clear();
+
+	// Load all cameras stored in the flatbuffer
 	if (scene->cameras() && scene->cameras()->size() > 0)
 	{
-		auto camFlat = scene->cameras()->Get(0);
-		if (camFlat && camFlat->transform())
+		for (auto camFlat : *scene->cameras())
 		{
-			const Simulation::Transform* t = camFlat->transform();
-			glm::vec3 camPos(t->position().x(), t->position().y(), t->position().z());
-			// Transform orientation stored yaw,pitch,roll -> Component / Camera expects pitch(x), yaw(y), roll(z)
-			glm::vec3 camRot(t->orientation().pitch(), t->orientation().yaw(), t->orientation().roll());
-			m_camera.SetPosition(camPos);
-			m_camera.SetRotation(camRot);
+			if (!camFlat) continue;
+
+			// Create a new Camera instance
+			Camera cam;
+
+			// Read transform if present
+			if (camFlat->transform())
+			{
+				const Simulation::Transform* t = camFlat->transform();
+				glm::vec3 camPos(t->position().x(), t->position().y(), t->position().z());
+				// Transform orientation stored yaw,pitch,roll -> Camera expects pitch(x), yaw(y), roll(z)
+				glm::vec3 camRot(t->orientation().pitch(), t->orientation().yaw(), t->orientation().roll());
+				cam.SetPosition(camPos);
+				cam.SetRotation(camRot);
+			}
+
+			// Determine projection type and apply projection parameters if available
+			if (camFlat->camera_type_type() == Simulation::CameraType_PerspectiveCamera)
+			{
+				auto persp = camFlat->camera_type_as_PerspectiveCamera();
+				if (persp)
+				{
+					float fov = persp->fov();
+					float near = persp->near();
+					float far = persp->far();
+
+					// Compute aspect ratio from swapchain if available, otherwise fallback
+					float aspect = 16.0f / 9.0f;
+					if (m_vulkanRHI)
+					{
+						auto extent = m_vulkanRHI->GetSwapchainExtent();
+						if (extent.height != 0)
+							aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+					}
+
+					cam.SetPerspective(fov, aspect, near, far);
+				}
+			}
+			else if (camFlat->camera_type_type() == Simulation::CameraType_OrthographicCamera)
+			{
+				// Orthographic camera in schema exists — for now, simply leave default projection
+				// or extend here to read orthographic parameters if needed.
+			}
+
+			m_cameras.push_back(std::move(cam));
 		}
 	}
+
+	// Ensure at least one camera exists
+	if (m_cameras.empty())
+	{
+		float aspect = 16.0f / 9.0f;
+		if (m_vulkanRHI)
+		{
+			auto extent = m_vulkanRHI->GetSwapchainExtent();
+			if (extent.height != 0)
+				aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+		}
+		m_cameras.emplace_back(60.0f, aspect, 0.1f, 1000.0f);
+	}
+
+	// Set active camera pointer to first camera
+	m_activeCamera = &m_cameras[0];
+	if (m_vulkanRHI) m_vulkanRHI->SetActiveCamera(m_activeCamera);
 
 	// Load objects
 	if (scene->objects())
