@@ -10,7 +10,7 @@ namespace Networking
 {
 
     ListeningSocket::ListeningSocket(const Address& bindAddr, int backlog)
-        : m_address(bindAddr), m_socket(INVALID_SOCKET)
+        : m_address(bindAddr), m_socket(INVALID_SOCKET), m_env(std::make_shared<Environment>())
     {
 
         m_socket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);

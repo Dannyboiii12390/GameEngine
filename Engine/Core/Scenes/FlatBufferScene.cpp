@@ -2,12 +2,14 @@
 #include "../Managers/ResourceManager.h"
 #include "../../IMGUI/imgui.h"
 #include "../Systems/SystemSwapBuffers.h"
+#include "../../../PhysicsEngine/Networking/TCPSocket.h"
 
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <filesystem>
 #include <string>
+#include <random>
 
 #include "../Systems/SystemVelocity.h"
 #include "../Systems/SystemPhysics.h"
@@ -36,6 +38,9 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_vulkanRHI(rhi),
 	m_gui(p_gui), m_systemManager(rhi, 2)
 {
+
+	m_instanceId = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+
 	// Camera, vulkan, and imgui Initialisation
 	m_cameras.reserve(100);
 	m_paused = false;
@@ -84,7 +89,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	{
 		auto address = GetClientAddress();
-		std::cout << "Client address: " << address.getIP() << ":" << address.getPort() << std::endl;
+		std::cout << "Server listening on " << address.getIP() << ":" << address.getPort() << std::endl;
 
 
 	}
@@ -95,7 +100,9 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 Networking::Address FlatBufferScene::GetClientAddress()
 {
-	int random = rand() % 10000 + 10000; // Random port between 10000 and 19999
+	static std::mt19937 rng{ std::random_device{}() };
+	static std::uniform_int_distribution<int> dist(10000, 19999);
+	const int random = dist(rng);
 
 	// Listen on 0.0.0.0 to support discovery broadcast and external clients
 	Networking::Address bindAddr("0.0.0.0", random);
@@ -105,11 +112,21 @@ Networking::Address FlatBufferScene::GetClientAddress()
 	m_networkRunning = true;
 	m_networkThread = std::thread([this, random]() {
 
-		// 1. Setup UDP Broadcast Socket for Discovery
+		// 1. Setup UDP Broadcast Socket for Discovery (send + receive)
 		SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		if (udpSocket != INVALID_SOCKET) {
 			char broadcastEnable = 1;
 			setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+
+			int reuse = 1;
+			setsockopt(udpSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
+
+			sockaddr_in listenAddr{};
+			listenAddr.sin_family = AF_INET;
+			listenAddr.sin_port = htons(8888);
+			listenAddr.sin_addr.s_addr = INADDR_ANY;
+			bind(udpSocket, reinterpret_cast<sockaddr*>(&listenAddr), sizeof(listenAddr));
+
 			u_long mode = 1;
 			ioctlsocket(udpSocket, FIONBIO, &mode);
 		}
@@ -126,10 +143,48 @@ Networking::Address FlatBufferScene::GetClientAddress()
 			// Broadcast presence (e.g. every 1 second)
 			auto now = std::chrono::steady_clock::now();
 			if (udpSocket != INVALID_SOCKET && std::chrono::duration_cast<std::chrono::seconds>(now - lastBroadcastTime).count() >= 1) {
-				std::string msg = "SERVER_DISCOVERY:" + std::to_string(random);
+				std::string msg = "SERVER_DISCOVERY:" + std::to_string(random) + ":" + m_instanceId;
 				sendto(udpSocket, msg.c_str(), static_cast<int>(msg.size()), 0,
 					reinterpret_cast<sockaddr*>(&broadcastAddr), sizeof(broadcastAddr));
 				lastBroadcastTime = now;
+			}
+
+			// Listen for discovery broadcasts and connect to the first peer we see
+			if (!m_peerConnected && udpSocket != INVALID_SOCKET) {
+				char recvBuf[256]{};
+				sockaddr_in from{};
+				int fromLen = sizeof(from);
+				int recvBytes = recvfrom(udpSocket, recvBuf, sizeof(recvBuf) - 1, 0,
+					reinterpret_cast<sockaddr*>(&from), &fromLen);
+
+				if (recvBytes > 0) {
+					recvBuf[recvBytes] = '\0';
+					const std::string msg(recvBuf);
+
+					const std::string prefix = "SERVER_DISCOVERY:";
+					if (msg.rfind(prefix, 0) == 0) {
+						const std::string payload = msg.substr(prefix.size());
+						const size_t sep = payload.find(':');
+						if (sep != std::string::npos) {
+							const int port = std::stoi(payload.substr(0, sep));
+							const std::string peerId = payload.substr(sep + 1);
+
+							if (peerId != m_instanceId && port != random) {
+								char ipStr[INET_ADDRSTRLEN]{};
+								inet_ntop(AF_INET, &from.sin_addr, ipStr, sizeof(ipStr));
+
+								try {
+									m_tcpClient = std::make_unique<Networking::TCPSocket>(Networking::Address(ipStr, static_cast<uint16_t>(port)));
+									m_peerConnected = true;
+									std::cout << "Connected to peer at " << ipStr << ":" << port << "\n";
+								}
+								catch (const std::exception& ex) {
+									std::cerr << "Peer connect failed: " << ex.what() << "\n";
+								}
+							}
+						}
+					}
+				}
 			}
 
 			// 2. Accept TCP connections

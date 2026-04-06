@@ -10,15 +10,17 @@
 #include "../../../PhysicsEngine/Networking/ListeningSocket.h"
 
 #include <thread>
+#include <atomic>
+#include <string>
+
+namespace Networking { class TCPSocket; }
 
 class Entity;
 class Window;
 
-
 class FlatBufferScene : public IScene
 {
 public:
-	// Inherited via IScene
 	void Start(float deltaTime) override;
 	void Stop() override;
 	void Update(float deltaTime) override;
@@ -34,9 +36,7 @@ public:
 	FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
 	~FlatBufferScene() override;
 
-
 private:
-
 	Networking::Address GetClientAddress();
 
 	void CreateDiagnosticCube();
@@ -58,7 +58,9 @@ private:
 
 	// Network Server Members
 	std::unique_ptr<Networking::ListeningSocket> m_tcpListener;
+	std::unique_ptr<Networking::TCPSocket> m_tcpClient;
 	std::thread m_networkThread;
 	std::atomic<bool> m_networkRunning = false;
-
+	std::atomic<bool> m_peerConnected = false;
+	std::string m_instanceId;
 };
