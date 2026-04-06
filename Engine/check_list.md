@@ -16,13 +16,13 @@
 - [x] Global UI to switch between scenes
 
 ### Cameras
-- [ ] Support multiple cameras per scene
-- [ ] Cameras have names for runtime switching
-- [ ] Local UI to switch between cameras
+- [x] Support multiple cameras per scene
+- [x] Cameras have names for runtime switching
+- [x] Local UI to switch between cameras
 - [x] Mouse & keyboard control for camera movement
 - [ ] Support Perspective and Orthographic cameras
-- [ ] FlatBuffer schemas implemented:
-  - [ ] PerspectiveCamera: fov, near, far
+- [x] FlatBuffer schemas implemented:
+  - [x] PerspectiveCamera: fov, near, far
   - [ ] OrthographicCamera: size, near, far
 
 ### Physics Objects
