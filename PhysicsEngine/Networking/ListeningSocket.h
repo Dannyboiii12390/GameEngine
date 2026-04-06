@@ -16,7 +16,7 @@ namespace Networking
 	{
 	public:
 		// Create, bind and listen on the provided local address. Throws std::runtime_error on failure.
-		ListeningSocket(const std::shared_ptr<Environment> p_env, const Address& bindAddr, int backlog = SOMAXCONN);
+		ListeningSocket(const Address& bindAddr, int backlog = SOMAXCONN);
 
 		// Close socket on destruction.
 		~ListeningSocket();

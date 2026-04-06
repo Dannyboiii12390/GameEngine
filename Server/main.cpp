@@ -98,7 +98,7 @@ int main()
         // Listen on all interfaces, port 54000
         Networking::Address bindAddr("0.0.0.0", 54000);
 
-        Networking::ListeningSocket listener(env, bindAddr, SOMAXCONN);
+        Networking::ListeningSocket listener(bindAddr, SOMAXCONN);
         std::cout << "Server listening on port " << bindAddr.getPort() << "\n";
 
         while (true)

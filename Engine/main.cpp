@@ -1,5 +1,25 @@
 ﻿#define GLFW_INCLUDE_VULKAN
 
+
+// Reduce Windows header pollution and disable min/max macros
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+// Some old Windows headers define 'near'/'far' macros which break generated code.
+// Undefine them if present so methods named near()/far() in generated FlatBuffers
+// headers compile correctly.
+#if defined(near)
+#undef near
+#endif
+
+#if defined(far)
+#undef far
+#endif
+
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <chrono>
@@ -42,201 +62,6 @@ Todo List
 */
 
 
-int clientRequest()
-{
-    Networking::Environment env;
-    Networking::Address serverAddr("127.0.0.1", 54000);
-
-    Networking::TCPSocket client(serverAddr);
-
-    std::vector<std::string> messages = {
-        "Hello, Server!",
-        "This is a test message.",
-        "Goodbye, Server!"
-    };
-    std::vector<uint8_t> recvAccumulator;
-    recvAccumulator.reserve(8192);
-
-    for (const auto& msg : messages) {
-        // Build a FlatBuffers buffer whose root is a string.
-        // This avoids needing a generated schema while still using FlatBuffers.
-        flatbuffers::FlatBufferBuilder builder;
-        auto strOff = builder.CreateString(msg);
-        builder.Finish(strOff); // root is the string itself
-
-        // Create packet and set payload (updates header.payloadSize)
-        Networking::Packet pkt;
-        pkt.header.type = 1; // example type
-        pkt.setPayload(builder.GetBufferPointer(), builder.GetSize());
-
-        // Serialize packet
-        std::vector<uint8_t> out;
-        pkt.serialize(out);
-        // Send packet
-        client.Send(out.data(), static_cast<int>(out.size()));
-
-        while (true)
-        {
-            uint8_t temp[4096];
-            int r = client.Receive(temp, static_cast<int>(sizeof(temp)));
-            if (r <= 0) {
-                std::cerr << "clientRequest: receive failed or connection closed\n";
-                return -1;
-            }
-            recvAccumulator.insert(recvAccumulator.end(), temp, temp + r);
-
-            Networking::Packet incoming;
-            if (Networking::Packet::tryDeserializeFromBuffer(recvAccumulator, incoming)) {
-                std::string payload;
-                if (incoming.payloadSize() > 0) {
-                    // Try to interpret payload as a FlatBuffers root string.
-                    // If that fails, fall back to raw bytes as string.
-                    const uint8_t* p = incoming.payloadData();
-                    // flatbuffers::GetRoot<T> is valid for built buffers whose root is T
-                    const flatbuffers::String* fbStr = flatbuffers::GetRoot<flatbuffers::String>(p);
-                    if (fbStr && fbStr->c_str()) {
-                        payload.assign(fbStr->c_str());
-                    }
-                    else {
-                        payload.assign(reinterpret_cast<const char*>(p), incoming.payloadSize());
-                    }
-                }
-                std::cout << "Echoed back: type=" << incoming.header.type << " payload=\"" << payload << "\"\n";
-                break; // proceed to next message
-            }
-            // otherwise continue receiving bytes
-        }
-
-        // small delay so output is readable
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-
-    return 0;
-}
-void runComputeShader(VulkanRHI& vulkanRHI)
-{
-	glm::vec3 zeroVec(0.0f);
-        constexpr uint32_t numEntities = 1024;
-        const float dt = 1.0f; // simulate a single frame step
-
-        std::vector<Entity> entities;
-        entities.reserve(numEntities);
-
-        // Host-side contiguous GPU-friendly arrays
-        std::vector<glm::vec4> positions;
-        std::vector<glm::vec4> velocities;
-        positions.reserve(numEntities);
-        velocities.reserve(numEntities);
-
-        // Create entities and populate host arrays
-        for (uint32_t i = 0; i < numEntities; ++i)
-        {
-            glm::vec3 pos(static_cast<float>(i), 0.0f, 0.0f);
-            glm::vec3 vel(0.0f, static_cast<float>(i) * 0.1f, 0.0f);
-
-            Entity e;
-            e.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f), glm::vec3(1.0f));
-            e.AddComponent(EComponentType::Component_Velocity, vel, glm::vec3(0.0f), glm::vec3(1.0f));
-            entities.push_back(std::move(e));
-
-            positions.emplace_back(pos.x, pos.y, pos.z, 0.0f);
-            velocities.emplace_back(vel.x, vel.y, vel.z, 0.0f);
-        }
-
-        // Output buffer for GPU results
-        std::vector<glm::vec4> positionsOut;
-        positionsOut.resize(numEntities);
-
-        // Create and configure compute shader
-        ComputeShader cs(&vulkanRHI);
-        cs.LoadShader("SHADERS/translate_by_vel.comp.spv"); // shader must implement out[i] = inPos[i] + inVel[i] * dt
-
-        VkDeviceSize bufSize = sizeof(glm::vec4) * numEntities;
-        // Bindings: 0 = inPos, 1 = inVel, 2 = outPos
-        cs.CreateBuffers({ bufSize, bufSize, bufSize });
-
-        // Upload initial data
-        cs.Upload(0, positions.data(), bufSize);
-        cs.Upload(1, velocities.data(), bufSize);
-
-        // If shader expects dt as push-constant you would set it via the ComputeShader API.
-        // For this example we assume the shader uses a specialization constant or a hardcoded dt.
-        // If the ComputeShader supports push-constants, you would call something like:
-        // cs.PushConstants(&dt, sizeof(dt));
-
-        // Dispatch: choose local size consistent with shader. Use 256 as a common local size.
-        constexpr uint32_t localSizeX = 256;
-        cs.Dispatch(numEntities, localSizeX);
-
-        // Read back results
-        cs.Readback(2, positionsOut.data(), bufSize);
-
-        // Apply results back to components. For portability, remove and re-add transform component with new position.
-        for (uint32_t i = 0; i < numEntities; ++i)
-        {
-            const glm::vec4& p = positionsOut[i];
-            glm::vec3 newPos(p.x, p.y, p.z);
-
-            // Replace transform component with updated position (preserve rotation/scale defaults)
-            auto* transform = entities[i].GetComponent<ComponentTransform>(EComponentType::Component_Transform);
-            transform->SetPosition(newPos);
-        }
-
-        for(auto& entity : entities)
-        {
-            auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
-            auto* velocity = entity.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
-
-            transform->SwapBuffers();
-            velocity->SwapBuffers();
-        }
-        
-        // Example debug print of first few results
-        std::cout << "Translated positions (first 8):\n";
-        for (uint32_t i = 0; i < std::min<uint32_t>(8, numEntities); ++i)
-        {
-            const glm::vec4& p = positionsOut[i];
-            std::cout << i << ": (" << p.x << ", " << p.y << ", " << p.z << ")\n";
-        }
-
-        //cs.Destroy();
-    
-    // Example usage of ComputeShader class to add two int arrays
-    constexpr uint32_t numElements = 1024;
-    std::vector<int> elements(numElements);
-    std::vector<int> elements2(numElements);
-    for (uint32_t i = 0; i < numElements; ++i)
-    {
-        elements[i] = static_cast<int>(i);
-        elements2[i] = static_cast<int>(i * 2);
-    }
-    std::vector<int> elementsOut(numElements, 0);
-
-    //ComputeShader cs(&vulkanRHI);
-    cs.LoadShader("SHADERS/add.comp.spv");
-
-    bufSize = sizeof(int) * numElements;
-    cs.CreateBuffers({ bufSize, bufSize, bufSize }); // inA, inB, out
-
-    cs.Upload(0, elements.data(), bufSize);
-    cs.Upload(1, elements2.data(), bufSize);
-
-    // Dispatch and read back
-    //constexpr uint32_t localSizeX = 256; // must match shader local_size_x
-    cs.Dispatch(numElements, localSizeX);
-
-    cs.Readback(2, elementsOut.data(), bufSize);
-
-    // Print some results
-    std::cout << "Compute shader results (first 8):\n";
-    for (uint32_t i = 0; i < std::min<uint32_t>(8, numElements); ++i)
-    {
-        std::cout << i << ": " << elements[i] << " + " << elements2[i] << " = " << elementsOut[i] << "\n";
-    }
-
-    cs.Destroy();
-}
-
 int main()
 {
     try
@@ -265,8 +90,6 @@ int main()
         const int height = 1080;
         Window window(width, height, "Vulkan Engine");
 
-        //SceneManager sceneManager;
-
         VulkanRHI vulkanRHI;
 
         #ifndef _DEBUG
@@ -280,12 +103,10 @@ int main()
         vulkanRHI.Initialise(&window);
         vulkanRHI.ToggleVSync(VsyncOn);    
 
-        runComputeShader(vulkanRHI);
-
-        //TestLoadSampleScene();
-
         GUI gui;
         gui.Create(vulkanRHI, window);
+
+        Networking::Environment env;
 
         //sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
 		SceneManager& sceneManager = SceneManager::Instance();

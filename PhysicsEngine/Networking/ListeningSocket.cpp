@@ -9,13 +9,9 @@
 namespace Networking
 {
 
-    ListeningSocket::ListeningSocket(const std::shared_ptr<Environment> p_env, const Address& bindAddr, int backlog)
-        : m_address(bindAddr), m_socket(INVALID_SOCKET), m_env(p_env)
+    ListeningSocket::ListeningSocket(const Address& bindAddr, int backlog)
+        : m_address(bindAddr), m_socket(INVALID_SOCKET)
     {
-        // Ensure environment exists (header stored shared_ptr to keep it alive)
-        if (!m_env) {
-            throw std::runtime_error("ListeningSocket: Environment shared_ptr is null");
-        }
 
         m_socket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (m_socket == INVALID_SOCKET) {

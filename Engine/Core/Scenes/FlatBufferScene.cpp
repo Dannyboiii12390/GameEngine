@@ -17,9 +17,20 @@
 #include "TemplateScene.h"
 #include "../Managers/SceneManager.h"
 
+// Undefine Windows macros breaking flatbuffer generation
+#if defined(near)
+#undef near
+#endif
+
+#if defined(far)
+#undef far
+#endif
+
 #include "../../Assets/Scene_generated.h"
 #include <flatbuffers/flatbuffers.h>
 #include "../../DebugUtils.h"
+
+
 
 FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_vulkanRHI(rhi),
@@ -27,12 +38,6 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 {
 	// Camera, vulkan, and imgui Initialisation
 	m_cameras.reserve(100);
-	//m_cameras.emplace_back(90, 16.0f / 9.0f, 0.1f, 100.0f);
-	//m_activeCamera = &m_cameras[0];
-	//m_vulkanRHI->SetActiveCamera(m_activeCamera);
-	//m_activeCamera->SetPosition(glm::vec3(-5.0f, 5.0f, 0.0f));
-	//m_activeCamera->LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
-
 	m_paused = false;
 
 	// 1. Ensure the file exists before attempting to load
@@ -70,17 +75,117 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		};
 	//createEntity(glm::vec3(-5.0f, 0.0f, 0.0f));
 	//createEntity(glm::vec3(5.0f, 0.0f, 0.0f));
-	
 
 	// 4. Register the required systems so objects are rendered
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
+
+	{
+		auto address = GetClientAddress();
+		std::cout << "Client address: " << address.getIP() << ":" << address.getPort() << std::endl;
+
+
+	}
+
+
+
+}
+
+Networking::Address FlatBufferScene::GetClientAddress()
+{
+	int random = rand() % 10000 + 10000; // Random port between 10000 and 19999
+
+	// Listen on 0.0.0.0 to support discovery broadcast and external clients
+	Networking::Address bindAddr("0.0.0.0", random);
+	m_tcpListener = std::make_unique<Networking::ListeningSocket>(bindAddr);
+	m_tcpListener->SetNonBlocking(true); // Don't block when accepting
+
+	m_networkRunning = true;
+	m_networkThread = std::thread([this, random]() {
+
+		// 1. Setup UDP Broadcast Socket for Discovery
+		SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (udpSocket != INVALID_SOCKET) {
+			char broadcastEnable = 1;
+			setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+			u_long mode = 1;
+			ioctlsocket(udpSocket, FIONBIO, &mode);
+		}
+
+		sockaddr_in broadcastAddr{};
+		broadcastAddr.sin_family = AF_INET;
+		broadcastAddr.sin_port = htons(8888); // An agreed port for clients to listen for broadcasts
+		inet_pton(AF_INET, "255.255.255.255", &broadcastAddr.sin_addr);
+
+		std::vector<SOCKET> clientSockets;
+		auto lastBroadcastTime = std::chrono::steady_clock::now();
+
+		while (m_networkRunning) {
+			// Broadcast presence (e.g. every 1 second)
+			auto now = std::chrono::steady_clock::now();
+			if (udpSocket != INVALID_SOCKET && std::chrono::duration_cast<std::chrono::seconds>(now - lastBroadcastTime).count() >= 1) {
+				std::string msg = "SERVER_DISCOVERY:" + std::to_string(random);
+				sendto(udpSocket, msg.c_str(), static_cast<int>(msg.size()), 0,
+					reinterpret_cast<sockaddr*>(&broadcastAddr), sizeof(broadcastAddr));
+				lastBroadcastTime = now;
+			}
+
+			// 2. Accept TCP connections
+			Networking::Address clientAddr;
+			SOCKET newClient = m_tcpListener->Accept(clientAddr);
+			if (newClient != INVALID_SOCKET) {
+				u_long mode = 1;
+				ioctlsocket(newClient, FIONBIO, &mode); // Set the client to non-blocking
+				clientSockets.push_back(newClient);
+				std::cout << "Peer to peer client connected from: " << clientAddr.getIP() << ":" << clientAddr.getPort() << std::endl;
+			}
+
+			// 3. Send/Receive data and gracefully handle disconnects
+			for (auto it = clientSockets.begin(); it != clientSockets.end(); ) {
+				SOCKET client = *it;
+				char buffer[1024];
+				int bytes = recv(client, buffer, sizeof(buffer), 0);
+
+				if (bytes > 0) {
+					// Add processing or echo the data here
+					send(client, buffer, bytes, 0);
+					++it;
+				}
+				else if (bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)) {
+					// Client disconnected gracefully (0) or forced closed
+					std::cout << "Client disconnected.\n";
+					closesocket(client);
+					it = clientSockets.erase(it);
+				}
+				else {
+					// Socket would block (no new data right now)
+					++it;
+				}
+			}
+
+			// Sleep briefly to prevent 100% CPU thread pegging
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+
+		// Loop shut down, cleanup
+		if (udpSocket != INVALID_SOCKET) closesocket(udpSocket);
+		for (SOCKET client : clientSockets) closesocket(client);
+		});
+
+	std::cout << "Network server started on port " << random << std::endl;
+	return bindAddr;
 }
 
 FlatBufferScene::~FlatBufferScene()
 {
+	m_networkRunning = false;
+	if (m_networkThread.joinable())
+	{
+		m_networkThread.join();
+	}
+
 	if (m_vulkanRHI)
 	{
 		m_vulkanRHI->WaitIdle();
@@ -94,6 +199,12 @@ FlatBufferScene::~FlatBufferScene()
 
 void FlatBufferScene::Destroy()
 {
+	m_networkRunning = false;
+	if (m_networkThread.joinable())
+	{
+		m_networkThread.join();
+	}
+
 	if (m_vulkanRHI)
 	{
 		m_vulkanRHI->WaitIdle();

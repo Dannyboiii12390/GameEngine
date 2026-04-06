@@ -6,6 +6,7 @@ namespace Networking
 	class Address
 	{
 	public:
+		Address() : m_ip("127.0.0.1"), m_port(0) {}
 		Address(std::string ip, uint16_t port)
 			: m_ip(std::move(ip)), m_port(port)
 		{

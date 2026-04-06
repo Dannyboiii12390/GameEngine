@@ -7,6 +7,10 @@
 #include "../InputHandler.h"
 #include "../../Renderer/Camera.h"
 
+#include "../../../PhysicsEngine/Networking/ListeningSocket.h"
+
+#include <thread>
+
 class Entity;
 class Window;
 
@@ -30,7 +34,10 @@ public:
 	FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
 	~FlatBufferScene() override;
 
+
 private:
+
+	Networking::Address GetClientAddress();
 
 	void CreateDiagnosticCube();
 
@@ -48,4 +55,10 @@ private:
 
 	std::vector<Camera> m_cameras;
 	Camera* m_activeCamera = nullptr;
+
+	// Network Server Members
+	std::unique_ptr<Networking::ListeningSocket> m_tcpListener;
+	std::thread m_networkThread;
+	std::atomic<bool> m_networkRunning = false;
+
 };
