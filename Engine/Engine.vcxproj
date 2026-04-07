@@ -155,15 +155,18 @@
     <ClCompile Include="Core\Components\ComponentCollision.cpp" />
     <ClCompile Include="Core\Components\ComponentCollision.h" />
     <ClCompile Include="Core\Components\ComponentGeometry.cpp" />
+    <ClCompile Include="Core\Components\ComponentNetwork.cpp" />
     <ClCompile Include="Core\Components\ComponentPhysics.cpp" />
     <ClCompile Include="Core\Components\ComponentTransform.cpp" />
     <ClCompile Include="Core\InputHandler.cpp" />
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
     <ClCompile Include="Core\Managers\SystemManager.cpp" />
+    <ClCompile Include="Core\NetworkTypes.h" />
     <ClCompile Include="Core\Scenes\BallDropScene.cpp" />
     <ClCompile Include="Core\Scenes\FlatBufferScene.cpp" />
     <ClCompile Include="Core\Scenes\PanningScene.cpp" />
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
+    <ClCompile Include="Core\Spawner.h" />
     <ClCompile Include="Core\Systems\SystemCollision.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.h" />
     <ClCompile Include="Core\Systems\SystemPhysics.cpp" />
@@ -191,6 +194,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Components\ComponentGeometry.h" />
+    <ClInclude Include="Core\Components\ComponentNetwork.h" />
     <ClInclude Include="Core\Components\ComponentPhysics.h" />
     <ClInclude Include="Core\Components\ComponentTransform.h" />
     <ClInclude Include="Core\Components\ComponentVelocity.h" />
@@ -199,12 +203,15 @@
     <ClInclude Include="Core\InputHandler.h" />
     <ClInclude Include="Core\Managers\ResourceManager.h" />
     <ClInclude Include="Core\Managers\SystemManager.h" />
+    <ClInclude Include="Core\Networking\NetworkTypes.h" />
     <ClInclude Include="Core\Scenes\BallDropScene.h" />
     <ClInclude Include="Core\Scenes\FlatBufferScene.h" />
     <ClInclude Include="Core\Scenes\IScene.h" />
     <ClInclude Include="Core\Scenes\PanningScene.h" />
+    <ClInclude Include="Core\Scenes\Spawner.h" />
     <ClInclude Include="Core\Scenes\TemplateScene.h" />
     <ClInclude Include="Core\Systems\ISystem.h" />
+    <ClInclude Include="Core\Systems\SystemNetworkSync.h" />
     <ClInclude Include="Core\Systems\SystemPhysics.h" />
     <ClInclude Include="Core\Systems\SystemRenderer.h" />
     <ClInclude Include="Core\Systems\SystemVelocity.h" />

@@ -31,6 +31,7 @@
 #include "../../Assets/Scene_generated.h"
 #include <flatbuffers/flatbuffers.h>
 #include "../../DebugUtils.h"
+#include "../Systems/SystemNetworkSync.h"
 
 
 
@@ -83,18 +84,25 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	// 4. Register the required systems so objects are rendered
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
-	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
+
+
+	
 
 	{
 		auto address = GetClientAddress();
 		std::cout << "Server listening on " << address.getIP() << ":" << address.getPort() << std::endl;
-
-
 	}
 
+	PeerID localPeerId = static_cast<PeerID>(std::hash<std::string>{}(m_instanceId));
 
+	// 4. Register the required systems so objects are rendered
+	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>(localPeerId));
+	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
+	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
+	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>());
 
 }
 
@@ -122,7 +130,7 @@ Networking::Address FlatBufferScene::GetClientAddress()
 			setsockopt(udpSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 
 			sockaddr_in listenAddr{};
-			listenAddr.sin_family = AF_INET;
+		 listenAddr.sin_family = AF_INET;
 			listenAddr.sin_port = htons(8888);
 			listenAddr.sin_addr.s_addr = INADDR_ANY;
 			bind(udpSocket, reinterpret_cast<sockaddr*>(&listenAddr), sizeof(listenAddr));
@@ -707,6 +715,8 @@ void FlatBufferScene::DeserializeState()
 	// Load objects
 	if (scene->objects())
 	{
+		uint32_t objectIndex = 0; // Use an index to distribute ownership
+
 		for (auto objFlat : *scene->objects())
 		{
 			if (!objFlat) continue;
@@ -722,7 +732,21 @@ void FlatBufferScene::DeserializeState()
 			entity.AddComponent(EComponentType::Component_Transform, pos, rot, scale);
 			entity.AddComponent(EComponentType::Component_Geometry);
 
-			const Texture defaultTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
+			// --- DISTRIBUTED OWNERSHIP LOGIC ---
+			// Sequentially assign ownership (e.g., 0, 1, 0, 1...)
+			uint32_t assignedOwnerId = objectIndex % 2; 
+
+			// QUICK FIX: Modulo the hash by 2 so it is always 0 or 1.
+			// (Note: Since it's random, if both programs load the same textures, just restart one of them until they get opposite IDs)
+			uint32_t localPeerId = static_cast<uint32_t>(std::hash<std::string>{}(m_instanceId)) % 2;
+
+			bool isOwnedByMe = (assignedOwnerId == localPeerId); 
+
+			// Load texture based on ownership
+			std::string texturePath = isOwnedByMe ? "Assets/red_brick_diff_1k.jpg" : "Assets/mossy_cobblestone_diff_1k.jpg";
+			const Texture objectTex(m_vulkanRHI, texturePath, TextureType::Albedo, true);
+			// -----------------------------------
+
 			ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 			if (geom)
 			{
@@ -740,13 +764,14 @@ void FlatBufferScene::DeserializeState()
 					{
 						std::cerr << "DeserializeState: failed to initialize pipeline for entity\n";
 					}
-					// Do not require a per-entity texture here; RHI will supply a default 1x1 texture.
-					// Optionally: geom->AddTexture(m_vulkanRHI, someTexture);
-					geom->AddTexture(m_vulkanRHI, defaultTex);
+					
+					// Apply the dynamically chosen texture
+					geom->AddTexture(m_vulkanRHI, objectTex);
 				}
 			}
 
 			m_entities.push_back(std::move(entity));
+			objectIndex++;
 		}
 	}
 }

@@ -7,7 +7,8 @@ enum class ESystemType
 	System_Velocity = 1,
 	System_Rendering = 1 << 1,
 	System_Physics = 1 << 2,
-	System_Collision = 1 << 3
+	System_Collision = 1 << 3,
+	System_Network_Sync = 1 << 4
 };
 class Entity;
 

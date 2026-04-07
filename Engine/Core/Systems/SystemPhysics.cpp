@@ -2,6 +2,7 @@
 #include "../Components/ComponentPhysics.h"
 #include "../Components/ComponentVelocity.h"
 #include "../Components/ComponentTransform.h"
+#include "../Components/ComponentNetwork.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <omp.h>
@@ -18,6 +19,13 @@ void SystemPhysics::OnUpdate(std::span<Entity> entities, float deltaTime)
     for (int i = 0; i < count; ++i)
     {
         auto& entity = entities[i];
+
+		auto* netComp = entity.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+
+        // If it's a simulated object AND we don't own it, SKIP simulation
+        if (netComp && netComp->IsSimulated() && !netComp->IsOwnedByMe(m_localPeerId)) {
+            continue; // Another peer is simulating this; we will just receive the transform updates
+        }
 
         if (!entity.HasComponent(requiredComponents))
             continue;
