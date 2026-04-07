@@ -18,6 +18,7 @@
 #include "PanningScene.h"
 #include "TemplateScene.h"
 #include "../Managers/SceneManager.h"
+#include "../Components/ComponentNetwork.h"
 
 // Undefine Windows macros breaking flatbuffer generation
 #if defined(near)
@@ -39,8 +40,8 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_vulkanRHI(rhi),
 	m_gui(p_gui), m_systemManager(rhi, 2)
 {
-
 	m_instanceId = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+	m_localPeerId = static_cast<PeerID>(std::hash<std::string>{}(m_instanceId) % 2);
 
 	// Camera, vulkan, and imgui Initialisation
 	m_cameras.reserve(100);
@@ -95,14 +96,15 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		std::cout << "Server listening on " << address.getIP() << ":" << address.getPort() << std::endl;
 	}
 
-	PeerID localPeerId = static_cast<PeerID>(std::hash<std::string>{}(m_instanceId));
+	PeerID localPeerId = m_localPeerId;
 
 	// 4. Register the required systems so objects are rendered
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>(localPeerId));
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
-	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>());
+	m_networkData = std::make_shared<SharedNetworkData>();
+	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>(m_localPeerId, m_networkData));
 }
 
 Networking::Address FlatBufferScene::GetClientAddress()
@@ -183,6 +185,10 @@ Networking::Address FlatBufferScene::GetClientAddress()
 								try {
 									m_tcpClient = std::make_unique<Networking::TCPSocket>(Networking::Address(ipStr, static_cast<uint16_t>(port)));
 									m_peerConnected = true;
+									
+									u_long mode = 1;
+									ioctlsocket(m_tcpClient->native_handle(), FIONBIO, &mode); // Set the client to non-blocking
+									
 									std::cout << "Connected to peer at " << ipStr << ":" << port << "\n";
 								}
 								catch (const std::exception& ex) {
@@ -204,26 +210,85 @@ Networking::Address FlatBufferScene::GetClientAddress()
 				std::cout << "Peer to peer client connected from: " << clientAddr.getIP() << ":" << clientAddr.getPort() << std::endl;
 			}
 
+			// Extract outgoing packets safely
+			std::vector<SyncPacket> outgoing;
+			if (m_networkData)
+			{
+				std::lock_guard<std::mutex> lock(m_networkData->outgoingMutex);
+				outgoing = m_networkData->outgoingPackets;
+				m_networkData->outgoingPackets.clear();
+			}
+
 			// 3. Send/Receive data and gracefully handle disconnects
 			for (auto it = clientSockets.begin(); it != clientSockets.end(); ) {
 				SOCKET client = *it;
-				char buffer[1024];
-				int bytes = recv(client, buffer, sizeof(buffer), 0);
+				bool clientOk = true;
 
-				if (bytes > 0) {
-					// Add processing or echo the data here
-					send(client, buffer, bytes, 0);
-					++it;
+				// Send outgoing data
+				for (const auto& packet : outgoing) {
+					int sent = send(client, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+					if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
+						clientOk = false;
+						break;
+					}
 				}
-				else if (bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)) {
-					// Client disconnected gracefully (0) or forced closed
+
+				SyncPacket incomPacket;
+				int bytes;
+				do {
+					bytes = recv(client, reinterpret_cast<char*>(&incomPacket), sizeof(SyncPacket), 0);
+					if (bytes == sizeof(SyncPacket)) {
+						if (m_networkData) {
+							std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
+							m_networkData->incomingPackets.push_back(incomPacket);
+						}
+					}
+				} while (bytes > 0);
+
+				if (bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)) {
 					std::cout << "Client disconnected.\n";
 					closesocket(client);
 					it = clientSockets.erase(it);
 				}
+				else if (!clientOk) {
+					std::cout << "Client transmission failed.\n";
+					closesocket(client);
+					it = clientSockets.erase(it);
+				}
 				else {
-					// Socket would block (no new data right now)
 					++it;
+				}
+			}
+			
+			// 4. Do the same for m_tcpClient if connected out to a peer
+			if (m_peerConnected && m_tcpClient) {
+				SOCKET client = m_tcpClient->native_handle();
+				bool clientOk = true;
+
+				for (const auto& packet : outgoing) {
+					int sent = send(client, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+					if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
+						clientOk = false;
+						break;
+					}
+				}
+
+				SyncPacket incomPacket;
+				int bytes;
+				do {
+					bytes = recv(client, reinterpret_cast<char*>(&incomPacket), sizeof(SyncPacket), 0);
+					if (bytes == sizeof(SyncPacket)) {
+						if (m_networkData) {
+							std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
+							m_networkData->incomingPackets.push_back(incomPacket);
+						}
+					}
+				} while (bytes > 0);
+
+				if (bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) || !clientOk) {
+					std::cout << "Disconnected from server peer.\n";
+					m_peerConnected = false;
+					m_tcpClient.reset();
 				}
 			}
 
@@ -344,6 +409,22 @@ void FlatBufferScene::Draw()
 			static bool show_demo_window = false;
 			static bool show_about = true;
 
+			auto applyTransform = [](ComponentTransform* transform, const glm::vec3& pos, const glm::vec3& rot, const glm::vec3& scale)
+			{
+				if (!transform) return;
+				Transform* write0 = transform->WriteBuffer();
+				write0->Position = pos;
+				write0->Rotation = rot;
+				write0->Scale = scale;
+
+				transform->SwapBuffers();
+
+				Transform* write1 = transform->WriteBuffer();
+				write1->Position = pos;
+				write1->Rotation = rot;
+				write1->Scale = scale;
+			};
+
 			// Global UI to switch between scenes
 			if (ImGui::BeginMainMenuBar())
 			{
@@ -363,6 +444,28 @@ void FlatBufferScene::Draw()
 
 					ImGui::EndMenu();
 				}
+
+				if (ImGui::BeginMenu("Entities"))
+				{
+					for (int i = 0; i < static_cast<int>(m_entities.size()); ++i)
+					{
+						auto& entity = m_entities[i];
+						auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+						auto* netComp = entity.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+
+						if (!transform || !netComp || !netComp->IsOwnedByMe(m_localPeerId))
+							continue;
+
+						const std::string label = "Entity " + std::to_string(i) + " (NetId " + std::to_string(netComp->networkId) + ")";
+						const bool isSelected = (m_selectedEntityIndex == i);
+						if (ImGui::MenuItem(label.c_str(), nullptr, isSelected))
+						{
+							m_selectedEntityIndex = i;
+						}
+					}
+					ImGui::EndMenu();
+				}
+
 				if (ImGui::BeginMenu("Cameras"))
 				{
 					// List available cameras and allow selecting an active one
@@ -476,6 +579,39 @@ void FlatBufferScene::Draw()
 				}
 
 				ImGui::EndMainMenuBar();
+			}
+
+			if (m_selectedEntityIndex >= 0 && m_selectedEntityIndex < static_cast<int>(m_entities.size()))
+			{
+				auto& entity = m_entities[m_selectedEntityIndex];
+				auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+				auto* netComp = entity.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+
+				if (transform && netComp && netComp->IsOwnedByMe(m_localPeerId))
+				{
+					ImGui::Begin("Entity Transform");
+					glm::vec3 pos = transform->Position();
+					glm::vec3 rot = transform->Rotation();
+					glm::vec3 scale = transform->Scale();
+
+					float posArr[3] = { pos.x, pos.y, pos.z };
+					float rotArr[3] = { rot.x, rot.y, rot.z };
+					float scaleArr[3] = { scale.x, scale.y, scale.z };
+
+					bool changed = false;
+					changed |= ImGui::DragFloat3("Position", posArr, 0.1f);
+					changed |= ImGui::DragFloat3("Rotation (deg)", rotArr, 1.0f);
+					changed |= ImGui::DragFloat3("Scale", scaleArr, 0.1f, 0.001f, 1000.0f);
+
+					if (changed)
+					{
+						applyTransform(transform,
+							glm::vec3(posArr[0], posArr[1], posArr[2]),
+							glm::vec3(rotArr[0], rotArr[1], rotArr[2]),
+							glm::vec3(scaleArr[0], scaleArr[1], scaleArr[2]));
+					}
+					ImGui::End();
+				}
 			}
 
 			if (show_demo_window)
@@ -760,14 +896,11 @@ void FlatBufferScene::DeserializeState()
 			entity.AddComponent(EComponentType::Component_Geometry);
 
 			// --- DISTRIBUTED OWNERSHIP LOGIC ---
-			// Sequentially assign ownership (e.g., 0, 1, 0, 1...)
-			uint32_t assignedOwnerId = objectIndex % 2; 
+			PeerID assignedOwnerId = static_cast<PeerID>(objectIndex % 2);
+			bool isOwnedByMe = (assignedOwnerId == m_localPeerId);
 
-			// QUICK FIX: Modulo the hash by 2 so it is always 0 or 1.
-			// (Note: Since it's random, if both programs load the same textures, just restart one of them until they get opposite IDs)
-			uint32_t localPeerId = static_cast<uint32_t>(std::hash<std::string>{}(m_instanceId)) % 2;
-
-			bool isOwnedByMe = (assignedOwnerId == localPeerId); 
+			// Add network ownership so systems + UI can detect ownership
+			entity.AddComponent(EComponentType::Component_Network, objectIndex, ObjectType::Simulated, assignedOwnerId);
 
 			// Load texture based on ownership
 			std::string texturePath = isOwnedByMe ? "Assets/red_brick_diff_1k.jpg" : "Assets/mossy_cobblestone_diff_1k.jpg";

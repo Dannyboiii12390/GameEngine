@@ -6,6 +6,7 @@
 #include "../../Renderer/GUI.h"
 #include "../InputHandler.h"
 #include "../../Renderer/Camera.h"
+#include "../NetworkTypes.h"
 
 #include "../../../PhysicsEngine/Networking/ListeningSocket.h"
 
@@ -54,7 +55,7 @@ private:
 	InputHandler m_inputHandler;
 
 	std::vector<Camera> m_cameras;
-	Camera* m_activeCamera = nullptr;
+	Camera* m_activeCamera = nullptr; 
 
 	// Network Server Members
 	std::unique_ptr<Networking::ListeningSocket> m_tcpListener;
@@ -64,8 +65,12 @@ private:
 	std::atomic<bool> m_peerConnected = false;
 	std::string m_instanceId;
 
+	PeerID m_localPeerId = 0;
+	int m_selectedEntityIndex = -1;
+
 	// Physics Members
 	std::thread m_physicsThread;
 	std::atomic<bool> m_isPhysicsRunning{false};
 	std::mutex m_sceneMutex; // Protects m_entities during sync
+	std::shared_ptr<SharedNetworkData> m_networkData;
 };

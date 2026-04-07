@@ -86,8 +86,8 @@ int main()
             return deltaTime;
         };
 
-        const int width = 1920;
-        const int height = 1080;
+        const int width = 1280;
+        const int height = 720;
         Window window(width, height, "Vulkan Engine");
 
         VulkanRHI vulkanRHI;

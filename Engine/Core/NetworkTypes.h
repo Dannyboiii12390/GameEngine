@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include <mutex>
 
 // An ID representing a unique peer in the network
 using PeerID = uint32_t;
@@ -31,3 +32,11 @@ struct SyncPacket {
     float velX, velY, velZ;
 };
 #pragma pack(pop)
+
+struct SharedNetworkData {
+    std::mutex incomingMutex;
+    std::vector<SyncPacket> incomingPackets;
+
+    std::mutex outgoingMutex;
+    std::vector<SyncPacket> outgoingPackets;
+};

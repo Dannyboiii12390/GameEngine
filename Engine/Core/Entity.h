@@ -8,6 +8,7 @@
 #include "Components/ComponentGeometry.h"
 #include "Components/ComponentPhysics.h"
 #include "Components/ComponentCollision.h"
+#include "Components/ComponentNetwork.h"
 
 #include <iostream>
 
@@ -24,43 +25,68 @@ public:
 	Entity& operator=(Entity&&) noexcept = default;
 
 	template<typename... Args>
-	void AddComponent(EComponentType type, Args... args) 
+	void AddComponent(EComponentType type, Args&&... args) 
 	{
 		switch (type)
 		{
 			case EComponentType::Component_Transform:
 			{
-				auto component = std::make_unique<ComponentTransform>(std::forward<Args>(args)...);
-				m_Components[type] = std::move(component);
-				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Transform));
+				if constexpr (std::is_constructible_v<ComponentTransform, Args...>)
+				{
+					auto component = std::make_unique<ComponentTransform>(std::forward<Args>(args)...);
+					m_Components[type] = std::move(component);
+					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Transform));
+				}
 				break;
 			}
 			case EComponentType::Component_Velocity:
 			{
-				auto component = std::make_unique<ComponentVelocity>(std::forward<Args>(args)...);
-				m_Components[type] = std::move(component);
-				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Velocity));
+				if constexpr (std::is_constructible_v<ComponentVelocity, Args...>)
+				{
+					auto component = std::make_unique<ComponentVelocity>(std::forward<Args>(args)...);
+					m_Components[type] = std::move(component);
+					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Velocity));
+				}
 				break;
 			}
 			case EComponentType::Component_Geometry:
 			{
-				auto component = std::make_unique<ComponentGeometry>();
-				m_Components[type] = std::move(component);
-				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Geometry));
+				if constexpr (std::is_constructible_v<ComponentGeometry, Args...>)
+				{
+					auto component = std::make_unique<ComponentGeometry>(std::forward<Args>(args)...);
+					m_Components[type] = std::move(component);
+					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Geometry));
+				}
 				break;
 			}
 			case EComponentType::Component_Physics:
 			{
-				auto component = std::make_unique<ComponentPhysics>();
-				m_Components[type] = std::move(component);
-				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Physics));
+				if constexpr (std::is_constructible_v<ComponentPhysics, Args...>)
+				{
+					auto component = std::make_unique<ComponentPhysics>(std::forward<Args>(args)...);
+					m_Components[type] = std::move(component);
+					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Physics));
+				}
 				break;
 			}
 			case EComponentType::Component_Collision:
 			{
-				auto component = std::make_unique<ComponentCollision>();
-				m_Components[type] = std::move(component);
-				m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Collision));
+				if constexpr (std::is_constructible_v<ComponentCollision, Args...>)
+				{
+					auto component = std::make_unique<ComponentCollision>(std::forward<Args>(args)...);
+					m_Components[type] = std::move(component);
+					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Collision));
+				}
+				break;
+			}
+			case EComponentType::Component_Network:
+			{
+				if constexpr (std::is_constructible_v<ComponentNetwork, Args...>)
+				{
+					auto component = std::make_unique<ComponentNetwork>(std::forward<Args>(args)...);
+					m_Components[type] = std::move(component);
+					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Network));
+				}
 				break;
 			}
 			default:

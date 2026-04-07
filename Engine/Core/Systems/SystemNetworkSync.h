@@ -4,24 +4,26 @@
 #include "../Components/ComponentTransform.h"
 #include <vector>
 #include <span>
+#include <memory>
 #include "../Entity.h"
 #include "ISystem.h" // Add this include
 
 class SystemNetworkSync : public ISystem // Inherit from ISystem
 {
 public:
-    SystemNetworkSync() { m_SystemType = ESystemType::System_Network_Sync; }
+    SystemNetworkSync(PeerID localPeerId, std::shared_ptr<SharedNetworkData> networkData)
+        : m_localPeerId(localPeerId), m_networkData(networkData)
+    { 
+        m_SystemType = ESystemType::System_Network_Sync; 
+    }
 
     // Implement OnUpdate to match ISystem interface
     void OnUpdate(std::span<Entity> entities, float deltaTime) override
     {
-        // Example: You may want to pass localPeerId and convert entities to pointers if needed
-        // For now, just call Update with dummy PeerID and pointer vector
-        PeerID localPeerId = 0;
         std::vector<Entity*> entityPtrs;
         for (auto& e : entities)
             entityPtrs.push_back(&e);
-        Update(localPeerId, entityPtrs);
+        Update(m_localPeerId, entityPtrs);
     }
 
     void Update(PeerID localPeerId, const std::vector<Entity*>& entities)
@@ -61,15 +63,23 @@ public:
     }
 
 private:
+    PeerID m_localPeerId;
+    std::shared_ptr<SharedNetworkData> m_networkData;
+
     void BroadcastToPeers(std::span<SyncPacket> packets)
     {
-        // Feed `packets.data()` and `packets.size_bytes()` to your existing UDP sockets
+        if (!m_networkData) return;
+        std::lock_guard<std::mutex> lock(m_networkData->outgoingMutex);
+        m_networkData->outgoingPackets.insert(m_networkData->outgoingPackets.end(), packets.begin(), packets.end());
     }
 
     std::vector<SyncPacket> ReceiveFromPeers()
     {
-        // Read from your UDP sockets and reconstruct SyncPackets
-        return {};
+        if (!m_networkData) return {};
+        std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
+        auto copy = m_networkData->incomingPackets;
+        m_networkData->incomingPackets.clear();
+        return copy;
     }
 
     void ApplyStateToObject(const SyncPacket& packet, const std::vector<Entity*>& entities)
@@ -82,7 +92,18 @@ private:
                 auto* transform = entity->GetComponent<ComponentTransform>(EComponentType::Component_Transform);
                 if (transform)
                 {
-                    transform->SetPosition({ packet.posX, packet.posY, packet.posZ });
+                    glm::vec3 syncedPosition(packet.posX, packet.posY, packet.posZ);
+                    
+                    // 1. Write the new position into the WriteBuffer
+                    transform->SetPosition(syncedPosition);
+                    
+                    // 2. Swap the buffers to commit it to the ReadBuffer instantly. 
+                    // This ensures the render thread and next physics step start from this synced position.
+                    transform->SwapBuffers();
+                    
+                    // 3. Write it again so the 'new' WriteBuffer is synchronized 
+                    // and stays physically consistent for delta implementations.
+                    transform->SetPosition(syncedPosition);
                 }
                 break;
             }
