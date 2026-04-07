@@ -6,9 +6,9 @@
 #include <span>
 #include <memory>
 #include "../Entity.h"
-#include "ISystem.h" // Add this include
+#include "ISystem.h"
 
-class SystemNetworkSync : public ISystem // Inherit from ISystem
+class SystemNetworkSync : public ISystem
 {
 public:
     SystemNetworkSync(PeerID localPeerId, std::shared_ptr<SharedNetworkData> networkData)
@@ -17,7 +17,6 @@ public:
         m_SystemType = ESystemType::System_Network_Sync; 
     }
 
-    // Implement OnUpdate to match ISystem interface
     void OnUpdate(std::span<Entity> entities, float deltaTime) override
     {
         std::vector<Entity*> entityPtrs;
@@ -41,10 +40,23 @@ public:
                 SyncPacket packet{};
                 packet.objectId = netComp->networkId;
 
-                auto pos = transform->GetTransformMatrix() * glm::vec4(0, 0, 0, 1);
+                // Sync Position
+                glm::vec3 pos = transform->Position();
                 packet.posX = pos.x;
                 packet.posY = pos.y;
                 packet.posZ = pos.z;
+
+                // Sync Rotation
+                glm::vec3 rot = transform->Rotation();
+                packet.rotX = rot.x;
+                packet.rotY = rot.y;
+                packet.rotZ = rot.z;
+
+                // Sync Scale
+                glm::vec3 scale = transform->Scale();
+                packet.scaleX = scale.x;
+                packet.scaleY = scale.y;
+                packet.scaleZ = scale.z;
 
                 outgoingPackets.push_back(packet);
             }
@@ -93,17 +105,23 @@ private:
                 if (transform)
                 {
                     glm::vec3 syncedPosition(packet.posX, packet.posY, packet.posZ);
+                    glm::vec3 syncedRotation(packet.rotX, packet.rotY, packet.rotZ);
+                    glm::vec3 syncedScale(packet.scaleX, packet.scaleY, packet.scaleZ);
                     
-                    // 1. Write the new position into the WriteBuffer
+                    // 1. Write the new transform values into the WriteBuffer
                     transform->SetPosition(syncedPosition);
+                    transform->SetRotation(syncedRotation);
+                    transform->SetScale(syncedScale);
                     
                     // 2. Swap the buffers to commit it to the ReadBuffer instantly. 
-                    // This ensures the render thread and next physics step start from this synced position.
+                    // This ensures the render thread and next physics step start from this synced transform.
                     transform->SwapBuffers();
                     
                     // 3. Write it again so the 'new' WriteBuffer is synchronized 
                     // and stays physically consistent for delta implementations.
                     transform->SetPosition(syncedPosition);
+                    transform->SetRotation(syncedRotation);
+                    transform->SetScale(syncedScale);
                 }
                 break;
             }
