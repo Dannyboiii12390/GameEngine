@@ -82,22 +82,22 @@
 ## Level 1: Core Concurrency Features (30%)
 
 ### Distributed Architecture
-- [ ] Peer-to-peer networking (min 2 peers)
+- [x] Peer-to-peer networking (min 2 peers)
 - [ ] Each peer:
   - [ ] Dedicated graphics thread
   - [ ] Dedicated physics thread
-  - [ ] Shared scene state
-- [ ] Identical rendered images across peers
+  - [x] Shared scene state
+- [x] Identical rendered images across peers
 
 ### Distributed Ownership
-- [ ] Static & Animated objects owned by all peers
-- [ ] Simulated objects assigned ownership per FlatBuffer or spawner
+- [x] Static & Animated objects owned by all peers
+- [x] Simulated objects assigned ownership per FlatBuffer or spawner
 - [ ] Sequential spawner ownership implemented
-- [ ] Owners handle simulation & collision response
+- [x] Owners handle simulation & collision response
 
 ### Networking
-- [ ] Implement TCP or UDP communication
-- [ ] Ease of network configuration demonstrated
+- [x] Implement TCP or UDP communication
+- [x] Ease of network configuration demonstrated
 
 ### Parallel Architecture
 - [x] Major components operate asynchronously

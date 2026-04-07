@@ -1,37 +1,32 @@
 #pragma once
 #include "Entity.h"
 #include "Components/ComponentNetwork.h"
+#include "Components/ComponentTransform.h"
 #include <vector>
-#include <cstdint>
 
 class Spawner {
 public:
-    // Update this whenever peers connect or disconnect
-    void UpdateActivePeers(const std::vector<PeerID>& activePeers) {
-        connectedPeers = activePeers;
-        // Make sure the local peer is in the list too if they can own spawned objects!
+    void SetConnectedPeers(const std::vector<PeerID>& activePeers) {
+        m_activePeers = activePeers;
+        m_nextPeerIndex = 0;
     }
 
-    // Called when spawning a simulated object over the network
-    PeerID GetNextSequentialOwner() {
-        if (connectedPeers.empty()) {
-            return 0; // Fallback to local peer ID if no network
+    Entity SpawnSimulatedBox(glm::vec3 position, uint32_t networkId) {
+        Entity e;
+        e.AddComponent(EComponentType::Component_Transform, position, glm::vec3(0), glm::vec3(1));
+        
+        // Sequential Ownership Logic
+        PeerID assignedOwner = 0;
+        if (!m_activePeers.empty()) {
+            assignedOwner = m_activePeers[m_nextPeerIndex];
+            m_nextPeerIndex = (m_nextPeerIndex + 1) % m_activePeers.size();
         }
 
-        PeerID assignedOwner = connectedPeers[nextPeerIndex];
-        nextPeerIndex = (nextPeerIndex + 1) % connectedPeers.size();
-        return assignedOwner;
-    }
-
-    void SpawnSimulatedObject(uint32_t networkId /* other params */) {
-        PeerID owner = GetNextSequentialOwner();
-
-        // Entity creation logic...
-        // Entity* newEntity = ...
-        // newEntity->AddComponent(new NetworkComponent(networkId, ObjectType::Simulated, owner));
+        // e.AddComponent(EComponentType::Component_Network, networkId, ObjectType::Simulated, assignedOwner);
+        return e;
     }
 
 private:
-    std::vector<PeerID> connectedPeers;
-    size_t nextPeerIndex = 0;
+    std::vector<PeerID> m_activePeers;
+    size_t m_nextPeerIndex = 0;
 };

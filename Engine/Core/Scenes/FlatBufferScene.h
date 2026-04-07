@@ -11,7 +11,7 @@
 
 #include <thread>
 #include <atomic>
-#include <string>
+#include <mutex>
 
 namespace Networking { class TCPSocket; }
 
@@ -63,4 +63,9 @@ private:
 	std::atomic<bool> m_networkRunning = false;
 	std::atomic<bool> m_peerConnected = false;
 	std::string m_instanceId;
+
+	// Physics Members
+	std::thread m_physicsThread;
+	std::atomic<bool> m_isPhysicsRunning{false};
+	std::mutex m_sceneMutex; // Protects m_entities during sync
 };

@@ -116,6 +116,8 @@ int main()
         Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
 
         std::vector<float> fpsHistory(100);
+		IScene* currentScene = sceneManager.GetCurrentScene();
+		currentScene->Start(getDeltaTime()); // Call Start on the initial scene before entering the main loop
 
         while (window.getGLFWwindow() && !glfwWindowShouldClose(window.getGLFWwindow()))
         {

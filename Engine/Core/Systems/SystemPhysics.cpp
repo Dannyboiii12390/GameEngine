@@ -1,8 +1,8 @@
 #include "SystemPhysics.h"
-#include "../Components/ComponentPhysics.h"
-#include "../Components/ComponentVelocity.h"
 #include "../Components/ComponentTransform.h"
 #include "../Components/ComponentNetwork.h"
+#include "../Components/ComponentPhysics.h"
+#include "../Components/ComponentVelocity.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <omp.h>

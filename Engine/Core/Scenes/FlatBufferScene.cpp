@@ -103,7 +103,6 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>());
-
 }
 
 Networking::Address FlatBufferScene::GetClientAddress()
@@ -281,6 +280,31 @@ void FlatBufferScene::Destroy()
 
 void FlatBufferScene::Start(float deltaTime) 
 {
+	// 1. Start the physical network sockets/connections...
+	
+	// 2. Launch Dedicated Physics Thread
+	m_isPhysicsRunning = true;
+	m_physicsThread = std::thread([this]() {
+		auto lastTime = std::chrono::high_resolution_clock::now();
+		while (m_isPhysicsRunning) {
+			auto currentTime = std::chrono::high_resolution_clock::now();
+			float dt = std::chrono::duration<float>(currentTime - lastTime).count();
+			lastTime = currentTime;
+
+			// Lock the state while simulating to prevent tearing with the rendering thread
+			{
+				std::lock_guard<std::mutex> lock(m_sceneMutex);
+				
+				// Only run Physics and Network Sync on this thread!
+				// m_systemManager.GetSystem<SystemPhysics>()->OnUpdate(m_entities, dt);
+				// m_systemManager.GetSystem<SystemNetworkSync>()->OnUpdate(m_entities, dt);
+			}
+
+			// Sleep to maintain a fixed physics tick rate (e.g., 60Hz)
+			std::this_thread::sleep_for(std::chrono::milliseconds(16));
+		}
+	});
+
 	// add diagnostics only once
 	static bool diagCreated = false;
 	if (!diagCreated) {
@@ -303,6 +327,9 @@ void FlatBufferScene::FixedUpdate() {}
 
 void FlatBufferScene::Draw()
 {
+	// Ensure Graphics Thread safely reads the updated physical state
+	std::lock_guard<std::mutex> lock(m_sceneMutex);
+	
 	m_vulkanRHI->BeginFrame();
 
 	VkCommandBuffer cmd = m_vulkanRHI->GetCurrentCommandBuffer();
