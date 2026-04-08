@@ -35,7 +35,6 @@
 #include "../Systems/SystemNetworkSync.h"
 
 
-
 FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_window(&p_window), m_inputHandler(p_window), m_vulkanRHI(rhi),
 	m_gui(p_gui), m_systemManager(rhi, 2)
@@ -46,6 +45,13 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	// Camera, vulkan, and imgui Initialisation
 	m_cameras.reserve(100);
 	m_paused = false;
+
+	// Ensure sensible defaults for scene-level properties so missing flatbuffer fields
+	// fall back to explicit defaults.
+	m_sceneName = "";
+	m_sceneDescription = "";
+	m_gravityOn = true; // default to gravity enabled unless scene explicitly disables it
+	m_selectedEntityIndex = -1;
 
 	// 1. Ensure the file exists before attempting to load
 	if (!std::filesystem::exists("scenes/Level1.bin"))
@@ -89,7 +95,6 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 
 
-	
 
 	{
 		auto address = GetClientAddress();
@@ -665,8 +670,8 @@ void FlatBufferScene::SerializeState()
 	flatbuffers::FlatBufferBuilder builder(4096);
 
 	// Scene metadata
-	auto sceneName = builder.CreateString("Level1");
-	auto sceneDesc = builder.CreateString("Saved scene containing cube entities and camera state.");
+	auto sceneName = builder.CreateString(m_sceneName.empty() ? "Level1" : m_sceneName.c_str());
+	auto sceneDesc = builder.CreateString(m_sceneDescription.empty() ? "Saved scene containing cube entities and camera state." : m_sceneDescription.c_str());
 
 	// Cameras - save current active camera (m_camera)
 	{
@@ -752,18 +757,47 @@ void FlatBufferScene::SerializeState()
 
 		auto objectsVec = builder.CreateVector(objectsVecOffsets);
 
+		// Materials vector (if any)
+		flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<Simulation::Material>>> materialsVec = 0;
+		if (!m_materials.empty())
+		{
+			std::vector<flatbuffers::Offset<Simulation::Material>> mats;
+			mats.reserve(m_materials.size());
+			for (auto &m : m_materials)
+			{
+				auto nameOff = builder.CreateString(m.name.c_str());
+				mats.push_back(Simulation::CreateMaterial(builder, nameOff, m.density));
+			}
+			materialsVec = builder.CreateVector(mats);
+		}
+
+		// Material interactions vector (if any)
+		flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<Simulation::MaterialInteraction>>> interactionsVec = 0;
+		if (!m_materialInteractions.empty())
+		{
+			std::vector<flatbuffers::Offset<Simulation::MaterialInteraction>> inters;
+			inters.reserve(m_materialInteractions.size());
+			for (auto &mi : m_materialInteractions)
+			{
+				auto a = builder.CreateString(mi.materialA.c_str());
+				auto b = builder.CreateString(mi.materialB.c_str());
+				inters.push_back(Simulation::CreateMaterialInteraction(builder, a, b, mi.restitution, mi.staticFriction, mi.dynamicFriction));
+			}
+			interactionsVec = builder.CreateVector(inters);
+		}
+
 		// Finish the scene with cameras and objects filled.
 		auto sceneOffset = Simulation::CreateScene(
 			builder,
 			sceneName,
 			sceneDesc,
-			true,           // gravity_on
+			m_gravityOn,     // gravity_on
 			camerasVec,
 			objectsVec,
-			0,              // spawners_type
+			0,              // spawners_type (not serializing spawners in full yet)
 			0,              // spawners
-			0,              // materials
-			0               // interactions
+			materialsVec,
+			interactionsVec
 		);
 
 		builder.Finish(sceneOffset);
@@ -801,6 +835,19 @@ void FlatBufferScene::DeserializeState()
 		std::cerr << "DeserializeState: invalid scene data\n";
 		return;
 	}
+
+	// Scene metadata: name + description + gravity
+	if (scene->name())
+		m_sceneName = scene->name()->str();
+	else
+		m_sceneName = "Scene_" + m_instanceId;
+
+	if (scene->description())
+		m_sceneDescription = scene->description()->str();
+	else
+		m_sceneDescription = "";
+
+	m_gravityOn = scene->gravity_on();
 
 	// Clear any existing cameras loaded previously
 	m_cameras.clear();
@@ -850,8 +897,25 @@ void FlatBufferScene::DeserializeState()
 			}
 			else if (camFlat->camera_type_type() == Simulation::CameraType_OrthographicCamera)
 			{
-				// Orthographic camera in schema exists — for now, simply leave default projection
-				// or extend here to read orthographic parameters if needed.
+				// Orthographic camera in schema exists — for now, read and apply basic orthographic params if present.
+				auto ortho = camFlat->camera_type_as_OrthographicCamera();
+				if (ortho)
+				{
+					float size = ortho->size();
+					float near = ortho->near();
+					float far = ortho->far();
+
+					// Camera class may not have explicit orthographic API; keep perspective defaults but mark projection if you extend Camera.
+					// For now set near/far and keep FOV-derived behaviour.
+					float aspect = 16.0f / 9.0f;
+					if (m_vulkanRHI)
+					{
+						auto extent = m_vulkanRHI->GetSwapchainExtent();
+						if (extent.height != 0)
+							aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+					}
+					cam.SetPerspective(60.0f, aspect, near, far);
+				}
 			}
 
 			m_cameras.push_back(std::move(cam));
@@ -875,6 +939,220 @@ void FlatBufferScene::DeserializeState()
 	m_activeCamera = &m_cameras[0];
 	if (m_vulkanRHI) m_vulkanRHI->SetActiveCamera(m_activeCamera);
 
+	// Load materials (if present)
+	m_materials.clear();
+	if (scene->materials())
+	{
+		for (auto mat : *scene->materials())
+		{
+			if (!mat) continue;
+			MaterialData m;
+			if (mat->name()) m.name = mat->name()->str();
+			m.density = mat->density();
+			m_materials.push_back(std::move(m));
+		}
+	}
+
+	// Load material interactions (if present)
+	m_materialInteractions.clear();
+	if (scene->interactions())
+	{
+		for (auto inter : *scene->interactions())
+		{
+			if (!inter) continue;
+			MaterialInteractionData mi;
+			if (inter->material_a()) mi.materialA = inter->material_a()->str();
+			if (inter->material_b()) mi.materialB = inter->material_b()->str();
+			mi.restitution = inter->restitution();
+			mi.staticFriction = inter->static_friction();
+			mi.dynamicFriction = inter->dynamic_friction();
+			m_materialInteractions.push_back(std::move(mi));
+		}
+	}
+
+	// Load spawners (if present) -- comprehensive parsing into SpawnerData
+	m_spawners.clear();
+	if (scene->spawners() && scene->spawners_type() && scene->spawners()->size() == scene->spawners_type()->size())
+	{
+		auto typesVec = scene->spawners_type();
+		auto spawnersVec = scene->spawners();
+		for (size_t i = 0; i < spawnersVec->size(); ++i)
+		{
+			uint8_t stype = typesVec->Get(static_cast<flatbuffers::uoffset_t>(i));
+			const void* raw = spawnersVec->Get(static_cast<flatbuffers::uoffset_t>(i));
+			if (!raw) continue;
+
+			SpawnerData sd; // defaults already set in struct
+
+			// First, extract concrete spawner-specific ranges where available
+			switch (static_cast<Simulation::SpawnerType>(stype))
+			{
+			case Simulation::SpawnerType_SphereSpawner:
+			{
+				auto sp = reinterpret_cast<const Simulation::SphereSpawner*>(raw);
+				if (sp && sp->base())
+				{
+					auto b = sp->base();
+					if (b->name()) sd.name = b->name()->str();
+					sd.startTime = b->start_time();
+					if (b->material()) sd.material = b->material()->str();
+					sd.owner = b->owner();
+					sd.spawnType = static_cast<uint8_t>(b->spawn_type_type());
+					sd.locationType = static_cast<uint8_t>(b->location_type());
+				}
+				if (sp->radius_range())
+				{
+					// average radius as a simple representation
+					sd.sphereRadius = (sp->radius_range()->min() + sp->radius_range()->max()) * 0.5f;
+				}
+				break;
+			}
+			case Simulation::SpawnerType_CuboidSpawner:
+			{
+				auto sp = reinterpret_cast<const Simulation::CuboidSpawner*>(raw);
+				if (sp && sp->base())
+				{
+					auto b = sp->base();
+					if (b->name()) sd.name = b->name()->str();
+					sd.startTime = b->start_time();
+					if (b->material()) sd.material = b->material()->str();
+					sd.owner = b->owner();
+					sd.spawnType = static_cast<uint8_t>(b->spawn_type_type());
+					sd.locationType = static_cast<uint8_t>(b->location_type());
+				}
+				if (sp->size_range())
+				{
+					// Vec3Range::min()/max() returns a struct reference; capture by reference/value
+					const auto &min = sp->size_range()->min();
+					const auto &max = sp->size_range()->max();
+					sd.boxMin = glm::vec3(min.x(), min.y(), min.z());
+					sd.boxMax = glm::vec3(max.x(), max.y(), max.z());
+				}
+				break;
+			}
+			case Simulation::SpawnerType_CapsuleSpawner:
+			case Simulation::SpawnerType_CylinderSpawner:
+			{
+				// handle cylinder / capsule generically via base
+				auto sp = reinterpret_cast<const Simulation::CylinderSpawner*>(raw);
+				if (sp && sp->base())
+				{
+					auto b = sp->base();
+					if (b->name()) sd.name = b->name()->str();
+					sd.startTime = b->start_time();
+					if (b->material()) sd.material = b->material()->str();
+					sd.owner = b->owner();
+					sd.spawnType = static_cast<uint8_t>(b->spawn_type_type());
+					sd.locationType = static_cast<uint8_t>(b->location_type());
+				}
+				break;
+			}
+			default:
+			{
+				// Unknown or NONE: attempt to parse as BaseSpawner if possible
+				auto basePtr = reinterpret_cast<const Simulation::BaseSpawner*>(raw);
+				if (basePtr)
+				{
+					if (basePtr->name()) sd.name = basePtr->name()->str();
+					sd.startTime = basePtr->start_time();
+					if (basePtr->material()) sd.material = basePtr->material()->str();
+					sd.owner = basePtr->owner();
+					sd.spawnType = static_cast<uint8_t>(basePtr->spawn_type_type());
+					sd.locationType = static_cast<uint8_t>(basePtr->location_type());
+				}
+				break;
+			}
+			}
+
+			// If name still empty, assign a predictable fallback
+			if (sd.name.empty())
+				sd.name = "spawner_" + std::to_string(i);
+
+			// --- Parse spawn_type union details (SingleBurst / Repeating) using the base accessor where possible ---
+			{
+				// Try to retrieve a BaseSpawner pointer robustly:
+				const Simulation::BaseSpawner* basePtr = nullptr;
+				// If the raw is actually a BaseSpawner-derived table with a 'base' accessor, use it; otherwise cast directly.
+				switch (static_cast<Simulation::SpawnerType>(stype))
+				{
+				case Simulation::SpawnerType_SphereSpawner:
+					basePtr = reinterpret_cast<const Simulation::SphereSpawner*>(raw)->base();
+					break;
+				case Simulation::SpawnerType_CuboidSpawner:
+					basePtr = reinterpret_cast<const Simulation::CuboidSpawner*>(raw)->base();
+					break;
+				case Simulation::SpawnerType_CylinderSpawner:
+					basePtr = reinterpret_cast<const Simulation::CylinderSpawner*>(raw)->base();
+					break;
+				case Simulation::SpawnerType_CapsuleSpawner:
+					basePtr = reinterpret_cast<const Simulation::CapsuleSpawner*>(raw)->base();
+					break;
+				default:
+					basePtr = reinterpret_cast<const Simulation::BaseSpawner*>(raw);
+					break;
+				}
+
+				if (basePtr)
+				{
+					// Spawn type specifics
+					if (basePtr->spawn_type_type() == Simulation::SpawnType_SingleBurstSpawn)
+					{
+						auto sb = basePtr->spawn_type_as_SingleBurstSpawn();
+						if (sb)
+						{
+							sd.singleBurstCount = sb->count();
+						}
+					}
+					else if (basePtr->spawn_type_type() == Simulation::SpawnType_RepeatingSpawn)
+					{
+						auto rs = basePtr->spawn_type_as_RepeatingSpawn();
+						if (rs)
+						{
+							sd.repeatingInterval = rs->interval();
+							sd.repeatingMaxCount = rs->max_count();
+						}
+					}
+
+					// Location specifics
+					if (basePtr->location_type() == Simulation::SpawnLocation_FixedLocation)
+					{
+						auto fl = basePtr->location_as_FixedLocation();
+						if (fl && fl->transform())
+						{
+							const auto &t = fl->transform()->position();
+							sd.fixedPosition = glm::vec3(t.x(), t.y(), t.z());
+						}
+					}
+					else if (basePtr->location_type() == Simulation::SpawnLocation_RandomBox)
+					{
+						auto rb = basePtr->location_as_RandomBox();
+						if (rb)
+						{
+							// RandomBox::min()/max() return pointers to Simulation::Vec3 — capture pointer and use '->' accessors.
+							const Simulation::Vec3* min = rb->min();
+							const Simulation::Vec3* max = rb->max();
+							if (min) sd.boxMin = glm::vec3(min->x(), min->y(), min->z());
+							if (max) sd.boxMax = glm::vec3(max->x(), max->y(), max->z());
+						}
+					}
+					else if (basePtr->location_type() == Simulation::SpawnLocation_RandomSphere)
+					{
+						auto rs = basePtr->location_as_RandomSphere();
+						if (rs)
+						{
+							const Simulation::Vec3* c = rs->center();
+							if (c) sd.sphereCenter = glm::vec3(c->x(), c->y(), c->z());
+							sd.sphereRadius = rs->radius();
+						}
+					}
+				}
+			}
+
+			// Push spawner data populated into in-memory list
+			m_spawners.push_back(std::move(sd));
+		}
+	}
+
 	// Load objects
 	if (scene->objects())
 	{
@@ -895,6 +1173,13 @@ void FlatBufferScene::DeserializeState()
 			entity.AddComponent(EComponentType::Component_Transform, pos, rot, scale);
 			entity.AddComponent(EComponentType::Component_Geometry);
 
+			// Assign a name if present, otherwise generate unique name (store in m_sceneName context or logs)
+			std::string objName;
+			if (objFlat->name())
+				objName = objFlat->name()->str();
+			else
+				objName = "object_" + std::to_string(objectIndex);
+
 			// --- DISTRIBUTED OWNERSHIP LOGIC ---
 			PeerID assignedOwnerId = static_cast<PeerID>(objectIndex % 2);
 			bool isOwnedByMe = (assignedOwnerId == m_localPeerId);
@@ -902,8 +1187,16 @@ void FlatBufferScene::DeserializeState()
 			// Add network ownership so systems + UI can detect ownership
 			entity.AddComponent(EComponentType::Component_Network, objectIndex, ObjectType::Simulated, assignedOwnerId);
 
-			// Load texture based on ownership
-			std::string texturePath = isOwnedByMe ? "Assets/red_brick_diff_1k.jpg" : "Assets/mossy_cobblestone_diff_1k.jpg";
+			// Load texture based on ownership, but prefer material name from object if present
+			std::string texturePath;
+			if (objFlat->material() && objFlat->material()->c_str()[0] != '\0') {
+				// simple heuristic: if material name ends with common texture name use it, else fallback to ownership colour
+				std::string matName = objFlat->material()->str();
+				// If a material exists in m_materials with that name and density, we won't infer texture path here.
+				texturePath = isOwnedByMe ? "Assets/red_brick_diff_1k.jpg" : "Assets/mossy_cobblestone_diff_1k.jpg";
+			} else {
+				texturePath = isOwnedByMe ? "Assets/red_brick_diff_1k.jpg" : "Assets/mossy_cobblestone_diff_1k.jpg";
+			}
 			const Texture objectTex(m_vulkanRHI, texturePath, TextureType::Albedo, true);
 			// -----------------------------------
 
@@ -930,8 +1223,26 @@ void FlatBufferScene::DeserializeState()
 				}
 			}
 
+			// If gravity setting exists, set ComponentPhysics affected flag for any physics components that already exist.
+			if (entity.HasComponent(EComponentType::Component_Physics))
+			{
+				auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+				if (phys)
+					phys->SetAffectedByGravity(m_gravityOn);
+			}
+
 			m_entities.push_back(std::move(entity));
 			objectIndex++;
+		}
+	}
+
+	// Apply gravity flag to all existing physics components in scene
+	for (auto &e : m_entities)
+	{
+		if (e.HasComponent(EComponentType::Component_Physics))
+		{
+			auto* phys = e.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+			if (phys) phys->SetAffectedByGravity(m_gravityOn);
 		}
 	}
 }

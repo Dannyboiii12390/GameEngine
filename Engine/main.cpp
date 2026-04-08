@@ -61,6 +61,8 @@ Todo List
 - flocking - using compute shader - week after next
 */
 
+// todo fix networking issues - ownership is same across both clients. so position data is being fought over 
+
 
 int main()
 {

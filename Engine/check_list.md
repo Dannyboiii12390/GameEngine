@@ -4,15 +4,15 @@
 
 ### Scenes
 - [x] Load scenes from FlatBuffers
-- [ ] Assign default values for missing FlatBuffer fields
-- [ ] Scene properties:
-  - [ ] Unique name
-  - [ ] Description
-  - [ ] Gravity flag
-  - [ ] Cameras list
-  - [ ] Objects list
-  - [ ] Spawners list
-  - [ ] Material interactions
+- [x] Assign default values for missing FlatBuffer fields
+- [x] Scene properties:
+  - [x] Unique name
+  - [x] Description
+  - [x] Gravity flag
+  - [x] Cameras list
+  - [x] Objects list
+  - [x] Spawners list
+  - [x] Material interactions
 - [x] Global UI to switch between scenes
 
 ### Cameras
