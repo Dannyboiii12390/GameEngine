@@ -22,7 +22,7 @@ public:
             m_nextPeerIndex = (m_nextPeerIndex + 1) % m_activePeers.size();
         }
 
-        // e.AddComponent(EComponentType::Component_Network, networkId, ObjectType::Simulated, assignedOwner);
+        e.AddComponent(EComponentType::Component_Network, networkId, ObjectType::Simulated, assignedOwner);
         return e;
     }
 

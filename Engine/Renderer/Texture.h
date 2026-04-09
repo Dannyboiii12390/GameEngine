@@ -69,6 +69,10 @@ public:
     // Write this texture into the RHI descriptor sets (binding 1). Safe to call after descriptors allocated.
     void WriteToDescriptorSets(VulkanRHI* rhi) const;
 
+    // Create a Texture from in-memory pixel data. Pixels are expected in R,G,B,A byte order (0..255).
+    // If channels != 4 this function will expand to RGBA.
+    static std::shared_ptr<Texture> CreateFromMemory(VulkanRHI* rhi, const void* pixels, int width, int height, int channels, TextureType type = TextureType::Unknown, bool srgb = false);
+
 private:
     // helpers
     bool CreateImageAndUpload(VulkanRHI* rhi, const void* pixels, int texWidth, int texHeight, int channels, VkFormat format);

@@ -1,4 +1,8 @@
 #include "ResourceManager.h"
+#include "../../Renderer/Texture.h"
+#include "../../Renderer/VulkanRHI.h"
+#include <glm/glm.hpp>
+#include <algorithm>
 #include <cmath>
 
 const float PI = 3.14159265358979323846f;
@@ -567,4 +571,20 @@ MeshData ResourceManager::CreateCapsuleMesh(float uv, float radius, float height
     // This is a moderate-quality capsule mesh suitable for general use.
 
     return { verts, indices };
+}
+
+std::shared_ptr<Texture> Create1x1Texture(VulkanRHI* rhi, const glm::vec4& color, TextureType type, bool srgb)
+{
+    if (!rhi) return nullptr;
+
+    // Clamp and convert floats [0,1] to bytes [0,255]
+    auto clamp01 = [](float v) { return std::max(0.0f, std::min(1.0f, v)); };
+    unsigned char px[4];
+    px[0] = static_cast<unsigned char>(std::round(clamp01(color.r) * 255.0f));
+    px[1] = static_cast<unsigned char>(std::round(clamp01(color.g) * 255.0f));
+    px[2] = static_cast<unsigned char>(std::round(clamp01(color.b) * 255.0f));
+    px[3] = static_cast<unsigned char>(std::round(clamp01(color.a) * 255.0f));
+
+    // Create texture from in-memory RGBA data
+    return Texture::CreateFromMemory(rhi, px, 1, 1, 4, type, srgb);
 }

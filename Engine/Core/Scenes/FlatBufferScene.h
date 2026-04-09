@@ -41,8 +41,6 @@ public:
 private:
 	Networking::Address GetClientAddress();
 
-	void CreateDiagnosticCube();
-
 	std::vector<Entity> m_entities;
 	VulkanRHI* m_vulkanRHI;
 
@@ -51,12 +49,15 @@ private:
 	Window* m_window;
 
 	float m_deltaTime = 0.0f;
-	bool m_paused = false;
+	std::atomic<float> m_renderDeltaTime{ 0.0f };
+	std::atomic<bool> m_paused{ false };
+	std::atomic<int> m_physicsHz{ 120 };
+	std::atomic<int> m_graphicsHz{ 30 };
 
 	InputHandler m_inputHandler;
 
 	std::vector<Camera> m_cameras;
-	Camera* m_activeCamera = nullptr; 
+	Camera* m_activeCamera = nullptr;
 
 	std::string m_sceneName = "";
 	std::string m_sceneDescription = "";
@@ -73,9 +74,6 @@ private:
 	PeerID m_localPeerId = 0;
 	int m_selectedEntityIndex = -1;
 
-	// Physics Members
-	std::thread m_physicsThread;
-	std::atomic<bool> m_isPhysicsRunning{false};
 	std::mutex m_sceneMutex; // Protects m_entities during sync
 	std::shared_ptr<SharedNetworkData> m_networkData;
 

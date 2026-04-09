@@ -20,27 +20,27 @@
 - [x] Cameras have names for runtime switching
 - [x] Local UI to switch between cameras
 - [x] Mouse & keyboard control for camera movement
-- [ ] Support Perspective and Orthographic cameras
+- [x] Support Perspective and Orthographic cameras
 - [x] FlatBuffer schemas implemented:
   - [x] PerspectiveCamera: fov, near, far
-  - [ ] OrthographicCamera: size, near, far
+  - [x] OrthographicCamera: size, near, far
 
 ### Physics Objects
 - [ ] Object properties:
-  - [ ] Name (generate unique if missing)
+  - [x] Name (generate unique if missing)
   - [x] Transform: position, orientation, scale
-  - [ ] Material
+  - [x] Material
   - [x] Shape: Sphere, Capsule, Cylinder, Plane, Cuboid
   - [ ] Behaviour: Static, Animated, Simulated
   - [ ] Collision type (SOLID or CONTAINER)
-- [ ] Color-code objects by owner (Red, Green, Blue, Yellow)
-- [ ] Render containers correctly to see inside
+- [x] Color-code objects by owner (Red, Green, Blue, Yellow)
+- [x] Render containers correctly to see inside
 
 ### Materials & Interactions
-- [ ] Materials have name and density
-- [ ] MaterialInteraction table implemented:
-  - [ ] Coefficient of restitution
-  - [ ] Static and dynamic friction between material pairs
+- [x] Materials have name and density
+- [x] MaterialInteraction table implemented:
+  - [x] Coefficient of restitution
+  - [x] Static and dynamic friction between material pairs
 
 ### Object Behaviours
 #### Static Objects
@@ -48,11 +48,11 @@
 
 #### Simulated Objects
 - [ ] Properties:
-  - [ ] Linear & angular velocity
+  - [x] Linear & angular velocity
   - [ ] Owner (ONE, TWO, THREE, FOUR)
 - [x] Full rigid body physics implemented (momentum, inertia)
 - [ ] Owner simulates object and handles collisions
-- [ ] Network dynamic state to all peers every frame
+- [x] Network dynamic state to all peers every frame
 
 #### Animated Objects
 - [ ] Waypoints with position, orientation, and absolute time
@@ -83,9 +83,9 @@
 
 ### Distributed Architecture
 - [x] Peer-to-peer networking (min 2 peers)
-- [ ] Each peer:
-  - [ ] Dedicated graphics thread
-  - [ ] Dedicated physics thread
+- [x] Each peer:
+  - [x] Dedicated graphics thread
+  - [x] Dedicated physics thread
   - [x] Shared scene state
 - [x] Identical rendered images across peers
 
@@ -101,16 +101,16 @@
 
 ### Parallel Architecture
 - [x] Major components operate asynchronously
-- [ ] Different update frequencies for:
-  - [ ] Graphics (e.g., 30 Hz)
-  - [ ] Physics simulation (e.g., 1000 Hz)
-- [ ] Controlled via ImGui
+- [x] Different update frequencies for:
+  - [x] Graphics (e.g., 30 Hz)
+  - [x] Physics simulation (e.g., 1000 Hz)
+- [x] Controlled via ImGui
 
 ### Process Affinity
-- [ ] Graphics → Core 1
-- [ ] Networking → Core 2-3
-- [ ] Simulation → Core 4+
-- [ ] Additional threads allowed, cores must match mapping
+- [x] Graphics → Core 1
+- [x] Networking → Core 2-3
+- [x] Simulation → Core 4+
+- [x] Additional threads allowed, cores must match mapping
 
 ---
 

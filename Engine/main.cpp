@@ -1,25 +1,6 @@
 ﻿#define GLFW_INCLUDE_VULKAN
 
 
-// Reduce Windows header pollution and disable min/max macros
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-// Some old Windows headers define 'near'/'far' macros which break generated code.
-// Undefine them if present so methods named near()/far() in generated FlatBuffers
-// headers compile correctly.
-#if defined(near)
-#undef near
-#endif
-
-#if defined(far)
-#undef far
-#endif
-
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <chrono>
@@ -60,17 +41,13 @@ Todo List
 - networking - next week
 - flocking - using compute shader - week after next
 */
-
-// todo fix networking issues - ownership is same across both clients. so position data is being fought over 
-
-
 int main()
 {
     try
     {
-        #ifdef _OPENMP
+#ifdef _OPENMP
         LOG_DEBUG("OpenMP is enabled! Max threads: " << omp_get_max_threads());
-        #endif
+#endif
 
         //clientRequest();    
 
@@ -88,8 +65,8 @@ int main()
             return deltaTime;
         };
 
-        const int width = 1280;
-        const int height = 720;
+        const int width = 1920;
+        const int height = 1080;
         Window window(width, height, "Vulkan Engine");
 
         VulkanRHI vulkanRHI;

@@ -439,3 +439,66 @@ void Texture::WriteToDescriptorSets(VulkanRHI* rhi) const
 
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
+
+// Static factory: create a Texture from raw pixels (R,G,B,A bytes). Will register texture with RHI.
+std::shared_ptr<Texture> Texture::CreateFromMemory(VulkanRHI* rhi, const void* pixels, int width, int height, int channels, TextureType type, bool srgb)
+{
+    if (!rhi || width <= 0 || height <= 0 || pixels == nullptr)
+        return nullptr;
+
+    VkFormat format = srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+
+    std::vector<unsigned char> expanded;
+    const void* uploadPixels = pixels;
+
+    if (channels == 4)
+    {
+        // already RGBA
+        uploadPixels = pixels;
+    }
+    else if (channels == 3)
+    {
+        // expand RGB -> RGBA (A = 255)
+        expanded.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+        const unsigned char* src = reinterpret_cast<const unsigned char*>(pixels);
+        for (int i = 0; i < width * height; ++i)
+        {
+            expanded[4 * i + 0] = src[3 * i + 0];
+            expanded[4 * i + 1] = src[3 * i + 1];
+            expanded[4 * i + 2] = src[3 * i + 2];
+            expanded[4 * i + 3] = 255;
+        }
+        uploadPixels = expanded.data();
+    }
+    else if (channels == 1)
+    {
+        // expand greyscale -> RGBA
+        expanded.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+        const unsigned char* src = reinterpret_cast<const unsigned char*>(pixels);
+        for (int i = 0; i < width * height; ++i)
+        {
+            unsigned char v = src[i];
+            expanded[4 * i + 0] = v;
+            expanded[4 * i + 1] = v;
+            expanded[4 * i + 2] = v;
+            expanded[4 * i + 3] = 255;
+        }
+        uploadPixels = expanded.data();
+    }
+    else
+    {
+        return nullptr; // unsupported
+    }
+
+    auto tex = std::make_shared<Texture>();
+    if (!tex->CreateImageAndUpload(rhi, uploadPixels, width, height, 4, format))
+        return nullptr;
+
+    // Register with RHI for descriptor management
+    rhi->RegisterTexture(tex->weak_from_this());
+
+    if (tex->m_Resources)
+        tex->m_Resources->Type = type;
+
+    return tex;
+}

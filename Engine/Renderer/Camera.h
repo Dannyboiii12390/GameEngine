@@ -9,19 +9,28 @@
 class Camera
 {
 public:
+    enum class ProjectionType : uint8_t
+    {
+        Perspective = 0,
+        Orthographic = 1
+    };
+
     Camera() = default;
     Camera(float fovDegrees, float aspect, float zNear, float zFar);
 
     // Configure projection
     void SetPerspective(float fovDegrees, float aspect, float zNear, float zFar);
+    void SetOrthographic(float size, float aspect, float zNear, float zFar);
     void SetAspect(float aspect);
     void SetNearFar(float zNear, float zFar);
 
     // Get projection parameters
+    ProjectionType GetProjectionType() const noexcept { return m_ProjectionType; }
     float GetFovDeg() const noexcept { return m_FovDeg; }
     float GetAspect() const noexcept { return m_Aspect; }
     float GetNear() const noexcept { return m_Near; }
     float GetFar() const noexcept { return m_Far; }
+    float GetOrthoSize() const noexcept { return m_OrthoSize; }
 
     // Transform
     void SetPosition(const glm::vec3& pos);
@@ -62,7 +71,9 @@ private:
     float m_Roll{ 0.0f };  // degrees, rotation around local Z (tilt)
 
     // Projection params
+    ProjectionType m_ProjectionType{ ProjectionType::Perspective };
     float m_FovDeg{ 60.0f };
+    float m_OrthoSize{ 10.0f }; // height of orthographic view volume
     float m_Aspect{ 16.0f / 9.0f };
     float m_Near{ 0.1f };
     float m_Far{ 1000.0f };

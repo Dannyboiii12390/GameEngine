@@ -1,4 +1,5 @@
 #include "Camera.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 #include <algorithm>
@@ -29,7 +30,18 @@ Camera::Camera(float fovDegrees, float aspect, float zNear, float zFar)
 
 void Camera::SetPerspective(float fovDegrees, float aspect, float zNear, float zFar)
 {
+    m_ProjectionType = ProjectionType::Perspective;
     m_FovDeg = fovDegrees;
+    m_Aspect = aspect;
+    m_Near = zNear;
+    m_Far = zFar;
+    m_ProjDirty = true;
+}
+
+void Camera::SetOrthographic(float size, float aspect, float zNear, float zFar)
+{
+    m_ProjectionType = ProjectionType::Orthographic;
+    m_OrthoSize = size;
     m_Aspect = aspect;
     m_Near = zNear;
     m_Far = zFar;
@@ -143,11 +155,25 @@ void Camera::RecomputeView() const
 
 void Camera::RecomputeProj() const
 {
-    m_Proj = glm::perspective(glm::radians(m_FovDeg), m_Aspect, m_Near, m_Far);
+    if (m_ProjectionType == ProjectionType::Perspective)
+    {
+        m_Proj = glm::perspective(glm::radians(m_FovDeg), m_Aspect, m_Near, m_Far);
 
-    // Vulkan clip-space has +Y pointing downward.  Flip the Y axis of the
-    // projection so geometry isn't inverted or incorrectly culled.
-    m_Proj[1][1] *= -1.0f;
+        // Vulkan clip-space has +Y pointing downward.  Flip the Y axis of the
+        // projection so geometry isn't inverted or incorrectly culled.
+        m_Proj[1][1] *= -1.0f;
+    }
+    else // Orthographic
+    {
+        // m_OrthoSize represents the height of the orthographic view volume.
+        const float halfHeight = 0.5f * m_OrthoSize;
+        const float halfWidth = halfHeight * m_Aspect;
+
+        m_Proj = glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, m_Near, m_Far);
+
+        // Flip Y for Vulkan clip-space consistency
+        m_Proj[1][1] *= -1.0f;
+    }
 
     m_ProjDirty = false;
 }
