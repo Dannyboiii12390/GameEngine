@@ -116,7 +116,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	LimitOpenMPCores();
 
 	m_instanceId = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
-	m_localPeerId = static_cast<PeerID>(std::hash<std::string>{}(m_instanceId) % 2);
+	m_localPeerId.store(static_cast<PeerID>(std::hash<std::string>{}(m_instanceId) % 2));
 
 	// Camera, vulkan, and imgui Initialisation
 	m_cameras.reserve(100);
@@ -175,7 +175,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 		std::cout << "Server listening on " << address.getIP() << ":" << address.getPort() << std::endl;
 	}
 
-	PeerID localPeerId = m_localPeerId;
+	PeerID localPeerId = m_localPeerId.load();
 
 	// 4. Register the required systems so objects are rendered
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
@@ -183,7 +183,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 	m_networkData = std::make_shared<SharedNetworkData>();
-	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>(m_localPeerId, m_networkData));
+	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>(&m_localPeerId, m_networkData));
 }
 
 Networking::Address FlatBufferScene::GetClientAddress()

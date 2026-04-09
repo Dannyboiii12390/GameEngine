@@ -5,13 +5,14 @@
 #include <vector>
 #include <span>
 #include <memory>
+#include <atomic>
 #include "../Entity.h"
 #include "ISystem.h"
 
 class SystemNetworkSync : public ISystem
 {
 public:
-    SystemNetworkSync(PeerID localPeerId, std::shared_ptr<SharedNetworkData> networkData)
+    SystemNetworkSync(std::atomic<PeerID>* localPeerId, std::shared_ptr<SharedNetworkData> networkData)
         : m_localPeerId(localPeerId), m_networkData(networkData)
     { 
         m_SystemType = ESystemType::System_Network_Sync; 
@@ -22,7 +23,9 @@ public:
         std::vector<Entity*> entityPtrs;
         for (auto& e : entities)
             entityPtrs.push_back(&e);
-        Update(m_localPeerId, entityPtrs);
+
+        const PeerID localPeerId = m_localPeerId ? m_localPeerId->load() : 0;
+        Update(localPeerId, entityPtrs);
     }
 
     void Update(PeerID localPeerId, const std::vector<Entity*>& entities)
@@ -75,7 +78,7 @@ public:
     }
 
 private:
-    PeerID m_localPeerId;
+    std::atomic<PeerID>* m_localPeerId = nullptr;
     std::shared_ptr<SharedNetworkData> m_networkData;
 
     void BroadcastToPeers(std::span<SyncPacket> packets)

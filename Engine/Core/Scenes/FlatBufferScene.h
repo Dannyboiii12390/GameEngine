@@ -71,7 +71,7 @@ private:
 	std::atomic<bool> m_peerConnected = false;
 	std::string m_instanceId;
 
-	PeerID m_localPeerId = 0;
+	std::atomic<PeerID> m_localPeerId{ 0 };
 	int m_selectedEntityIndex = -1;
 
 	std::mutex m_sceneMutex; // Protects m_entities during sync
