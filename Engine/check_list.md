@@ -120,7 +120,7 @@
 - [ ] Cloth Simulation
 - [ ] Compound Rigid Bodies
 - [ ] Hinged Objects
-- [ ] Flocking & Steering
+- [x] Flocking & Steering
 - [ ] Include UI controls & debugging visualization
 - [ ] Extend FlatBuffer schema for chosen feature
 
@@ -136,14 +136,14 @@
 ## Level 3: Extended Advanced Features (20%)
 
 ### Extended Simulation
-- [ ] Extend chosen advanced simulation feature:
+- [x] Extend chosen advanced simulation feature:
   - Cloth → wind, tearing, burning
   - Compound → fracturing
   - Hinged → ragdoll
   - Flocking → spatial partitioning (uniform grid, octree) with performance comparison
 
 ### Extended Concurrency
-- [ ] Compute shaders for simulation elements
+- [x] Compute shaders for simulation elements
 
 ---
 

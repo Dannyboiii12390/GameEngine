@@ -15,12 +15,11 @@ class Entity;
 class ISystem
 {
 public:
-
+	virtual ~ISystem() = default; // IMPORTANT: ensures derived destructors run
 	virtual void OnUpdate(std::span<Entity> entities, float deltaTime) = 0;
 
 	ESystemType GetSystemType() const { return m_SystemType; }
 
 protected:
 	ESystemType m_SystemType = ESystemType::System_Invalid;
-
 };

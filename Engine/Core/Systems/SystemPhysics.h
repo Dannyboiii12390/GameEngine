@@ -1,12 +1,10 @@
-
 #pragma once
 
 #include "ISystem.h"
 #include <span>
+#include <atomic>
 #include "../Entity.h"
-
 #include "../../PhysicsEngine/Maths/Integration.h"
-
 #include <glm/glm.hpp>
 #include "../NetworkTypes.h"
 
@@ -15,20 +13,22 @@ class Entity;
 class SystemPhysics : public ISystem
 {
 public:
-	SystemPhysics(PeerID localPeerID) : ISystem(), m_localPeerId(localPeerID)
+	// Keep default ctor for scenes that do: make_unique<SystemPhysics>()
+	SystemPhysics()
+		: ISystem(), m_localPeerId(nullptr)
 	{
 		m_SystemType = ESystemType::System_Physics;
 	}
-	SystemPhysics() : SystemPhysics(0) {} // Default to local peer ID 0 if not provided
 
-	// Update physics: apply gravity (and any per-object forces handled elsewhere)
-	// This system updates velocities (semi-implicit Euler): v += a * dt.
-	// Position integration is left to SystemVelocity (keep responsibilities separate).
+	// Network-aware ctor (FlatBufferScene)
+	SystemPhysics(std::atomic<PeerID>* localPeerId)
+		: ISystem(), m_localPeerId(localPeerId)
+	{
+		m_SystemType = ESystemType::System_Physics;
+	}
+
 	void OnUpdate(std::span<Entity> entities, float deltaTime);
 
-	void SetLocalPeerId(PeerID localPeerID) { m_localPeerId = localPeerID; }
-
 private:
-	PeerID m_localPeerId; // This should be set to the actual local peer ID in a real implementation
-
+	std::atomic<PeerID>* m_localPeerId = nullptr;
 };

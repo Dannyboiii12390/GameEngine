@@ -1,0 +1,190 @@
+#version 450
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+const uint INVALID_INDEX = 0xFFFFFFFFu;
+
+// binding 0: input boid positions (xyz = world position)
+layout(std430, binding = 0) readonly buffer PositionsBuffer
+{
+    vec4 positions[];
+};
+
+// binding 1: output flocking force (xyz = force)
+layout(std430, binding = 1) writeonly buffer ForcesBuffer
+{
+    vec4 forces[];
+};
+
+// binding 2: boid indices sorted by cell id (length = entityCount)
+layout(std430, binding = 2) readonly buffer SortedIndicesBuffer
+{
+    uint sortedEntityIndices[];
+};
+
+// binding 3: cell start offset into sortedEntityIndices (length = gridDimX*gridDimY*gridDimZ)
+// empty cell => INVALID_INDEX
+layout(std430, binding = 3) readonly buffer CellStartBuffer
+{
+    uint cellStart[];
+};
+
+// binding 4: cell population count (length = gridDimX*gridDimY*gridDimZ)
+layout(std430, binding = 4) readonly buffer CellCountBuffer
+{
+    uint cellCount[];
+};
+
+layout(push_constant) uniform FlockingParams
+{
+    uint  entityCount;
+
+    // grid dimensions
+    uint  gridDimX;
+    uint  gridDimY;
+    uint  gridDimZ;
+
+    // world-space grid config
+    vec3  gridMin;
+    float cellSize;
+
+    // flock params
+    float neighborRadius;
+    float separationRadius;
+    float maxForce;
+    float cohesionWeight;
+    float separationWeight;
+
+    // 0 = brute force O(N^2), 1 = uniform-grid neighborhood search
+    uint  useSpatialHash;
+    uint  pad0;
+    uint  pad1;
+} params;
+
+uvec3 PositionToCell(vec3 p)
+{
+    vec3 rel = (p - params.gridMin) / max(params.cellSize, 0.0001);
+    ivec3 c = ivec3(floor(rel));
+
+    c = clamp(c, ivec3(0), ivec3(int(params.gridDimX) - 1, int(params.gridDimY) - 1, int(params.gridDimZ) - 1));
+    return uvec3(c);
+}
+
+uint FlattenCell(uvec3 c)
+{
+    return c.x + c.y * params.gridDimX + c.z * params.gridDimX * params.gridDimY;
+}
+
+void AccumulateNeighbor(
+    uint selfIndex,
+    vec3 selfPos,
+    uint neighborIndex,
+    float neighborRadiusSq,
+    float separationRadiusSq,
+    inout vec3 cohesionAccum,
+    inout vec3 separationAccum,
+    inout uint neighborCount)
+{
+    if (neighborIndex == selfIndex)
+        return;
+
+    vec3 toNeighbor = positions[neighborIndex].xyz - selfPos;
+    float distSq = dot(toNeighbor, toNeighbor);
+
+    if (distSq < neighborRadiusSq)
+    {
+        cohesionAccum += positions[neighborIndex].xyz;
+        neighborCount++;
+    }
+
+    if (distSq > 1e-8 && distSq < separationRadiusSq)
+    {
+        float invDist = inversesqrt(distSq);
+        separationAccum -= toNeighbor * invDist * invDist; // normalized / dist
+    }
+}
+
+void main()
+{
+    const uint i = gl_GlobalInvocationID.x;
+    if (i >= params.entityCount)
+        return;
+
+    vec3 selfPos = positions[i].xyz;
+
+    vec3 cohesionAccum = vec3(0.0);
+    vec3 separationAccum = vec3(0.0);
+    uint neighborCount = 0u;
+
+    float neighborRadiusSq = params.neighborRadius * params.neighborRadius;
+    float separationRadiusSq = params.separationRadius * params.separationRadius;
+
+    if (params.useSpatialHash != 0u)
+    {
+        uvec3 cell = PositionToCell(selfPos);
+
+        for (int dz = -1; dz <= 1; ++dz)
+        {
+            for (int dy = -1; dy <= 1; ++dy)
+            {
+                for (int dx = -1; dx <= 1; ++dx)
+                {
+                    ivec3 nc = ivec3(cell) + ivec3(dx, dy, dz);
+
+                    if (nc.x < 0 || nc.y < 0 || nc.z < 0 ||
+                        nc.x >= int(params.gridDimX) ||
+                        nc.y >= int(params.gridDimY) ||
+                        nc.z >= int(params.gridDimZ))
+                    {
+                        continue;
+                    }
+
+                    uint cellIndex = FlattenCell(uvec3(nc));
+                    uint start = cellStart[cellIndex];
+                    uint count = cellCount[cellIndex];
+
+                    if (start == INVALID_INDEX || count == 0u)
+                        continue;
+
+                    for (uint k = 0u; k < count; ++k)
+                    {
+                        uint neighborIndex = sortedEntityIndices[start + k];
+                        AccumulateNeighbor(
+                            i, selfPos, neighborIndex,
+                            neighborRadiusSq, separationRadiusSq,
+                            cohesionAccum, separationAccum, neighborCount);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        for (uint j = 0u; j < params.entityCount; ++j)
+        {
+            AccumulateNeighbor(
+                i, selfPos, j,
+                neighborRadiusSq, separationRadiusSq,
+                cohesionAccum, separationAccum, neighborCount);
+        }
+    }
+
+    vec3 cohesionForce = vec3(0.0);
+    if (neighborCount > 0u)
+    {
+        vec3 center = cohesionAccum / float(neighborCount);
+        cohesionForce = center - selfPos;
+    }
+
+    vec3 force =
+        cohesionForce * params.cohesionWeight +
+        separationAccum * params.separationWeight;
+
+    float lenF = length(force);
+    if (lenF > params.maxForce && lenF > 0.0)
+    {
+        force = (force / lenF) * params.maxForce;
+    }
+
+    forces[i] = vec4(force, 0.0);
+}

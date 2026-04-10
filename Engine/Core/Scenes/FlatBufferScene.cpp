@@ -23,6 +23,7 @@
 #include "../Systems/SystemVelocity.h"
 #include "../Systems/SystemPhysics.h"
 #include "../Systems/SystemCollision.h"
+#include "../Systems/SystemFlocking.h"
 #include "BallDropScene.h"
 #include "PanningScene.h"
 #include "TemplateScene.h"
@@ -165,11 +166,6 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	//createEntity(glm::vec3(-5.0f, 0.0f, 0.0f));
 	//createEntity(glm::vec3(5.0f, 0.0f, 0.0f));
 
-	// 4. Register the required systems so objects are rendered
-	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
-	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
-	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
-
 	{
 		auto address = GetClientAddress();
 		std::cout << "Server listening on " << address.getIP() << ":" << address.getPort() << std::endl;
@@ -179,7 +175,8 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	// 4. Register the required systems so objects are rendered
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
-	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>(localPeerId));
+	m_systemManager.RegisterSystem(std::make_unique<SystemFlocking>(m_vulkanRHI, &m_localPeerId));
+	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>(&m_localPeerId));
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 	m_networkData = std::make_shared<SharedNetworkData>();
@@ -1374,6 +1371,16 @@ void FlatBufferScene::DeserializeState()
 			Entity entity;
 			entity.AddComponent(EComponentType::Component_Transform, pos, rot, scale);
 			entity.AddComponent(EComponentType::Component_Geometry);
+
+			// Add simulation components so flocking + physics can move these objects
+			entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
+			entity.AddComponent(EComponentType::Component_Physics);
+
+			if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+			{
+				phys->SetMass(1.0f);
+				phys->SetAffectedByGravity(m_gravityOn);
+			}
 
 			// Assign a name if present, otherwise generate unique name (store in m_sceneName context or logs)
 			std::string objName;
