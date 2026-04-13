@@ -140,31 +140,43 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	// 2. Load properties directly into the scene
 	DeserializeState();
 	m_activeCamera = &m_cameras[0];
+	m_entities.clear();
 
-	//// 3. TEMPORARY: Manually Add a Cube Entity so we have something to render
-	auto createEntity = [&](glm::vec3 pos)
+
+	// Lambda now accepts the texture to apply as an explicit parameter.
+	auto createBoid = [&](glm::vec3 pos, const Texture& tex)
+	{
+		Entity boid;
+		boid.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f), glm::vec3(1.0f));
+		boid.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
+		boid.AddComponent(EComponentType::Component_Physics);
+		auto* phys = boid.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+		phys->SetAffectedByGravity(false);
+		boid.AddComponent(EComponentType::Component_Geometry);
+		ComponentGeometry* geom = boid.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+		//if (geom)
 		{
-			Entity cube;
-			cube.AddComponent(EComponentType::Component_Transform, pos, glm::vec3(0.0f), glm::vec3(1.0f));
-			cube.AddComponent(EComponentType::Component_Geometry);
+			MeshData meshData = ResourceManager::CreateSphereMesh(); // Fallback visible mesh
+			auto [verts, indices] = meshData;
+			geom->InitializeMesh(m_vulkanRHI, verts, indices);
+			geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
+			// Note: Requires a valid texture
+			geom->AddTexture(m_vulkanRHI, tex);
+		}
+		m_entities.push_back(std::move(boid));
+	};
 
-			ComponentGeometry* geom = cube.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
-			//if (geom)
-			{
-				// You can swap this with a pure cube mesh if your ResourceManager supports it
-				MeshData meshData = ResourceManager::CreateCubeMesh(); // Fallback visible mesh
-				auto [verts, indices] = meshData;
-				geom->InitializeMesh(m_vulkanRHI, verts, indices);
-				geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(), "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
-
-				// Note: Requires a valid texture
-				const Texture defaultTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
-				geom->AddTexture(m_vulkanRHI, defaultTex);
-			}
-			m_entities.push_back(std::move(cube));
-		};
-	//createEntity(glm::vec3(-5.0f, 0.0f, 0.0f));
-	//createEntity(glm::vec3(5.0f, 0.0f, 0.0f));
+	// default texture to pass into the lambda
+	const Texture defaultTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
+	for(int i = 0; i < num_boids; ++i)
+	{
+		glm::vec3 pos = glm::vec3(
+			static_cast<float>(rand() % 20 - 10),
+			static_cast<float>(rand() % 20 - 10),
+			static_cast<float>(rand() % 20 - 10)
+		);
+		createBoid(pos, defaultTex);
+	}
 
 	{
 		auto address = GetClientAddress();

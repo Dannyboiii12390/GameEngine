@@ -20,6 +20,36 @@ namespace Networking { class TCPSocket; }
 class Entity;
 class Window;
 
+struct SpawnerData {
+	std::string name;
+	float startTime = 0.0f;
+	uint8_t spawnType = 0; // Simulation::SpawnType
+	uint8_t locationType = 0; // Simulation::SpawnLocation
+	std::string material;
+	int owner = 0; // Simulation::SpawnerOwnerType
+	// Basic location info (one of these used depending on locationType)
+	glm::vec3 fixedPosition = glm::vec3(0.0f);
+	glm::vec3 boxMin = glm::vec3(0.0f);
+	glm::vec3 boxMax = glm::vec3(0.0f);
+	glm::vec3 sphereCenter = glm::vec3(0.0f);
+	float sphereRadius = 0.0f;
+	// spawn-specific
+	uint32_t singleBurstCount = 0;
+	float repeatingInterval = 0.0f;
+	uint32_t repeatingMaxCount = 0;
+};
+struct MaterialInteractionData {
+	std::string materialA;
+	std::string materialB;
+	float restitution = 0.0f;
+	float staticFriction = 0.0f;
+	float dynamicFriction = 0.0f;
+};
+struct MaterialData {
+	std::string name;
+	float density = 0.0f;
+};
+
 class FlatBufferScene : public IScene
 {
 public:
@@ -76,39 +106,10 @@ private:
 
 	std::mutex m_sceneMutex; // Protects m_entities during sync
 	std::shared_ptr<SharedNetworkData> m_networkData;
-
-	struct MaterialData {
-		std::string name;
-		float density = 0.0f;
-	};
 	std::vector<MaterialData> m_materials;
-
-	struct MaterialInteractionData {
-		std::string materialA;
-		std::string materialB;
-		float restitution = 0.0f;
-		float staticFriction = 0.0f;
-		float dynamicFriction = 0.0f;
-	};
 	std::vector<MaterialInteractionData> m_materialInteractions;
-
-	struct SpawnerData {
-		std::string name;
-		float startTime = 0.0f;
-		uint8_t spawnType = 0; // Simulation::SpawnType
-		uint8_t locationType = 0; // Simulation::SpawnLocation
-		std::string material;
-		int owner = 0; // Simulation::SpawnerOwnerType
-		// Basic location info (one of these used depending on locationType)
-		glm::vec3 fixedPosition = glm::vec3(0.0f);
-		glm::vec3 boxMin = glm::vec3(0.0f);
-		glm::vec3 boxMax = glm::vec3(0.0f);
-		glm::vec3 sphereCenter = glm::vec3(0.0f);
-		float sphereRadius = 0.0f;
-		// spawn-specific
-		uint32_t singleBurstCount = 0;
-		float repeatingInterval = 0.0f;
-		uint32_t repeatingMaxCount = 0;
-	};
 	std::vector<SpawnerData> m_spawners;
+
+
+	int num_boids = 64;
 };
