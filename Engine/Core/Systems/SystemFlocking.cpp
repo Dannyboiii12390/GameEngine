@@ -9,6 +9,8 @@
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <stdexcept>
+#include <chrono>
+#include <fstream>
 
 namespace
 {
@@ -40,10 +42,22 @@ SystemFlocking::SystemFlocking(VulkanRHI* rhi, std::atomic<PeerID>* localPeerId)
 	: m_rhi(rhi), m_localPeerId(localPeerId)
 {
 	m_SystemType = ESystemType::System_Physics;
+	m_flocking_compute_times.reserve(100000); // Pre-allocate to avoid measuring vector growth during updates
 }
 
 SystemFlocking::~SystemFlocking()
 {
+	//write m_flocking_compute_times to a file for analysis
+	{
+		std::string file_path = USE_SPATIAL_HASH ? "flocking_spatial_compute_times.csv": "flocking_brute_compute_times.csv";
+		std::ofstream out(file_path);
+		float sum = 0.0f;
+		for (float t : m_flocking_compute_times) sum += t;
+		float avg = sum / static_cast<float>(m_flocking_compute_times.size());
+		out << "Flocking Compute Times (ms), Average: " << avg << " ms\n";
+	}
+
+
 	if (m_compute)
 	{
 		m_compute->Destroy();
@@ -75,8 +89,15 @@ void SystemFlocking::EnsureComputeReady(const FlockingPushConstants& params, uin
 		m_bufferSizes = sizes;
 	}
 }
-
-void SystemFlocking::OnUpdate(std::span<Entity> entities, float)
+void SystemFlocking::OnUpdate(std::span<Entity> entities, float deltaTime)
+{
+	auto startTime = std::chrono::high_resolution_clock::now();
+	USE_SPATIAL_HASH ? OnUpdateSpatial(entities, deltaTime) : OnUpdateBruteForce(entities, deltaTime);
+	auto endTime = std::chrono::high_resolution_clock::now();
+	float ms = std::chrono::duration<float, std::milli>(endTime - startTime).count();
+	m_flocking_compute_times.push_back(ms);
+}
+void SystemFlocking::OnUpdateSpatial(std::span<Entity> entities, float)
 {
 	if (m_disabled || !m_rhi)
 		return;
@@ -171,6 +192,70 @@ void SystemFlocking::OnUpdate(std::span<Entity> entities, float)
 	m_compute->Upload(2, sortedIndices.data(), static_cast<VkDeviceSize>(sortedIndices.size() * sizeof(uint32_t)));
 	m_compute->Upload(3, cellStart.data(), static_cast<VkDeviceSize>(cellStart.size() * sizeof(uint32_t)));
 	m_compute->Upload(4, cellCount.data(), static_cast<VkDeviceSize>(cellCount.size() * sizeof(uint32_t)));
+
+	m_compute->Dispatch(boidCount, 256);
+	m_compute->Readback(1, forces.data(), static_cast<VkDeviceSize>(forces.size() * sizeof(glm::vec4)));
+
+	const PeerID localPeerId = m_localPeerId ? m_localPeerId->load(std::memory_order_relaxed) : 0;
+
+	for (uint32_t boid = 0; boid < boidCount; ++boid)
+	{
+		Entity& entity = entities[boidEntityIndices[boid]];
+
+		auto* netComp = entity.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+		if (netComp && netComp->IsSimulated() && !netComp->IsOwnedByMe(localPeerId))
+			continue;
+
+		auto* physics = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+		if (!physics)
+			continue;
+
+		const glm::vec3 force = glm::vec3(forces[boid]) * m_forceScale;
+		physics->ApplyForce(force);
+	}
+}
+void SystemFlocking::OnUpdateBruteForce(std::span<Entity> entities, float)
+{
+	if (m_disabled || !m_rhi)
+		return;
+
+	std::vector<uint32_t> boidEntityIndices;
+	std::vector<glm::vec4> positions;
+
+	boidEntityIndices.reserve(entities.size());
+	positions.reserve(entities.size());
+
+	for (uint32_t i = 0; i < static_cast<uint32_t>(entities.size()); ++i)
+	{
+		Entity& entity = entities[i];
+		auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+		if (!transform)
+			continue;
+
+		positions.emplace_back(transform->Position(), 0.0f);
+		boidEntityIndices.push_back(i);
+	}
+
+	const uint32_t boidCount = static_cast<uint32_t>(positions.size());
+	if (boidCount == 0)
+		return;
+
+	FlockingPushConstants params{};
+	params.entityCount = boidCount;
+	params.neighborRadius = m_neighborRadius;
+	params.separationRadius = m_separationRadius;
+	params.maxForce = m_maxForce;
+	params.cohesionWeight = m_cohesionWeight;
+	params.separationWeight = m_separationWeight;
+	params.useSpatialHash = 0;
+
+	EnsureComputeReady(params, boidCount, 1);
+
+	m_compute->PushConstants(&params, static_cast<uint32_t>(sizeof(FlockingPushConstants)));
+	m_compute->Upload(0, positions.data(), static_cast<VkDeviceSize>(positions.size() * sizeof(glm::vec4)));
+
+	std::vector<glm::vec4> forces(boidCount, glm::vec4(0.0f));
+	m_compute->Upload(1, forces.data(), static_cast<VkDeviceSize>(forces.size() * sizeof(glm::vec4)));
 
 	m_compute->Dispatch(boidCount, 256);
 	m_compute->Readback(1, forces.data(), static_cast<VkDeviceSize>(forces.size() * sizeof(glm::vec4)));
