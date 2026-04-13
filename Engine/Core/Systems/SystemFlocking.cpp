@@ -81,123 +81,115 @@ void SystemFlocking::OnUpdate(std::span<Entity> entities, float)
 	if (m_disabled || !m_rhi)
 		return;
 
-	try
+	std::vector<uint32_t> boidEntityIndices;
+	std::vector<glm::vec4> positions;
+
+	boidEntityIndices.reserve(entities.size());
+	positions.reserve(entities.size());
+
+	for (uint32_t i = 0; i < static_cast<uint32_t>(entities.size()); ++i)
 	{
-		std::vector<uint32_t> boidEntityIndices;
-		std::vector<glm::vec4> positions;
+		Entity& entity = entities[i];
+		auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+		if (!transform)
+			continue;
 
-		boidEntityIndices.reserve(entities.size());
-		positions.reserve(entities.size());
-
-		for (uint32_t i = 0; i < static_cast<uint32_t>(entities.size()); ++i)
-		{
-			Entity& entity = entities[i];
-			auto* transform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
-			if (!transform)
-				continue;
-
-			positions.emplace_back(transform->Position(), 0.0f);
-			boidEntityIndices.push_back(i);
-		}
-
-		const uint32_t boidCount = static_cast<uint32_t>(positions.size());
-		if (boidCount == 0)
-			return;
-
-		glm::vec3 minPos = glm::vec3(positions[0]);
-		glm::vec3 maxPos = glm::vec3(positions[0]);
-		for (const glm::vec4& p : positions)
-		{
-			minPos = glm::min(minPos, glm::vec3(p));
-			maxPos = glm::max(maxPos, glm::vec3(p));
-		}
-
-		const float cellSize = std::max(m_neighborRadius, 0.001f);
-		const glm::uvec3 dims = ComputeGridDims(minPos, maxPos, cellSize, m_maxGridDim);
-		const uint32_t totalCells = dims.x * dims.y * dims.z;
-
-		std::vector<uint32_t> cellIds(boidCount, 0u);
-		std::vector<uint32_t> cellCount(totalCells, 0u);
-		std::vector<uint32_t> cellStart(totalCells, INVALID_INDEX);
-		std::vector<uint32_t> sortedIndices(boidCount, 0u);
-
-		for (uint32_t i = 0; i < boidCount; ++i)
-		{
-			const glm::uvec3 cell = PositionToCell(glm::vec3(positions[i]), minPos, cellSize, dims);
-			const uint32_t flat = FlattenCell(cell.x, cell.y, cell.z, dims.x, dims.y);
-			cellIds[i] = flat;
-			cellCount[flat]++;
-		}
-
-		uint32_t runningOffset = 0u;
-		for (uint32_t c = 0; c < totalCells; ++c)
-		{
-			if (cellCount[c] == 0u)
-				continue;
-
-			cellStart[c] = runningOffset;
-			runningOffset += cellCount[c];
-		}
-
-		std::vector<uint32_t> writeOffsets = cellStart;
-		for (uint32_t i = 0; i < boidCount; ++i)
-		{
-			const uint32_t cell = cellIds[i];
-			const uint32_t dst = writeOffsets[cell]++;
-			sortedIndices[dst] = i;
-		}
-
-		FlockingPushConstants params{};
-		params.entityCount = boidCount;
-		params.gridDimX = dims.x;
-		params.gridDimY = dims.y;
-		params.gridDimZ = dims.z;
-		params.gridMin[0] = minPos.x;
-		params.gridMin[1] = minPos.y;
-		params.gridMin[2] = minPos.z;
-		params.cellSize = cellSize;
-		params.neighborRadius = m_neighborRadius;
-		params.separationRadius = m_separationRadius;
-		params.maxForce = m_maxForce;
-		params.cohesionWeight = m_cohesionWeight;
-		params.separationWeight = m_separationWeight;
-		params.useSpatialHash = m_useSpatialHash;
-
-		EnsureComputeReady(params, boidCount, totalCells);
-
-		m_compute->PushConstants(&params, static_cast<uint32_t>(sizeof(FlockingPushConstants)));
-		m_compute->Upload(0, positions.data(), static_cast<VkDeviceSize>(positions.size() * sizeof(glm::vec4)));
-
-		std::vector<glm::vec4> forces(boidCount, glm::vec4(0.0f));
-		m_compute->Upload(1, forces.data(), static_cast<VkDeviceSize>(forces.size() * sizeof(glm::vec4)));
-		m_compute->Upload(2, sortedIndices.data(), static_cast<VkDeviceSize>(sortedIndices.size() * sizeof(uint32_t)));
-		m_compute->Upload(3, cellStart.data(), static_cast<VkDeviceSize>(cellStart.size() * sizeof(uint32_t)));
-		m_compute->Upload(4, cellCount.data(), static_cast<VkDeviceSize>(cellCount.size() * sizeof(uint32_t)));
-
-		m_compute->Dispatch(boidCount, 256);
-		m_compute->Readback(1, forces.data(), static_cast<VkDeviceSize>(forces.size() * sizeof(glm::vec4)));
-
-		const PeerID localPeerId = m_localPeerId ? m_localPeerId->load(std::memory_order_relaxed) : 0;
-
-		for (uint32_t boid = 0; boid < boidCount; ++boid)
-		{
-			Entity& entity = entities[boidEntityIndices[boid]];
-
-			auto* netComp = entity.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
-			if (netComp && netComp->IsSimulated() && !netComp->IsOwnedByMe(localPeerId))
-				continue;
-
-			auto* physics = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
-			if (!physics)
-				continue;
-
-			const glm::vec3 force = glm::vec3(forces[boid]) * m_forceScale;
-			physics->ApplyForce(force);
-		}
+		positions.emplace_back(transform->Position(), 0.0f);
+		boidEntityIndices.push_back(i);
 	}
-	catch (const std::exception& ex)
+
+	const uint32_t boidCount = static_cast<uint32_t>(positions.size());
+	if (boidCount == 0)
+		return;
+
+	glm::vec3 minPos = glm::vec3(positions[0]);
+	glm::vec3 maxPos = glm::vec3(positions[0]);
+	for (const glm::vec4& p : positions)
 	{
-		LOG_DEBUG("SystemFlocking disabled: " << ex.what());
-		m_disabled = true;
+		minPos = glm::min(minPos, glm::vec3(p));
+		maxPos = glm::max(maxPos, glm::vec3(p));
+	}
+
+	const float cellSize = std::max(m_neighborRadius, 0.001f);
+	const glm::uvec3 dims = ComputeGridDims(minPos, maxPos, cellSize, m_maxGridDim);
+	const uint32_t totalCells = dims.x * dims.y * dims.z;
+
+	std::vector<uint32_t> cellIds(boidCount, 0u);
+	std::vector<uint32_t> cellCount(totalCells, 0u);
+	std::vector<uint32_t> cellStart(totalCells, INVALID_INDEX);
+	std::vector<uint32_t> sortedIndices(boidCount, 0u);
+
+	for (uint32_t i = 0; i < boidCount; ++i)
+	{
+		const glm::uvec3 cell = PositionToCell(glm::vec3(positions[i]), minPos, cellSize, dims);
+		const uint32_t flat = FlattenCell(cell.x, cell.y, cell.z, dims.x, dims.y);
+		cellIds[i] = flat;
+		cellCount[flat]++;
+	}
+
+	uint32_t runningOffset = 0u;
+	for (uint32_t c = 0; c < totalCells; ++c)
+	{
+		if (cellCount[c] == 0u)
+			continue;
+
+		cellStart[c] = runningOffset;
+		runningOffset += cellCount[c];
+	}
+
+	std::vector<uint32_t> writeOffsets = cellStart;
+	for (uint32_t i = 0; i < boidCount; ++i)
+	{
+		const uint32_t cell = cellIds[i];
+		const uint32_t dst = writeOffsets[cell]++;
+		sortedIndices[dst] = i;
+	}
+
+	FlockingPushConstants params{};
+	params.entityCount = boidCount;
+	params.gridDimX = dims.x;
+	params.gridDimY = dims.y;
+	params.gridDimZ = dims.z;
+	params.gridMin[0] = minPos.x;
+	params.gridMin[1] = minPos.y;
+	params.gridMin[2] = minPos.z;
+	params.cellSize = cellSize;
+	params.neighborRadius = m_neighborRadius;
+	params.separationRadius = m_separationRadius;
+	params.maxForce = m_maxForce;
+	params.cohesionWeight = m_cohesionWeight;
+	params.separationWeight = m_separationWeight;
+	params.useSpatialHash = m_useSpatialHash;
+
+	EnsureComputeReady(params, boidCount, totalCells);
+
+	m_compute->PushConstants(&params, static_cast<uint32_t>(sizeof(FlockingPushConstants)));
+	m_compute->Upload(0, positions.data(), static_cast<VkDeviceSize>(positions.size() * sizeof(glm::vec4)));
+
+	std::vector<glm::vec4> forces(boidCount, glm::vec4(0.0f));
+	m_compute->Upload(1, forces.data(), static_cast<VkDeviceSize>(forces.size() * sizeof(glm::vec4)));
+	m_compute->Upload(2, sortedIndices.data(), static_cast<VkDeviceSize>(sortedIndices.size() * sizeof(uint32_t)));
+	m_compute->Upload(3, cellStart.data(), static_cast<VkDeviceSize>(cellStart.size() * sizeof(uint32_t)));
+	m_compute->Upload(4, cellCount.data(), static_cast<VkDeviceSize>(cellCount.size() * sizeof(uint32_t)));
+
+	m_compute->Dispatch(boidCount, 256);
+	m_compute->Readback(1, forces.data(), static_cast<VkDeviceSize>(forces.size() * sizeof(glm::vec4)));
+
+	const PeerID localPeerId = m_localPeerId ? m_localPeerId->load(std::memory_order_relaxed) : 0;
+
+	for (uint32_t boid = 0; boid < boidCount; ++boid)
+	{
+		Entity& entity = entities[boidEntityIndices[boid]];
+
+		auto* netComp = entity.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+		if (netComp && netComp->IsSimulated() && !netComp->IsOwnedByMe(localPeerId))
+			continue;
+
+		auto* physics = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+		if (!physics)
+			continue;
+
+		const glm::vec3 force = glm::vec3(forces[boid]) * m_forceScale;
+		physics->ApplyForce(force);
 	}
 }
