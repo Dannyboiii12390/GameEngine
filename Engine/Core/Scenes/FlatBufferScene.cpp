@@ -140,7 +140,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	// 2. Load properties directly into the scene
 	DeserializeState();
 	m_activeCamera = &m_cameras[0];
-	m_entities.clear();
+	//m_entities.clear();
 
 
 	// Lambda now accepts the texture to apply as an explicit parameter.
@@ -167,16 +167,16 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	};
 
 	// default texture to pass into the lambda
-	const Texture defaultTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
-	for(int i = 0; i < num_boids; ++i)
-	{
-		glm::vec3 pos = glm::vec3(
-			static_cast<float>(rand() % 20 - 10),
-			static_cast<float>(rand() % 20 - 10),
-			static_cast<float>(rand() % 20 - 10)
-		);
-		createBoid(pos, defaultTex);
-	}
+	//const Texture defaultTex(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
+	//for(int i = 0; i < num_boids; ++i)
+	//{
+	//	glm::vec3 pos = glm::vec3(
+	//		static_cast<float>(rand() % 20 - 10),
+	//		static_cast<float>(rand() % 20 - 10),
+	//		static_cast<float>(rand() % 20 - 10)
+	//	);
+	//	createBoid(pos, defaultTex);
+	//}
 
 	{
 		auto address = GetClientAddress();
