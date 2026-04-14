@@ -14,7 +14,7 @@ class VulkanRHI;
 class Entity;
 
 
-bool constexpr USE_SPATIAL_HASH = true; // Toggle to switch between naive O(N^2) and spatial-hash-accelerated compute shader variants (requires different shader and push-constant layout)
+bool constexpr USE_SPATIAL_HASH = false; // Toggle to switch between naive O(N^2) and spatial-hash-accelerated compute shader variants (requires different shader and push-constant layout)
 
 struct alignas(16) FlockingPushConstants
 {
