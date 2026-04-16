@@ -111,5 +111,5 @@ private:
 	std::vector<SpawnerData> m_spawners;
 
 
-	int num_boids = 64;
+	int num_boids = 2048;
 };

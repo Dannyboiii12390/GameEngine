@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <functional>
+#include <cstdint>
+#include <string>
 
 #include "../../PhysicsEngine/Shapes/Sphere.h"
 #include "../../PhysicsEngine/Shapes/LineInf.h"
@@ -15,6 +17,28 @@
 class Entity;
 
 void CollisionResponse(Entity& self, Entity& other);
+
+enum class CollisionRole : uint8_t
+{
+    Solid = 0,
+    Container = 1
+};
+
+struct MaterialInteractionCoefficients
+{
+    float restitution = 0.85f;
+    float staticFriction = 0.5f;
+    float dynamicFriction = 0.3f;
+};
+
+void ClearMaterialInteractions();
+void RegisterMaterialInteraction(
+    const std::string& materialA,
+    const std::string& materialB,
+    const MaterialInteractionCoefficients& coeffs);
+MaterialInteractionCoefficients GetMaterialInteraction(
+    const std::string& materialA,
+    const std::string& materialB);
 
 class ComponentCollision : public IComponent
 {
@@ -31,23 +55,36 @@ public:
     }
 
     void InvokeCollision(Entity& ent1, Entity& ent2);
-	Physics::Collider* GetCollider() const { return m_collider.get(); }
+    Physics::Collider* GetCollider() const { return m_collider.get(); }
 
     bool Collided(const Physics::Collider& other) const
     {
         if (!m_collider)
-            return false; // No collider means we can't collide with anything.
+            return false;
 
-		return m_collider->isColliding(other);
+        return m_collider->isColliding(other);
     }
+
     void SetCollider(std::unique_ptr<Physics::Collider> collider)
     {
         m_collider = std::move(collider);
-	}
+    }
+
+    void SetCollisionRole(CollisionRole role)
+    {
+        m_collisionRole = role;
+    }
+
+    CollisionRole GetCollisionRole() const
+    {
+        return m_collisionRole;
+    }
+
 private:
 
     std::unique_ptr<Physics::Collider> m_collider;
     CollisionCallback m_onCollision = CollisionResponse;
+    CollisionRole m_collisionRole = CollisionRole::Solid;
 };
 
 

@@ -2,6 +2,56 @@
 #include "../Entity.h"
 #include "../../../PhysicsEngine/Maths/CollisionResolution/ConservationOfMomentum.h"
 #include "../../../PhysicsEngine/Maths/CollisionResolution/CollisionResolution.h"
+#include <unordered_map>
+#include <mutex>
+#include <algorithm>
+
+namespace
+{
+	std::mutex g_materialInteractionMutex;
+	std::unordered_map<std::string, MaterialInteractionCoefficients> g_materialInteractions;
+
+	std::string MakeMaterialPairKey(const std::string& a, const std::string& b)
+	{
+		if (a <= b)
+			return a + "|" + b;
+		return b + "|" + a;
+	}
+}
+
+void ClearMaterialInteractions()
+{
+	std::lock_guard<std::mutex> lock(g_materialInteractionMutex);
+	g_materialInteractions.clear();
+}
+
+void RegisterMaterialInteraction(
+	const std::string& materialA,
+	const std::string& materialB,
+	const MaterialInteractionCoefficients& coeffs)
+{
+	if (materialA.empty() || materialB.empty())
+		return;
+
+	std::lock_guard<std::mutex> lock(g_materialInteractionMutex);
+	g_materialInteractions[MakeMaterialPairKey(materialA, materialB)] = coeffs;
+}
+
+MaterialInteractionCoefficients GetMaterialInteraction(
+	const std::string& materialA,
+	const std::string& materialB)
+{
+	if (materialA.empty() || materialB.empty())
+		return {};
+
+	std::lock_guard<std::mutex> lock(g_materialInteractionMutex);
+	const std::string key = MakeMaterialPairKey(materialA, materialB);
+	auto it = g_materialInteractions.find(key);
+	if (it != g_materialInteractions.end())
+		return it->second;
+
+	return {};
+}
 
 void CollisionResponse(Entity& self, Entity& other)
 {
@@ -27,10 +77,22 @@ void CollisionResponse(Entity& self, Entity& other)
 	if (!transSelf || !velSelf)
 		return;
 
+	// Material interaction lookup
+	std::string selfMaterial;
+	std::string otherMaterial;
+	if (auto* selfNet = self.GetComponent<ComponentNetwork>(EComponentType::Component_Network))
+		selfMaterial = selfNet->materialName;
+	if (auto* otherNet = other.GetComponent<ComponentNetwork>(EComponentType::Component_Network))
+		otherMaterial = otherNet->materialName;
+
+	const MaterialInteractionCoefficients mi = GetMaterialInteraction(selfMaterial, otherMaterial);
+	const float restitution = std::clamp(mi.restitution, 0.0f, 1.0f);
+	const float staticFriction = std::clamp(mi.staticFriction, 0.0f, 1.0f);
+	const float dynamicFriction = std::clamp(mi.dynamicFriction, 0.0f, 1.0f);
+
 	glm::vec3 posSelf = transSelf->Position();
 	glm::vec3 vSelf = velSelf->GetPositionVelocity();
 	float massSelf = (physSelf) ? physSelf->GetMass() : 1.0f;
-	float invMassSelf = (physSelf) ? physSelf->GetInverseMass() : 1.0f;
 
 	glm::vec3 contactNormal(0.0f);
 	const float EPS = 1e-6f;
@@ -87,7 +149,6 @@ void CollisionResponse(Entity& self, Entity& other)
 	}
 	else if (otherCollider->getType() == Physics::EColliderType::CAPSULE)
 	{
-		// Capsule collision support: find closest point on capsule segment (including spherical ends)
 		auto* cap = dynamic_cast<Physics::Capsule*>(otherCollider);
 		if (!cap) return;
 
@@ -97,14 +158,12 @@ void CollisionResponse(Entity& self, Entity& other)
 		float L = glm::length(AB);
 		if (L <= EPS)
 		{
-			// Degenerate capsule -> treat as sphere at A
 			glm::vec3 diff = posSelf - A;
 			float dlen = glm::length(diff);
 			contactNormal = (dlen > EPS) ? diff / dlen : glm::vec3(0.0f, 1.0f, 0.0f);
 		}
 		else
 		{
-			// Project point onto segment, clamp to segment endpoints and compute radial direction
 			glm::vec3 u = AB / L;
 			float t_raw = glm::dot(posSelf - A, u);
 			float t_clamped = std::clamp(t_raw, 0.0f, L);
@@ -123,16 +182,31 @@ void CollisionResponse(Entity& self, Entity& other)
 	if (approachSpeed >= 0.0f)
 		return;
 
-	constexpr float k_velocityRetention        = 0.9f;
-	constexpr float k_forceRetention           = 0.8f;
-	constexpr float k_velocityStopThreshold    = 0.5f;
-	constexpr float k_normalStopThreshold      = 0.5f;
+	auto applyFriction = [&](glm::vec3& velocity, const glm::vec3& n)
+	{
+		const float normalSpeed = glm::dot(velocity, n);
+		glm::vec3 tangential = velocity - (normalSpeed * n);
+		const float tangentialSpeed = glm::length(tangential);
+
+		if (tangentialSpeed <= (staticFriction * 0.1f))
+		{
+			velocity -= tangential;
+			return;
+		}
+
+		velocity -= tangential * dynamicFriction;
+	};
+
+	constexpr float k_velocityRetention = 0.9f;
+	constexpr float k_forceRetention = 0.8f;
+	constexpr float k_velocityStopThreshold = 0.5f;
+	constexpr float k_normalStopThreshold = 0.5f;
 	constexpr float k_forceNormalStopThreshold = 0.7f;
 
-	glm::vec3 savedForceSelf  = (physSelf)  ? physSelf->getTotalForce()  : glm::vec3(0.0f);
+	glm::vec3 savedForceSelf = (physSelf) ? physSelf->getTotalForce() : glm::vec3(0.0f);
 
-	ComponentPhysics*  physOther = other.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
-	ComponentVelocity* velOther  = other.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+	ComponentPhysics* physOther = other.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+	ComponentVelocity* velOther = other.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 
 	glm::vec3 savedForceOther = (physOther) ? physOther->getTotalForce() : glm::vec3(0.0f);
 
@@ -144,15 +218,21 @@ void CollisionResponse(Entity& self, Entity& other)
 		float massOther = physOther->GetMass();
 		glm::vec3 vOther = (velOther) ? velOther->GetPositionVelocity() : glm::vec3(0.0f);
 
-		glm::vec3 u1n = glm::dot(vSelf,  n) * n;
-		glm::vec3 u1t = vSelf  - u1n;
+		glm::vec3 u1n = glm::dot(vSelf, n) * n;
+		glm::vec3 u1t = vSelf - u1n;
 		glm::vec3 u2n = glm::dot(vOther, n) * n;
 		glm::vec3 u2t = vOther - u2n;
 
 		auto [v1_after, v2_after] = Physics::InElasticCollision(u1n, u2n, massSelf, massOther);
 
-		glm::vec3 newV1 = (v1_after + u1t) * k_velocityRetention;
-		glm::vec3 newV2 = (v2_after + u2t) * k_velocityRetention;
+		glm::vec3 v1nRest = glm::dot(v1_after, n) * n * restitution;
+		glm::vec3 v2nRest = glm::dot(v2_after, n) * n * restitution;
+
+		glm::vec3 newV1 = (v1nRest + u1t) * k_velocityRetention;
+		glm::vec3 newV2 = (v2nRest + u2t) * k_velocityRetention;
+
+		applyFriction(newV1, n);
+		applyFriction(newV2, n);
 
 		if (glm::length(newV1) < k_velocityStopThreshold)
 			newV1 = glm::vec3(0.0f);
@@ -189,9 +269,10 @@ void CollisionResponse(Entity& self, Entity& other)
 	}
 	else
 	{
-		float restitution = 0.85f;
 		glm::vec3 newV = Physics::ResolveVelocityAgainstFixedObject(vSelf, restitution, n);
 		newV *= k_velocityRetention;
+
+		applyFriction(newV, n);
 
 		if (glm::length(newV) < k_velocityStopThreshold)
 			newV = glm::vec3(0.0f);
@@ -205,8 +286,6 @@ void CollisionResponse(Entity& self, Entity& other)
 		velSelf->SetPositionalVelocity(newV);
 	}
 
-	// Write depenetrated position into the write buffer.
-	// SystemCollision will call SwapBuffers() after all responses fire.
 	const float separationBias = 0.01f;
 	glm::vec3 resolvedPos = transSelf->PreviousPosition() + contactNormal * separationBias;
 	transSelf->SetPosition(resolvedPos);

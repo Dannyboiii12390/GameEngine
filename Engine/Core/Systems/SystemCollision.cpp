@@ -2,6 +2,7 @@
 #include "../Components/ComponentCollision.h"
 #include "../Components/ComponentTransform.h"
 #include "../Components/ComponentVelocity.h"
+#include "../Components/ComponentNetwork.h"
 #include "../Entity.h"
 #include <omp.h>
 #include "../../DebugUtils.h"
@@ -11,8 +12,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-//#define USE_COMPUTE // Comment out to use CPU-based collision detection instead of GPU compute shader
 
 namespace
 {
@@ -104,6 +103,7 @@ namespace
 
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
+	const PeerID localPeerId = m_localPeerId ? m_localPeerId->load(std::memory_order_relaxed) : 0;
 	EComponentType requiredComponents = EComponentType::Component_Collision | EComponentType::Component_Transform;
 
 	const int count = static_cast<int>(entities.size());
@@ -271,13 +271,28 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 		if (!collisionA || !collisionB)
 			continue;
 
+		if (collisionA->GetCollisionRole() == CollisionRole::Container &&
+			collisionB->GetCollisionRole() == CollisionRole::Container)
+		{
+			continue;
+		}
+
+		auto* netA = entityA.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+		auto* netB = entityB.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+
+		const bool canResolveA = !netA || !netA->IsSimulated() || netA->IsOwnedByMe(localPeerId);
+		const bool canResolveB = !netB || !netB->IsSimulated() || netB->IsOwnedByMe(localPeerId);
+
+		if (!canResolveA && !canResolveB)
+			continue;
+
 		if (collisionA->Collided(*collisionB->GetCollider()))
 		{
-			//#pragma omp critical
-			{
+			if (canResolveA)
 				collisionA->InvokeCollision(entityA, entityB);
+
+			if (canResolveB)
 				collisionB->InvokeCollision(entityB, entityA);
-			}
 		}
 	}
 }

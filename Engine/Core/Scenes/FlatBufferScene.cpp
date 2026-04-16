@@ -3,6 +3,11 @@
 #include "../../IMGUI/imgui.h"
 #include "../Systems/SystemSwapBuffers.h"
 #include "../../../PhysicsEngine/Networking/TCPSocket.h"
+#include "../../../PhysicsEngine/Shapes/Sphere.h"
+#include "../../../PhysicsEngine/Shapes/Capsule.h"
+#include "../../../PhysicsEngine/Shapes/Cylinder.h"
+#include "../../../PhysicsEngine/Shapes/Plane.h"
+#include "../Components/ComponentCollision.h"
 
 #include <fstream>
 #include <iostream>
@@ -99,6 +104,70 @@ namespace
 		{
 			SetThreadAffinityMask(GetCurrentThread(), mask);
 		}
+
+	}
+	// 3) Add helper functions in anonymous namespace:
+	static PeerID OwnerTypeToPeerId(Simulation::ObjectOwnerType owner)
+	{
+		switch (owner)
+		{
+		case Simulation::ObjectOwnerType_ONE: return 0;
+		case Simulation::ObjectOwnerType_TWO: return 1;
+		case Simulation::ObjectOwnerType_THREE: return 2;
+		case Simulation::ObjectOwnerType_FOUR: return 3;
+		default: return 0;
+		}
+	}
+
+	static Simulation::ObjectOwnerType PeerIdToOwnerType(PeerID ownerId)
+	{
+		switch (ownerId)
+		{
+		case 0: return Simulation::ObjectOwnerType_ONE;
+		case 1: return Simulation::ObjectOwnerType_TWO;
+		case 2: return Simulation::ObjectOwnerType_THREE;
+		case 3: return Simulation::ObjectOwnerType_FOUR;
+		default: return Simulation::ObjectOwnerType_ONE;
+		}
+	}
+
+	static ObjectType BehaviourToObjectType(Simulation::Behaviour b)
+	{
+		switch (b)
+		{
+		case Simulation::Behaviour_StaticObject: return ObjectType::Static;
+		case Simulation::Behaviour_AnimatedObject: return ObjectType::Animated;
+		case Simulation::Behaviour_SimulatedObject:
+		default: return ObjectType::Simulated;
+		}
+	}
+	static glm::vec4 OwnerToColor(PeerID ownerId)
+	{
+		switch (ownerId)
+		{
+		case 0: return glm::vec4(1.0f, 0.15f, 0.15f, 1.0f); // Red
+		case 1: return glm::vec4(0.15f, 1.0f, 0.15f, 1.0f); // Green
+		case 2: return glm::vec4(0.15f, 0.35f, 1.0f, 1.0f); // Blue
+		case 3: return glm::vec4(1.0f, 1.0f, 0.15f, 1.0f); // Yellow
+		default: return glm::vec4(0.75f, 0.75f, 0.75f, 1.0f); // ALL_PEERS / fallback
+		}
+	}
+
+	static Texture CreateOwnerTexture(VulkanRHI* rhi, PeerID ownerId)
+	{
+		const glm::vec4 c = OwnerToColor(ownerId);
+		const unsigned char px[4] = {
+			static_cast<unsigned char>(std::clamp(c.r, 0.0f, 1.0f) * 255.0f),
+			static_cast<unsigned char>(std::clamp(c.g, 0.0f, 1.0f) * 255.0f),
+			static_cast<unsigned char>(std::clamp(c.b, 0.0f, 1.0f) * 255.0f),
+			static_cast<unsigned char>(std::clamp(c.a, 0.0f, 1.0f) * 255.0f)
+		};
+
+		if (auto tex = Texture::CreateFromMemory(rhi, px, 1, 1, 4, TextureType::Albedo, false))
+			return *tex;
+
+		// fallback if memory texture creation fails
+		return Texture(rhi, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	}
 }
 // Call once at startup (before OpenMP work)
@@ -189,7 +258,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemFlocking>(m_vulkanRHI, &m_localPeerId));
 	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>(&m_localPeerId));
-	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI));
+	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI, &m_localPeerId));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 	m_networkData = std::make_shared<SharedNetworkData>();
 	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>(&m_localPeerId, m_networkData));
@@ -806,6 +875,35 @@ void FlatBufferScene::Draw()
 				}
 			}
 
+			if (m_selectedEntityIndex >= 0 && m_selectedEntityIndex < static_cast<int>(m_entities.size()))
+			{
+				auto& selected = m_entities[m_selectedEntityIndex];
+				auto* net = selected.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+				auto* col = selected.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+
+				if (net)
+				{
+					ImGui::Separator();
+					ImGui::Text("Selected Entity: %d", m_selectedEntityIndex);
+					ImGui::Text("OwnerId: %u", net->ownerId);
+					ImGui::Text("LocalSimulates: %s", net->IsOwnedByMe(m_localPeerId) && net->IsSimulated() ? "YES" : "NO");
+					ImGui::Text("Behaviour: %s",
+						Simulation::EnumNameBehaviour(static_cast<Simulation::Behaviour>(net->behaviourType)));
+					ImGui::Text("Shape: %s",
+						Simulation::EnumNameShape(static_cast<Simulation::Shape>(net->shapeType)));
+					ImGui::Text("CollisionType: %s",
+						static_cast<Simulation::CollisionType>(net->collisionType) == Simulation::CollisionType_CONTAINER
+						? "CONTAINER" : "SOLID");
+					ImGui::Text("Material: %s", net->materialName.c_str());
+
+					if (col)
+					{
+						ImGui::Text("CollisionRole(runtime): %s",
+							col->GetCollisionRole() == CollisionRole::Container ? "Container" : "Solid");
+					}
+				}
+			}
+
 			if (show_demo_window)
 				ImGui::ShowDemoWindow(&show_demo_window);
 
@@ -951,17 +1049,68 @@ void FlatBufferScene::SerializeState()
 			// Name (optional)
 			auto name = builder.CreateString("cube");
 
-			// Create the Object table. Use Shape_Cuboid and default behaviour/collision.
+			Simulation::Behaviour behaviourType = Simulation::Behaviour_StaticObject;
+			flatbuffers::Offset<void> behaviourUnion = 0;
+
+			auto* netComp = e.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
+			if (netComp)
+			{
+				if (netComp->type == ObjectType::Simulated)
+				{
+					behaviourType = Simulation::Behaviour_SimulatedObject;
+
+					Simulation::Vec3 lv(0.0f, 0.0f, 0.0f);
+					Simulation::Vec3 av(0.0f, 0.0f, 0.0f);
+
+					if (auto* vel = e.GetComponent<ComponentVelocity>(EComponentType::Component_Velocity))
+					{
+						const glm::vec3 lvv = vel->GetPositionVelocity();
+						const glm::vec3 avv = vel->GetRotationalVelocity();
+						lv = Simulation::Vec3(lvv.x, lvv.y, lvv.z);
+						av = Simulation::Vec3(avv.x, avv.y, avv.z);
+					}
+
+					Simulation::PhysicsState initState(lv, av);
+					auto simObj = Simulation::CreateSimulatedObject(builder, &initState, PeerIdToOwnerType(netComp->ownerId));
+					behaviourUnion = simObj.Union();
+				}
+				else if (netComp->type == ObjectType::Animated)
+				{
+					behaviourType = Simulation::Behaviour_AnimatedObject;
+					auto animObj = Simulation::CreateAnimatedObject(builder, 0, 0.0f, Simulation::EasingType_LINEAR, Simulation::PathMode_STOP);
+					behaviourUnion = animObj.Union();
+				}
+				else
+				{
+					behaviourType = Simulation::Behaviour_StaticObject;
+					auto staticObj = Simulation::CreateStaticObject(builder);
+					behaviourUnion = staticObj.Union();
+				}
+			}
+			else
+			{
+				auto staticObj = Simulation::CreateStaticObject(builder);
+				behaviourUnion = staticObj.Union();
+			}
+
+			Simulation::CollisionType fbCollisionType = Simulation::CollisionType_SOLID;
+			if (auto* collision = e.GetComponent<ComponentCollision>(EComponentType::Component_Collision))
+			{
+				fbCollisionType = (collision->GetCollisionRole() == CollisionRole::Container)
+					? Simulation::CollisionType_CONTAINER
+					: Simulation::CollisionType_SOLID;
+			}
+
 			auto objOffset = Simulation::CreateObject(
 				builder,
 				name,
 				&objTransform,
-				0, // material
-				Simulation::Shape_Cuboid,
-				cuboidOffset.Union(), // union as void offset (Offset<T> convertible)
-				Simulation::Behaviour_NONE,
 				0,
-				Simulation::CollisionType_SOLID
+				Simulation::Shape_Cuboid,
+				cuboidOffset.Union(),
+				behaviourType,
+				behaviourUnion,
+				fbCollisionType
 			);
 
 			objectsVecOffsets.push_back(objOffset);
@@ -1029,6 +1178,8 @@ void FlatBufferScene::SerializeState()
 
 void FlatBufferScene::DeserializeState()
 {
+	m_entities.clear();
+	m_entities.clear();
 	std::ifstream infile("scenes/Level1.bin", std::ios::binary);
 	if (!infile.is_open())
 	{
@@ -1181,6 +1332,17 @@ void FlatBufferScene::DeserializeState()
 		}
 	}
 
+	// Register interaction table for collision response usage
+	ClearMaterialInteractions();
+	for (const auto& mi : m_materialInteractions)
+	{
+		MaterialInteractionCoefficients coeffs;
+		coeffs.restitution = mi.restitution;
+		coeffs.staticFriction = mi.staticFriction;
+		coeffs.dynamicFriction = mi.dynamicFriction;
+		RegisterMaterialInteraction(mi.materialA, mi.materialB, coeffs);
+	}
+
 	// Load spawners (if present) -- comprehensive parsing into SpawnerData
 	m_spawners.clear();
 	if (scene->spawners() && scene->spawners_type() && scene->spawners()->size() == scene->spawners_type()->size())
@@ -1277,7 +1439,7 @@ void FlatBufferScene::DeserializeState()
 
 			// If name still empty, assign a predictable fallback
 			if (sd.name.empty())
-				sd.name = "spawner_" + std::to_string(i);
+			 sd.name = "spawner_" + std::to_string(i);
 
 			// --- Parse spawn_type union details (SingleBurst / Repeating) using the base accessor where possible ---
 			{
@@ -1379,79 +1541,209 @@ void FlatBufferScene::DeserializeState()
 			glm::vec3 rot(t->orientation().pitch(), t->orientation().yaw(), t->orientation().roll());
 			glm::vec3 scale(t->scale().x(), t->scale().y(), t->scale().z());
 
-			// Create entity and components
 			Entity entity;
 			entity.AddComponent(EComponentType::Component_Transform, pos, rot, scale);
 			entity.AddComponent(EComponentType::Component_Geometry);
 
-			// Add simulation components so flocking + physics can move these objects
-			entity.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
-			entity.AddComponent(EComponentType::Component_Physics);
-
-			if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
-			{
-				phys->SetMass(1.0f);
-				phys->SetAffectedByGravity(m_gravityOn);
-			}
-
-			// Assign a name if present, otherwise generate unique name (store in m_sceneName context or logs)
 			std::string objName;
 			if (objFlat->name())
 				objName = objFlat->name()->str();
 			else
 				objName = "object_" + std::to_string(objectIndex);
 
-			// --- DISTRIBUTED OWNERSHIP LOGIC ---
-			// Use deterministic assignment across peers by using object index modulo peer count.
-			// The mapping of peer ordinal (0..N-1) is agreed by deterministic ordering of instance IDs.
-			PeerID assignedOwnerId = static_cast<PeerID>(objectIndex % 2);
-			bool isOwnedByMe = (assignedOwnerId == m_localPeerId);
+			std::string materialName;
+			if (objFlat->material())
+				materialName = objFlat->material()->str();
 
-			// Add network ownership so systems + UI can detect ownership
-			entity.AddComponent(EComponentType::Component_Network, objectIndex, ObjectType::Simulated, assignedOwnerId);
+			Simulation::Shape shapeType = objFlat->shape_type();
+			if (shapeType == Simulation::Shape_NONE)
+				shapeType = Simulation::Shape_Cuboid;
 
-			// Load texture based on ownership, but prefer material name from object if present
-			std::string texturePath;
-			if (objFlat->material() && objFlat->material()->c_str()[0] != '\0') {
-				// simple heuristic: if material name ends with common texture name use it, else fallback to ownership colour
-				std::string matName = objFlat->material()->str();
-				// If a material exists in m_materials with that name and density, we won't infer texture path here.
-				texturePath = isOwnedByMe ? "Assets/red_brick_diff_1k.jpg" : "Assets/mossy_cobblestone_diff_1k.jpg";
-			} else {
-				texturePath = isOwnedByMe ? "Assets/red_brick_diff_1k.jpg" : "Assets/mossy_cobblestone_diff_1k.jpg";
+			Simulation::Behaviour behaviourType = objFlat->behaviour_type();
+			if (behaviourType == Simulation::Behaviour_NONE)
+				behaviourType = Simulation::Behaviour_SimulatedObject;
+
+			const ObjectType objectType = BehaviourToObjectType(behaviourType);
+
+			glm::vec3 linearVel(0.0f);
+			glm::vec3 angularVel(0.0f);
+
+			PeerID assignedOwnerId = ALL_PEERS;
+			if (objectType == ObjectType::Simulated)
+			{
+				if (auto* simBehaviour = objFlat->behaviour_as_SimulatedObject())
+				{
+					assignedOwnerId = OwnerTypeToPeerId(simBehaviour->owner());
+					if (simBehaviour->initial_state())
+					{
+						const auto& lv = simBehaviour->initial_state()->linear_velocity();
+						const auto& av = simBehaviour->initial_state()->angular_velocity();
+						linearVel = glm::vec3(lv.x(), lv.y(), lv.z());
+						angularVel = glm::vec3(av.x(), av.y(), av.z());
+					}
+				}
+				else
+				{
+					assignedOwnerId = static_cast<PeerID>(objectIndex % 4);
+				}
 			}
-			const Texture objectTex(m_vulkanRHI, texturePath, TextureType::Albedo, true);
-			// -----------------------------------
 
+			const Simulation::CollisionType fbCollisionType = objFlat->collision_type();
+
+			entity.AddComponent(
+				EComponentType::Component_Network,
+				objectIndex,
+				objectType,
+				assignedOwnerId,
+				materialName,
+				static_cast<uint8_t>(shapeType),
+				static_cast<uint8_t>(behaviourType),
+				static_cast<uint8_t>(fbCollisionType));
+
+			if (objectType == ObjectType::Simulated)
+			{
+				entity.AddComponent(EComponentType::Component_Velocity, linearVel, angularVel, glm::vec3(0.0f));
+				entity.AddComponent(EComponentType::Component_Physics);
+				if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+				{
+					phys->SetMass(1.0f);
+					phys->SetAffectedByGravity(m_gravityOn);
+				}
+			}
+
+			// Shape parameters from FB
+			float shapeRadius = 0.5f;
+			float shapeHeight = 1.0f;
+			glm::vec3 planeNormal(0.0f, 1.0f, 0.0f);
+
+			if (auto* s = objFlat->shape_as_Sphere())
+			{
+				shapeRadius = std::max(0.01f, s->radius());
+			}
+			else if (auto* c = objFlat->shape_as_Capsule())
+			{
+				shapeRadius = std::max(0.01f, c->radius());
+				shapeHeight = std::max(0.01f, c->height());
+			}
+			else if (auto* c = objFlat->shape_as_Cylinder())
+			{
+				shapeRadius = std::max(0.01f, c->radius());
+				shapeHeight = std::max(0.01f, c->height());
+			}
+			else if (auto* p = objFlat->shape_as_Plane())
+			{
+				if (p->normal())
+				{
+					planeNormal = glm::normalize(glm::vec3(
+						p->normal()->x(),
+						p->normal()->y(),
+						p->normal()->z()));
+				}
+			}
+
+			// Geometry by shape
+			MeshData meshData;
+			switch (shapeType)
+			{
+			case Simulation::Shape_Sphere:
+				meshData = ResourceManager::CreateSphereMesh(1.0f, 24, 16);
+				break;
+			case Simulation::Shape_Capsule:
+				meshData = ResourceManager::CreateCapsuleMesh(1.0f, shapeRadius, shapeHeight, 24, 16);
+				break;
+			case Simulation::Shape_Cylinder:
+				meshData = ResourceManager::CreateCylinderMesh(1.0f, shapeRadius, shapeHeight, 24);
+				break;
+			case Simulation::Shape_Plane:
+				meshData = ResourceManager::CreatePlaneMesh(1.0f, std::max(1.0f, scale.x), std::max(1.0f, scale.z), 1, 1);
+				break;
+			case Simulation::Shape_Cuboid:
+			default:
+				meshData = ResourceManager::CreateCubeMesh();
+				break;
+			}
+
+			const auto [verts, indices] = meshData;
 			ComponentGeometry* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
 			if (geom)
 			{
-				// For cuboid shapes we use the cube mesh and let the transform scale it.
-				MeshData meshData = ResourceManager::CreateCubeMesh();
-				auto [verts, indices] = meshData;
 				if (!geom->InitializeMesh(m_vulkanRHI, verts, indices))
 				{
 					std::cerr << "DeserializeState: failed to initialize mesh for entity\n";
 				}
 				else
 				{
-					if (!geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(),
-						"SHADERS/object.vert.spv", "SHADERS/object.frag.spv"))
+					if (!geom->InitializePipeline(
+						m_vulkanRHI,
+						m_vulkanRHI->GetRenderPass(),
+						m_vulkanRHI->GetSwapchainExtent(),
+						"SHADERS/object.vert.spv",
+						"SHADERS/object.frag.spv"))
 					{
 						std::cerr << "DeserializeState: failed to initialize pipeline for entity\n";
 					}
-					
-					// Apply the dynamically chosen texture
-					geom->AddTexture(m_vulkanRHI, objectTex);
+
+					// Owner color coding: red/green/blue/yellow
+					const Texture ownerTex = CreateOwnerTexture(m_vulkanRHI, assignedOwnerId);
+					geom->AddTexture(m_vulkanRHI, ownerTex);
 				}
 			}
 
-			// If gravity setting exists, set ComponentPhysics affected flag for any physics components that already exist.
-			if (entity.HasComponent(EComponentType::Component_Physics))
+			// Collision role + collider from shape
+			entity.AddComponent(EComponentType::Component_Collision);
+			if (auto* collision = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision))
 			{
-				auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
-				if (phys)
-					phys->SetAffectedByGravity(m_gravityOn);
+				collision->SetCollisionRole(
+					fbCollisionType == Simulation::CollisionType_CONTAINER
+					? CollisionRole::Container
+					: CollisionRole::Solid);
+
+				switch (shapeType)
+				{
+				case Simulation::Shape_Sphere:
+				{
+					collision->SetCollider(std::make_unique<Physics::Sphere>(pos, shapeRadius));
+					break;
+				}
+				case Simulation::Shape_Capsule:
+				{
+					const glm::vec3 a = pos + glm::vec3(0.0f, shapeHeight * 0.5f, 0.0f);
+					const glm::vec3 b = pos - glm::vec3(0.0f, shapeHeight * 0.5f, 0.0f);
+					collision->SetCollider(std::make_unique<Physics::Capsule>(a, b, shapeRadius));
+					break;
+				}
+				case Simulation::Shape_Cylinder:
+				{
+					const glm::vec3 a = pos + glm::vec3(0.0f, shapeHeight * 0.5f, 0.0f);
+					const glm::vec3 b = pos - glm::vec3(0.0f, shapeHeight * 0.5f, 0.0f);
+					collision->SetCollider(std::make_unique<Physics::Cylinder>(a, b, shapeRadius));
+					break;
+				}
+				case Simulation::Shape_Plane:
+				{
+					glm::vec3 up = std::abs(glm::dot(planeNormal, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.98f
+						? glm::vec3(1.0f, 0.0f, 0.0f)
+						: glm::vec3(0.0f, 1.0f, 0.0f);
+					glm::vec3 u = glm::normalize(glm::cross(up, planeNormal));
+					glm::vec3 v = glm::normalize(glm::cross(planeNormal, u));
+					collision->SetCollider(std::make_unique<Physics::Plane>(pos, u, v));
+					break;
+				}
+				case Simulation::Shape_Cuboid:
+				default:
+				{
+					// Fallback collider for cuboid: bounding sphere
+					const float r = std::max(0.01f, 0.5f * glm::length(scale));
+					collision->SetCollider(std::make_unique<Physics::Sphere>(pos, r));
+					break;
+				}
+				}
+
+				if (auto* collider = collision->GetCollider())
+				{
+					collider->setRotation(rot);
+					collider->setScale(scale);
+				}
 			}
 
 			m_entities.push_back(std::move(entity));

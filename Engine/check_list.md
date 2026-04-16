@@ -32,7 +32,7 @@
   - [x] Material
   - [x] Shape: Sphere, Capsule, Cylinder, Plane, Cuboid
   - [ ] Behaviour: Static, Animated, Simulated
-  - [ ] Collision type (SOLID or CONTAINER)
+  - [x] Collision type (SOLID or CONTAINER)
 - [x] Color-code objects by owner (Red, Green, Blue, Yellow)
 - [x] Render containers correctly to see inside
 
@@ -44,14 +44,14 @@
 
 ### Object Behaviours
 #### Static Objects
-- [ ] Each user has local copy
+- [x] Each user has local copy
 
 #### Simulated Objects
-- [ ] Properties:
+- [x] Properties:
   - [x] Linear & angular velocity
-  - [ ] Owner (ONE, TWO, THREE, FOUR)
+  - [x] Owner (ONE, TWO, THREE, FOUR)
 - [x] Full rigid body physics implemented (momentum, inertia)
-- [ ] Owner simulates object and handles collisions
+- [x] Owner simulates object and handles collisions
 - [x] Network dynamic state to all peers every frame
 
 #### Animated Objects

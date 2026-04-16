@@ -2,6 +2,7 @@
 #include "../NetworkTypes.h"
 #include "../Components/ComponentNetwork.h"
 #include "../Components/ComponentTransform.h"
+#include "../Components/ComponentVelocity.h"
 #include <vector>
 #include <span>
 #include <memory>
@@ -21,6 +22,7 @@ public:
     void OnUpdate(std::span<Entity> entities, float deltaTime) override
     {
         std::vector<Entity*> entityPtrs;
+        entityPtrs.reserve(entities.size());
         for (auto& e : entities)
             entityPtrs.push_back(&e);
 
@@ -32,49 +34,44 @@ public:
     {
         std::vector<SyncPacket> outgoingPackets;
 
-        // 1. GATHER STATE: Broadcast state of simulated objects I own
         for (auto* entity : entities)
         {
             auto* netComp = entity->GetComponent<ComponentNetwork>(EComponentType::Component_Network);
             auto* transform = entity->GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+            auto* velocity = entity->GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
 
             if (netComp && transform && netComp->IsSimulated() && netComp->IsOwnedByMe(localPeerId))
             {
                 SyncPacket packet{};
                 packet.objectId = netComp->networkId;
 
-                // Sync Position
                 glm::vec3 pos = transform->Position();
-                packet.posX = pos.x;
-                packet.posY = pos.y;
-                packet.posZ = pos.z;
+                packet.posX = pos.x; packet.posY = pos.y; packet.posZ = pos.z;
 
-                // Sync Rotation
                 glm::vec3 rot = transform->Rotation();
-                packet.rotX = rot.x;
-                packet.rotY = rot.y;
-                packet.rotZ = rot.z;
+                packet.rotX = rot.x; packet.rotY = rot.y; packet.rotZ = rot.z; packet.rotW = 0.0f;
 
-                // Sync Scale
                 glm::vec3 scale = transform->Scale();
-                packet.scaleX = scale.x;
-                packet.scaleY = scale.y;
-                packet.scaleZ = scale.z;
+                packet.scaleX = scale.x; packet.scaleY = scale.y; packet.scaleZ = scale.z;
+
+                if (velocity)
+                {
+                    const glm::vec3 lv = velocity->GetPositionVelocity();
+                    const glm::vec3 av = velocity->GetRotationalVelocity();
+                    packet.velX = lv.x; packet.velY = lv.y; packet.velZ = lv.z;
+                    packet.angVelX = av.x; packet.angVelY = av.y; packet.angVelZ = av.z;
+                }
 
                 outgoingPackets.push_back(packet);
             }
         }
 
         if (!outgoingPackets.empty())
-        {
             BroadcastToPeers(outgoingPackets);
-        }
 
         std::vector<SyncPacket> incomingPackets = ReceiveFromPeers();
         for (const auto& packet : incomingPackets)
-        {
-            ApplyStateToObject(packet, entities);
-        }
+            ApplyStateToObject(packet, entities, localPeerId);
     }
 
 private:
@@ -97,37 +94,45 @@ private:
         return copy;
     }
 
-    void ApplyStateToObject(const SyncPacket& packet, const std::vector<Entity*>& entities)
+    void ApplyStateToObject(const SyncPacket& packet, const std::vector<Entity*>& entities, PeerID localPeerId)
     {
         for (auto* entity : entities)
         {
             auto* netComp = entity->GetComponent<ComponentNetwork>(EComponentType::Component_Network);
-            if (netComp && netComp->networkId == packet.objectId)
+            if (!netComp || netComp->networkId != packet.objectId)
+                continue;
+
+            if (netComp->IsSimulated() && netComp->IsOwnedByMe(localPeerId))
+                return; // owner keeps authoritative local simulation
+
+            auto* transform = entity->GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+            if (transform)
             {
-                auto* transform = entity->GetComponent<ComponentTransform>(EComponentType::Component_Transform);
-                if (transform)
-                {
-                    glm::vec3 syncedPosition(packet.posX, packet.posY, packet.posZ);
-                    glm::vec3 syncedRotation(packet.rotX, packet.rotY, packet.rotZ);
-                    glm::vec3 syncedScale(packet.scaleX, packet.scaleY, packet.scaleZ);
-                    
-                    // 1. Write the new transform values into the WriteBuffer
-                    transform->SetPosition(syncedPosition);
-                    transform->SetRotation(syncedRotation);
-                    transform->SetScale(syncedScale);
-                    
-                    // 2. Swap the buffers to commit it to the ReadBuffer instantly. 
-                    // This ensures the render thread and next physics step start from this synced transform.
-                    transform->SwapBuffers();
-                    
-                    // 3. Write it again so the 'new' WriteBuffer is synchronized 
-                    // and stays physically consistent for delta implementations.
-                    transform->SetPosition(syncedPosition);
-                    transform->SetRotation(syncedRotation);
-                    transform->SetScale(syncedScale);
-                }
-                break;
+                glm::vec3 syncedPosition(packet.posX, packet.posY, packet.posZ);
+                glm::vec3 syncedRotation(packet.rotX, packet.rotY, packet.rotZ);
+                glm::vec3 syncedScale(packet.scaleX, packet.scaleY, packet.scaleZ);
+
+                transform->SetPosition(syncedPosition);
+                transform->SetRotation(syncedRotation);
+                transform->SetScale(syncedScale);
+                transform->SwapBuffers();
+                transform->SetPosition(syncedPosition);
+                transform->SetRotation(syncedRotation);
+                transform->SetScale(syncedScale);
             }
+
+            auto* velocity = entity->GetComponent<ComponentVelocity>(EComponentType::Component_Velocity);
+            if (velocity)
+            {
+                const glm::vec3 lv(packet.velX, packet.velY, packet.velZ);
+                const glm::vec3 av(packet.angVelX, packet.angVelY, packet.angVelZ);
+                velocity->SetPositionalVelocity(lv);
+                velocity->SetRotationalVelocity(av);
+                velocity->SwapBuffers();
+                velocity->SetPositionalVelocity(lv);
+                velocity->SetRotationalVelocity(av);
+            }
+            break;
         }
     }
 };

@@ -20,40 +20,36 @@
 
 #include "ISystem.h"
 #include "../../Renderer/ComputeShader.h"
+#include "../NetworkTypes.h"
 #include <glm/ext/vector_float4.hpp>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <cstdint>
+#include <atomic>
 
- // Forward declaration
 class VulkanRHI;
-
 
 class SystemCollision : public ISystem
 {
 public:
-	// GPU-side layout for a single entity used by the compute shader.
-	// Matches what the collision.compute shader will read/write.
 	struct ShaderEntityGPU
 	{
-		glm::vec4 position; // xyz = position, w = padding
-		glm::vec4 velocity; // xyz = velocity, w = padding
-		glm::vec4 collider; // x = colliderType (as float/int bitcast), y = radius, z = halfExtentX, w = halfExtentY (or extra)
+		glm::vec4 position;
+		glm::vec4 velocity;
+		glm::vec4 collider;
 	};
 
-	SystemCollision(uint32_t numEntities, VulkanRHI* rhi = nullptr) : m_NumEntities(numEntities)
+	SystemCollision(uint32_t numEntities, VulkanRHI* rhi = nullptr, std::atomic<PeerID>* localPeerId = nullptr)
+		: m_NumEntities(numEntities), m_localPeerId(localPeerId)
 	{
 	}
 	SystemCollision() = default;
-	~SystemCollision()
-	{
-	}
+	~SystemCollision() = default;
 
-	// Inherited via ISystem
 	void OnUpdate(std::span<Entity> entities, float deltaTime) override;
 
 private:
-	// Stored for use by OnUpdate (implemented elsewhere)
 	uint32_t m_NumEntities = 0;
 	VkDeviceSize m_EntitySize = 0;
+	std::atomic<PeerID>* m_localPeerId = nullptr;
 };

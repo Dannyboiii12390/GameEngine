@@ -24,7 +24,9 @@
 #include "IMGUI/imgui.h"
 #include "Core/Scenes/FlatBufferScene.h"
 
-
+#define GLM_FORCE_INTRINSICS
+#define GLM_FORCE_SSE2
+#define GLM_FORCE_AVX
 /*
 flocking performance comparison:
 1.	Ensure both paths are actually testable

@@ -29,8 +29,9 @@ struct SyncPacket {
     uint32_t objectId;
     float posX, posY, posZ;
     float rotX, rotY, rotZ, rotW;
-    float scaleX, scaleY, scaleZ; // Added scale fields
+    float scaleX, scaleY, scaleZ;
     float velX, velY, velZ;
+    float angVelX, angVelY, angVelZ;
 };
 #pragma pack(pop)
 
