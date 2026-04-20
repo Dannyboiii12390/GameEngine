@@ -9,6 +9,7 @@
 #include "Components/ComponentPhysics.h"
 #include "Components/ComponentCollision.h"
 #include "Components/ComponentNetwork.h"
+#include "Components/ComponentAnimation.h"
 
 #include <iostream>
 
@@ -86,6 +87,16 @@ public:
 					auto component = std::make_unique<ComponentNetwork>(std::forward<Args>(args)...);
 					m_Components[type] = std::move(component);
 					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Network));
+				}
+				break;
+			}
+			case EComponentType::Component_Animation:
+			{
+				if constexpr (std::is_constructible_v<ComponentAnimation, Args...>)
+				{
+					auto component = std::make_unique<ComponentAnimation>(std::forward<Args>(args)...);
+					m_Components[type] = std::move(component);
+					m_EntityType = static_cast<EComponentType>(to_mask(m_EntityType) | to_mask(EComponentType::Component_Animation));
 				}
 				break;
 			}

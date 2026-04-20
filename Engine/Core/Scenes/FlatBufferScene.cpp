@@ -49,6 +49,7 @@
 #include "../../DebugUtils.h"
 #include "../Systems/SystemNetworkSync.h"
 #include "../Components/ComponentAnimation.h"
+#include "AnimationScene.h"
 
 namespace
 {
@@ -656,6 +657,9 @@ void FlatBufferScene::Draw()
 			{
 				if (ImGui::BeginMenu("Scenes"))
 				{
+					if (ImGui::MenuItem("Animation Demo"))
+						SceneManager::Instance().RequestReplaceScene(std::make_unique<AnimationScene>(*m_window, m_vulkanRHI, m_gui));
+
 					if (ImGui::MenuItem("Ball Drop"))
 						SceneManager::Instance().RequestReplaceScene(std::make_unique<BallDropScene>(*m_window, m_vulkanRHI, m_gui));
 

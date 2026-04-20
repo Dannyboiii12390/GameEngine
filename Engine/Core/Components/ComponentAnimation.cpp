@@ -1,18 +1,19 @@
-
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include "ComponentAnimation.h"
 #include <glm/gtx/quaternion.hpp>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 ComponentAnimation::ComponentAnimation()
-    : m_easingType(EasingType::LINEAR),
-    m_pathMode(PathMode::STOP),
-    m_totalDuration(0.0f),
-    m_currentTime(0.0f),
-    m_isPlaying(true),
-    m_isReversing(false)
+    : IComponent(EComponentType::Component_Animation),
+      m_easingType(EasingType::LINEAR),
+      m_pathMode(PathMode::STOP),
+      m_totalDuration(0.0f),
+      m_currentTime(0.0f),
+      m_isPlaying(true),
+      m_isReversing(false)
 {
 }
 
@@ -29,6 +30,9 @@ void ComponentAnimation::AddWaypoint(const glm::vec3& position, const glm::vec3&
     {
         m_totalDuration = absoluteTime;
     }
+
+    std::cout << "Added waypoint at time " << absoluteTime << " pos: (" 
+              << position.x << ", " << position.y << ", " << position.z << ")" << std::endl;
 }
 
 void ComponentAnimation::SetWaypoints(const std::vector<Waypoint>& waypoints)

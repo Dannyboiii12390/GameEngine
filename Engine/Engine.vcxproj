@@ -163,6 +163,7 @@
     <ClCompile Include="Core\Managers\ResourceManager.cpp" />
     <ClCompile Include="Core\Managers\SystemManager.cpp" />
     <ClCompile Include="Core\NetworkTypes.h" />
+    <ClCompile Include="Core\Scenes\AnimationScene.cpp" />
     <ClCompile Include="Core\Scenes\BallDropScene.cpp" />
     <ClCompile Include="Core\Scenes\FlatBufferScene.cpp" />
     <ClCompile Include="Core\Scenes\PanningScene.cpp" />
@@ -209,6 +210,7 @@
     <ClInclude Include="Core\Managers\ResourceManager.h" />
     <ClInclude Include="Core\Managers\SystemManager.h" />
     <ClInclude Include="Core\Networking\NetworkTypes.h" />
+    <ClInclude Include="Core\Scenes\AnimationScene.h" />
     <ClInclude Include="Core\Scenes\BallDropScene.h" />
     <ClInclude Include="Core\Scenes\FlatBufferScene.h" />
     <ClInclude Include="Core\Scenes\IScene.h" />

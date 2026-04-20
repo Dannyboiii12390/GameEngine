@@ -1,15 +1,14 @@
 #pragma once
 
 #include "ISystem.h"
-#include "../Components/ComponentAnimation.h"
-#include "../Components/ComponentTransform.h"
-#include "../Entity.h"
 #include <span>
+
+class Entity;
 
 class SystemAnimation : public ISystem
 {
 public:
-    SystemAnimation() = default;
+    SystemAnimation() : ISystem() {}
     virtual ~SystemAnimation() = default;
 
     virtual void OnUpdate(std::span<Entity> entities, float deltaTime) override;

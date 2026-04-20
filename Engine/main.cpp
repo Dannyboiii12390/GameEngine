@@ -23,32 +23,16 @@
 #include "IMGUI/imgui.h"
 #include "Core/Scenes/FlatBufferScene.h"
 
+#include "Core/Scenes/AnimationScene.h"
+
 #define GLM_FORCE_INTRINSICS
 #define GLM_FORCE_SSE2
 #define GLM_FORCE_AVX
 /*
-flocking performance comparison:
-1.	Ensure both paths are actually testable
-•	Your shader selection is compile-time via USE_SPATIAL_HASH in SystemFlocking.h.
-•	For true A/B with one executable, load flockingSpatial.comp.spv and switch with useSpatialHash (0 = brute force, 1 = spatial).
-•	Otherwise you are comparing different builds, which is noisier.
-2.	Measure the right metric
-•	Primary: time spent in flocking update per frame (ms).
-•	Secondary: overall frame time / FPS.
-3.	Instrument two timings
-•	CPU-side flocking time: around OnUpdate (or just the flocking block).
-•	GPU compute time: Vulkan timestamp queries around m_compute->Dispatch(...) (best signal for shader improvement).
-4.	Run controlled tests
-•	Same scene, same camera, same boid initial state/seed.
-•	Disable VSync for perf runs (already done in non-debug in main.cpp).
-•	Test multiple boid counts (example: 256, 512, 1024, 2048, 4096, 8192).
-•	For each count and mode: warm up 3–5 seconds, then record 20–30 seconds.
-5.	Report statistically
-•	For each mode/count: mean, median, p95 flocking ms.
-•	Compute speedup: brute_ms / spatial_ms.
-•	Add a table/graph to satisfy the checklist “performance comparison” item in check_list.md.
+- [ ] {Bug: after swapping scenes, camera can no longer be controlled by input}
+    - likely due to dangling pointer in VulkanRHI after old scene's camera is destroyed 
+    - fix by having VulkanRHI not take ownership of camera and instead just have a raw pointer that scenes set to point to their active camera
 */
-
 
 /*
 Todo List
@@ -104,7 +88,7 @@ int main()
 
         //sceneManager.AddScene(std::make_unique<BallDropScene>(window, &vulkanRHI, &gui));
 		SceneManager& sceneManager = SceneManager::Instance();
-		sceneManager.AddScene(std::make_unique<FlatBufferScene>(window, &vulkanRHI, &gui));
+		sceneManager.AddScene(std::make_unique<AnimationScene>(window, &vulkanRHI, &gui));
 
         Physics::Sphere testSphere(glm::vec3(0.0f, 0.0f, 0.0f), 1.0f);
         Physics::Sphere testSphere2(glm::vec3(0.5f, 0.0f, 0.0f), 1.0f);
@@ -118,9 +102,8 @@ int main()
             float deltaTime = getDeltaTime();
 
             IScene* scene = sceneManager.GetCurrentScene();
-            scene->Update(deltaTime);
-
             scene->HandleInput(deltaTime);
+            scene->Update(deltaTime);
             scene->Draw();
 
 			sceneManager.ApplyPending();

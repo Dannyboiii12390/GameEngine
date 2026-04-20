@@ -55,13 +55,13 @@
 - [x] Network dynamic state to all peers every frame
 
 #### Animated Objects
-- [ ] Waypoints with position, orientation, and absolute time
-- [ ] Path modes implemented:
-  - [ ] STOP
-  - [ ] LOOP
-  - [ ] REVERSE
-- [ ] Easing types implemented (LINEAR, SMOOTHSTEP)
-- [ ] Collision with simulated objects transfers momentum correctly
+- [x] Waypoints with position, orientation, and absolute time
+- [x] Path modes implemented:
+  - [x] STOP
+  - [x] LOOP
+  - [x] REVERSE
+- [x] Easing types implemented (LINEAR, SMOOTHSTEP)
+- [x] Collision with simulated objects transfers momentum correctly
 
 ### Object Spawners
 - [ ] BaseSpawner properties:

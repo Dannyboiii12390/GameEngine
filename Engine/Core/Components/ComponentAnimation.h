@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <cstdint>
+#include "IComponent.h"
 
 struct Waypoint
 {
@@ -24,7 +25,7 @@ enum class PathMode : int8_t
     REVERSE = 2
 };
 
-class ComponentAnimation
+class ComponentAnimation : public IComponent
 {
 public:
     ComponentAnimation();
