@@ -1,4 +1,5 @@
 #include "Spawner.h"
+#include "Entity.h"
 #include <glm/gtc/random.hpp>
 
 Spawner::Spawner(const SpawnerConfig& config)

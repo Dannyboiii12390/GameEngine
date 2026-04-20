@@ -6,7 +6,7 @@
 #include <memory>
 #include <functional>
 #include <random>
-#include "Networking/NetworkTypes.h"
+#include "NetworkTypes.h"
 
 namespace Simulation {
     enum class SpawnType : uint8_t {
