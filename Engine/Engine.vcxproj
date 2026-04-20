@@ -166,6 +166,7 @@
     <ClCompile Include="Core\Scenes\FlatBufferScene.cpp" />
     <ClCompile Include="Core\Scenes\PanningScene.cpp" />
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
+    <ClCompile Include="Core\Spawner.cpp" />
     <ClCompile Include="Core\Spawner.h" />
     <ClCompile Include="Core\Systems\SystemCollision.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.h" />
@@ -248,6 +249,8 @@
     <None Include="Assets\Scene.fbs" />
     <None Include="check_list.md" />
     <None Include="DebugUtils.h" />
+    <None Include="flocking_brute_compute_times.csv" />
+    <None Include="flocking_spatial_compute_times.csv" />
     <None Include="packages.config" />
     <CustomBuild Include="SHADERS\object.frag">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
