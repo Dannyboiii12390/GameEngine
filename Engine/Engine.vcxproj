@@ -152,6 +152,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Core\Components\ComponentAnimation.cpp" />
     <ClCompile Include="Core\Components\ComponentCollision.cpp" />
     <ClCompile Include="Core\Components\ComponentCollision.h" />
     <ClCompile Include="Core\Components\ComponentGeometry.cpp" />
@@ -168,6 +169,7 @@
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
     <ClCompile Include="Core\Spawner.cpp" />
     <ClCompile Include="Core\Spawner.h" />
+    <ClCompile Include="Core\Systems\SystemAnimation.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.h" />
     <ClCompile Include="Core\Systems\SystemFlocking.cpp" />
@@ -195,6 +197,7 @@
     <ClCompile Include="Core\Managers\SceneManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Core\Components\ComponentAnimation.h" />
     <ClInclude Include="Core\Components\ComponentGeometry.h" />
     <ClInclude Include="Core\Components\ComponentNetwork.h" />
     <ClInclude Include="Core\Components\ComponentPhysics.h" />
@@ -213,6 +216,7 @@
     <ClInclude Include="Core\Scenes\Spawner.h" />
     <ClInclude Include="Core\Scenes\TemplateScene.h" />
     <ClInclude Include="Core\Systems\ISystem.h" />
+    <ClInclude Include="Core\Systems\SystemAnimation.h" />
     <ClInclude Include="Core\Systems\SystemFlocking.h" />
     <ClInclude Include="Core\Systems\SystemNetworkSync.h" />
     <ClInclude Include="Core\Systems\SystemPhysics.h" />

@@ -1,6 +1,7 @@
 #pragma once
 #include <span>
 
+
 enum class ESystemType
 {
 	System_Invalid = 0,
@@ -8,7 +9,8 @@ enum class ESystemType
 	System_Rendering = 1 << 1,
 	System_Physics = 1 << 2,
 	System_Collision = 1 << 3,
-	System_Network_Sync = 1 << 4
+	System_Network_Sync = 1 << 4,
+	System_Animation = 1 << 5
 };
 class Entity;
 

@@ -48,6 +48,7 @@
 #include <flatbuffers/flatbuffers.h>
 #include "../../DebugUtils.h"
 #include "../Systems/SystemNetworkSync.h"
+#include "../Components/ComponentAnimation.h"
 
 namespace
 {
@@ -1743,6 +1744,57 @@ void FlatBufferScene::DeserializeState()
 				{
 					collider->setRotation(rot);
 					collider->setScale(scale);
+				}
+			}
+
+			// Add this section in the DeserializeState() method where animated objects are loaded
+			// Find the section where behaviourType is checked and add this for Animated objects:
+
+			if (objectType == ObjectType::Animated)
+			{
+				// Load animation component if the object is animated
+				if (auto* animBehaviour = objFlat->behaviour_as_AnimatedObject())
+				{
+					entity.AddComponent(EComponentType::Component_Animation);
+					if (auto* animComp = entity.GetComponent<ComponentAnimation>(EComponentType::Component_Animation))
+					{
+						// Set easing and path modes
+						animComp->SetEasingType(static_cast<EasingType>(animBehaviour->easing()));
+						animComp->SetPathMode(static_cast<PathMode>(animBehaviour->path_mode()));
+						animComp->SetTotalDuration(animBehaviour->total_duration());
+
+						// Load waypoints
+						if (animBehaviour->waypoints())
+						{
+							for (auto wpFlat : *animBehaviour->waypoints())
+							{
+								if (!wpFlat) continue;
+
+								glm::vec3 wpPos(0.0f);
+								glm::vec3 wpRot(0.0f);
+								float wpTime = 0.0f;
+
+								if (wpFlat->position())
+								{
+									const auto& pos = wpFlat->position();
+									wpPos = glm::vec3(pos->x(), pos->y(), pos->z());
+								}
+
+								if (wpFlat->rotation())
+								{
+									const auto& rot = wpFlat->rotation();
+									// Convert from yaw, pitch, roll to pitch, yaw, roll
+									wpRot = glm::vec3(rot->pitch(), rot->yaw(), rot->roll());
+								}
+
+								wpTime = wpFlat->time();
+
+								animComp->AddWaypoint(wpPos, wpRot, wpTime);
+							}
+						}
+
+						animComp->Play();
+					}
 				}
 			}
 
