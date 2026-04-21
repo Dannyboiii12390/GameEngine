@@ -171,6 +171,14 @@ namespace
 		// fallback if memory texture creation fails
 		return Texture(rhi, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	}
+
+	static constexpr PeerID kRuntimePeerCount = 2;
+	static PeerID RemapOwnerForRuntime(PeerID ownerId)
+	{
+		if (ownerId == ALL_PEERS)
+			return ALL_PEERS;
+		return ownerId % kRuntimePeerCount;
+	}
 }
 // Call once at startup (before OpenMP work)
 void LimitOpenMPCores()
@@ -1625,11 +1633,15 @@ void FlatBufferScene::DeserializeState()
 			glm::vec3 angularVel(0.0f);
 
 			PeerID assignedOwnerId = ALL_PEERS;
+			PeerID ownerColorId = ALL_PEERS;
+
 			if (objectType == ObjectType::Simulated)
 			{
 				if (auto* simBehaviour = objFlat->behaviour_as_SimulatedObject())
 				{
-					assignedOwnerId = OwnerTypeToPeerId(simBehaviour->owner());
+					ownerColorId = OwnerTypeToPeerId(simBehaviour->owner());
+					assignedOwnerId = RemapOwnerForRuntime(ownerColorId);
+
 					if (simBehaviour->initial_state())
 					{
 						const auto& lv = simBehaviour->initial_state()->linear_velocity();
@@ -1640,7 +1652,8 @@ void FlatBufferScene::DeserializeState()
 				}
 				else
 				{
-					assignedOwnerId = static_cast<PeerID>(objectIndex % 4);
+					ownerColorId = static_cast<PeerID>(objectIndex % 4);
+					assignedOwnerId = RemapOwnerForRuntime(ownerColorId);
 				}
 			}
 
@@ -1740,7 +1753,7 @@ void FlatBufferScene::DeserializeState()
 					}
 
 					// Owner color coding: red/green/blue/yellow
-					const Texture ownerTex = CreateOwnerTexture(m_vulkanRHI, assignedOwnerId);
+					const Texture ownerTex = CreateOwnerTexture(m_vulkanRHI, ownerColorId);
 					geom->AddTexture(m_vulkanRHI, ownerTex);
 				}
 			}
