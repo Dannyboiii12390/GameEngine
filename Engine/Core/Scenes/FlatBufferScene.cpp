@@ -256,6 +256,57 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	PeerID localPeerId = m_localPeerId.load();
 
+	Entity floor;
+	const glm::vec3 floorPos(0.0f, -5.0f, 0.0f);
+
+	floor.AddComponent(
+		EComponentType::Component_Transform,
+		floorPos,
+		glm::vec3(-90.0f, 0.0f, 0.0f),
+		glm::vec3(100.0f, 1.0f, 100.0f));
+
+	floor.AddComponent(EComponentType::Component_Geometry);
+	if (auto* geom = floor.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry))
+	{
+		MeshData meshData = ResourceManager::CreatePlaneMesh(1.0f, 100.0f, 100.0f, 1, 1);
+		auto [verts, indices] = meshData;
+
+		geom->InitializeMesh(m_vulkanRHI, verts, indices);
+		geom->InitializePipeline(
+			m_vulkanRHI,
+			m_vulkanRHI->GetRenderPass(),
+			m_vulkanRHI->GetSwapchainExtent(),
+			"SHADERS/object.vert.spv",
+			"SHADERS/object.frag.spv");
+
+		const unsigned char purple[4] = { 128, 0, 128, 255 };
+		if (auto tex = Texture::CreateFromMemory(m_vulkanRHI, purple, 1, 1, 4, TextureType::Albedo, false))
+		{
+			geom->AddTexture(m_vulkanRHI, *tex);
+		}
+		else
+		{
+			Texture fallback(m_vulkanRHI, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
+			geom->AddTexture(m_vulkanRHI, fallback);
+		}
+	}
+
+	floor.AddComponent(EComponentType::Component_Collision);
+	if (auto* collision = floor.GetComponent<ComponentCollision>(EComponentType::Component_Collision))
+	{
+		collision->SetCollisionRole(CollisionRole::Container);
+
+		// Match BallDropScene: start with XY plane basis.
+		// The transform rotation (-90,0,0) applied by SystemCollision rotates this to a horizontal floor.
+		collision->SetCollider(std::make_unique<Physics::Plane>(
+			floorPos,
+			glm::vec3(1.0f, 0.0f, 0.0f),
+			glm::vec3(0.0f, 1.0f, 0.0f)));
+	}
+
+	m_entities.push_back(std::move(floor));
+
+
 	// 4. Register the required systems so objects are rendered
 	m_systemManager.RegisterSystem(std::make_unique<SystemVelocity>());
 	m_systemManager.RegisterSystem(std::make_unique<SystemFlocking>(m_vulkanRHI, &m_localPeerId));
@@ -1742,7 +1793,7 @@ void FlatBufferScene::DeserializeState()
 					collision->SetCollider(std::make_unique<Physics::Sphere>(pos, r));
 					break;
 				}
-				}
+				};
 
 				if (auto* collider = collision->GetCollider())
 				{

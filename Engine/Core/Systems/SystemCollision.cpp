@@ -288,6 +288,16 @@ void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 
 		if (collisionA->Collided(*collisionB->GetCollider()))
 		{
+			Physics::Collider* colliderA = collisionA->GetCollider();
+			Physics::Collider* colliderB = collisionB->GetCollider();
+
+			const bool aIsPlane = colliderA && colliderA->getType() == Physics::EColliderType::PLANE;
+			const bool bIsPlane = colliderB && colliderB->getType() == Physics::EColliderType::PLANE;
+
+			const bool aHasVelocity = entityA.HasComponent(EComponentType::Component_Velocity);
+			const bool bHasVelocity = entityB.HasComponent(EComponentType::Component_Velocity);
+
+			// Normal ownership-based resolve
 			if (canResolveA)
 				collisionA->InvokeCollision(entityA, entityB);
 

@@ -57,8 +57,14 @@ void CollisionResponse(Entity& self, Entity& other)
 {
 	auto* selfColComp = self.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
 	auto* col = selfColComp->GetCollider();
-	if (col->getType() != Physics::EColliderType::SPHERE)
+
+	const auto selfType = col->getType();
+	if (selfType != Physics::EColliderType::SPHERE &&
+		selfType != Physics::EColliderType::CAPSULE &&
+		selfType != Physics::EColliderType::CYLINDER)
+	{
 		return;
+	}
 
 	Physics::Collider* otherCollider = nullptr;
 	if (other.HasComponent(EComponentType::Component_Collision))
