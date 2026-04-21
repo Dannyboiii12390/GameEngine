@@ -153,7 +153,7 @@
 - [x] glm math library only
 - [x] Winsock 2 networking only
 - [x] Win32 or C++23 threads only
-- [ ] Demonstrable on RBB-335 PCs
+- [x] Demonstrable on RBB-335 PCs
 
 ---
 
@@ -161,5 +161,5 @@
 - [ ] Report (Markdown on GitHub):
   - [ ] System architecture & threads/networking (≤1000 words)
   - [ ] Motion physics & collision detection/response (≤1000 words)
-- [ ] Source code on GitHub
+- [x] Source code on GitHub
 - [ ] Narrated video demonstrating features submitted via Canvas
