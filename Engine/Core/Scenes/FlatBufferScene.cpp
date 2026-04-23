@@ -16,6 +16,8 @@
 #include <string>
 #include <random>
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -179,7 +181,67 @@ namespace
 			return ALL_PEERS;
 		return ownerId % kRuntimePeerCount;
 	}
+
+	// add these helper mappings inside anonymous namespace
+
+	static RuntimeSpawner::SpawnType ToRuntimeSpawnType(uint8_t spawnType)
+	{
+		switch (static_cast<Simulation::SpawnType>(spawnType))
+		{
+		case Simulation::SpawnType_SingleBurstSpawn: return RuntimeSpawner::SpawnType::SingleBurst;
+		case Simulation::SpawnType_RepeatingSpawn:   return RuntimeSpawner::SpawnType::Repeating;
+		default:                                     return RuntimeSpawner::SpawnType::None;
+		}
+	}
+
+	static RuntimeSpawner::SpawnLocation ToRuntimeSpawnLocation(uint8_t locationType)
+	{
+		switch (static_cast<Simulation::SpawnLocation>(locationType))
+		{
+		case Simulation::SpawnLocation_FixedLocation: return RuntimeSpawner::SpawnLocation::Fixed;
+		case Simulation::SpawnLocation_RandomBox:     return RuntimeSpawner::SpawnLocation::Box;
+		case Simulation::SpawnLocation_RandomSphere:  return RuntimeSpawner::SpawnLocation::Sphere;
+		default:                                      return RuntimeSpawner::SpawnLocation::None;
+		}
+	}
+
+	static RuntimeSpawner::SpawnerShapeType ToRuntimeSpawnerShape(uint8_t spawnerType)
+	{
+		switch (static_cast<Simulation::SpawnerType>(spawnerType))
+		{
+		case Simulation::SpawnerType_CylinderSpawner: return RuntimeSpawner::SpawnerShapeType::Cylinder;
+		case Simulation::SpawnerType_CapsuleSpawner:  return RuntimeSpawner::SpawnerShapeType::Capsule;
+		case Simulation::SpawnerType_CuboidSpawner:   return RuntimeSpawner::SpawnerShapeType::Cuboid;
+		case Simulation::SpawnerType_SphereSpawner:
+		default:                                      return RuntimeSpawner::SpawnerShapeType::Sphere;
+		}
+	}
+
+	static Simulation::Shape SpawnerTypeToShape(uint8_t spawnerType)
+	{
+		switch (static_cast<Simulation::SpawnerType>(spawnerType))
+		{
+		case Simulation::SpawnerType_CylinderSpawner: return Simulation::Shape_Cylinder;
+		case Simulation::SpawnerType_CapsuleSpawner:  return Simulation::Shape_Capsule;
+		case Simulation::SpawnerType_CuboidSpawner:   return Simulation::Shape_Cuboid;
+		case Simulation::SpawnerType_SphereSpawner:
+		default:                                      return Simulation::Shape_Sphere;
+		}
+	}
+
+	static PeerID SpawnerOwnerToPeerId(Simulation::SpawnerOwnerType owner)
+	{
+		switch (owner)
+		{
+		case Simulation::SpawnerOwnerType_ONE:   return 0;
+		case Simulation::SpawnerOwnerType_TWO:   return 1;
+		case Simulation::SpawnerOwnerType_THREE: return 2;
+		case Simulation::SpawnerOwnerType_FOUR:  return 3;
+		default:                                 return 0;
+		}
+	}
 }
+
 // Call once at startup (before OpenMP work)
 void LimitOpenMPCores()
 {
@@ -321,6 +383,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemPhysics>(&m_localPeerId));
 	m_systemManager.RegisterSystem(std::make_unique<SystemCollision>(m_entities.size(), m_vulkanRHI, &m_localPeerId));
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
+
 	m_networkData = std::make_shared<SharedNetworkData>();
 	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>(&m_localPeerId, m_networkData));
 }
@@ -658,6 +721,8 @@ void FlatBufferScene::Update(float deltaTime)
 	if (m_paused.load())
 		deltaTime = 0.0f;
 
+	UpdateSpawnerRuntime(deltaTime);
+
 	if (!m_systemManager.IsSimulationThreadRunning())
 	{
 		m_systemManager.Update(m_entities, deltaTime);
@@ -968,6 +1033,164 @@ void FlatBufferScene::Draw()
 				}
 			}
 
+			{
+				ImGui::Begin("Spawners");
+				bool rebuildSpawners = false;
+				int removeIndex = -1;
+
+				if (ImGui::Button("Add Spawner"))
+				{
+					SpawnerData sd;
+					sd.name = "Spawner_" + std::to_string(m_spawners.size());
+					sd.spawnType = static_cast<uint8_t>(Simulation::SpawnType_SingleBurstSpawn);
+					sd.locationType = static_cast<uint8_t>(Simulation::SpawnLocation_FixedLocation);
+					sd.spawnerType = static_cast<uint8_t>(Simulation::SpawnerType_SphereSpawner);
+					sd.owner = static_cast<int>(Simulation::SpawnerOwnerType_ONE);
+					m_spawners.push_back(sd);
+					rebuildSpawners = true;
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Save Spawners"))
+				{
+					SerializeState();
+				}
+
+				for (int i = 0; i < static_cast<int>(m_spawners.size()); ++i)
+				{
+					SpawnerData& sp = m_spawners[i];
+					const std::string nodeLabel = (sp.name.empty() ? ("Spawner_" + std::to_string(i)) : sp.name) + "##" + std::to_string(i);
+
+					if (!ImGui::TreeNode(nodeLabel.c_str()))
+						continue;
+
+					char nameBuf[128]{};
+					std::snprintf(nameBuf, sizeof(nameBuf), "%s", sp.name.c_str());
+					if (ImGui::InputText(("Name##" + std::to_string(i)).c_str(), nameBuf, sizeof(nameBuf)))
+					{
+						sp.name = nameBuf;
+						rebuildSpawners = true;
+					}
+
+					rebuildSpawners |= ImGui::DragFloat(("Start Time##" + std::to_string(i)).c_str(), &sp.startTime, 0.01f, 0.0f, 3600.0f);
+
+					int spawnIdx = (sp.spawnType == static_cast<uint8_t>(Simulation::SpawnType_RepeatingSpawn)) ? 1 : 0;
+					if (ImGui::Combo(("Spawn Type##" + std::to_string(i)).c_str(), &spawnIdx, "SingleBurst\0Repeating\0"))
+					{
+						sp.spawnType = (spawnIdx == 0)
+							? static_cast<uint8_t>(Simulation::SpawnType_SingleBurstSpawn)
+							: static_cast<uint8_t>(Simulation::SpawnType_RepeatingSpawn);
+						rebuildSpawners = true;
+					}
+
+					int locIdx = 0;
+					if (sp.locationType == static_cast<uint8_t>(Simulation::SpawnLocation_RandomBox)) locIdx = 1;
+					if (sp.locationType == static_cast<uint8_t>(Simulation::SpawnLocation_RandomSphere)) locIdx = 2;
+					if (ImGui::Combo(("Location##" + std::to_string(i)).c_str(), &locIdx, "Fixed\0Box\0Sphere\0"))
+					{
+						sp.locationType = (locIdx == 0) ? static_cast<uint8_t>(Simulation::SpawnLocation_FixedLocation)
+							: (locIdx == 1) ? static_cast<uint8_t>(Simulation::SpawnLocation_RandomBox)
+							: static_cast<uint8_t>(Simulation::SpawnLocation_RandomSphere);
+						rebuildSpawners = true;
+					}
+
+					int shapeIdx = 0;
+					if (sp.spawnerType == static_cast<uint8_t>(Simulation::SpawnerType_CylinderSpawner)) shapeIdx = 1;
+					if (sp.spawnerType == static_cast<uint8_t>(Simulation::SpawnerType_CapsuleSpawner)) shapeIdx = 2;
+					if (sp.spawnerType == static_cast<uint8_t>(Simulation::SpawnerType_CuboidSpawner)) shapeIdx = 3;
+					if (ImGui::Combo(("Shape##" + std::to_string(i)).c_str(), &shapeIdx, "Sphere\0Cylinder\0Capsule\0Cuboid\0"))
+					{
+						sp.spawnerType = (shapeIdx == 0) ? static_cast<uint8_t>(Simulation::SpawnerType_SphereSpawner)
+							: (shapeIdx == 1) ? static_cast<uint8_t>(Simulation::SpawnerType_CylinderSpawner)
+							: (shapeIdx == 2) ? static_cast<uint8_t>(Simulation::SpawnerType_CapsuleSpawner)
+							: static_cast<uint8_t>(Simulation::SpawnerType_CuboidSpawner);
+						rebuildSpawners = true;
+					}
+
+					int ownerIdx = std::clamp(sp.owner, 0, 4);
+					if (ImGui::Combo(("Owner##" + std::to_string(i)).c_str(), &ownerIdx, "ONE\0TWO\0THREE\0FOUR\0SEQUENTIAL\0"))
+					{
+						sp.owner = ownerIdx;
+						rebuildSpawners = true;
+					}
+
+					char matBuf[128]{};
+					std::snprintf(matBuf, sizeof(matBuf), "%s", sp.material.c_str());
+					if (ImGui::InputText(("Material##" + std::to_string(i)).c_str(), matBuf, sizeof(matBuf)))
+					{
+						sp.material = matBuf;
+						rebuildSpawners = true;
+					}
+
+					rebuildSpawners |= ImGui::DragFloat3(("Linear Vel Min##" + std::to_string(i)).c_str(), &sp.linearVelMin.x, 0.05f);
+					rebuildSpawners |= ImGui::DragFloat3(("Linear Vel Max##" + std::to_string(i)).c_str(), &sp.linearVelMax.x, 0.05f);
+					rebuildSpawners |= ImGui::DragFloat3(("Angular Vel Min##" + std::to_string(i)).c_str(), &sp.angularVelMin.x, 0.05f);
+					rebuildSpawners |= ImGui::DragFloat3(("Angular Vel Max##" + std::to_string(i)).c_str(), &sp.angularVelMax.x, 0.05f);
+
+					if (sp.locationType == static_cast<uint8_t>(Simulation::SpawnLocation_FixedLocation))
+					{
+						rebuildSpawners |= ImGui::DragFloat3(("Fixed Pos##" + std::to_string(i)).c_str(), &sp.fixedPosition.x, 0.05f);
+					}
+					else if (sp.locationType == static_cast<uint8_t>(Simulation::SpawnLocation_RandomBox))
+					{
+						rebuildSpawners |= ImGui::DragFloat3(("Box Min##" + std::to_string(i)).c_str(), &sp.boxMin.x, 0.05f);
+						rebuildSpawners |= ImGui::DragFloat3(("Box Max##" + std::to_string(i)).c_str(), &sp.boxMax.x, 0.05f);
+					}
+					else
+					{
+						rebuildSpawners |= ImGui::DragFloat3(("Sphere Center##" + std::to_string(i)).c_str(), &sp.sphereCenter.x, 0.05f);
+						rebuildSpawners |= ImGui::DragFloat(("Sphere Radius##" + std::to_string(i)).c_str(), &sp.sphereRadius, 0.05f, 0.01f, 1000.0f);
+					}
+
+					if (sp.spawnType == static_cast<uint8_t>(Simulation::SpawnType_SingleBurstSpawn))
+					{
+						int burst = static_cast<int>(sp.singleBurstCount);
+						if (ImGui::DragInt(("Burst Count##" + std::to_string(i)).c_str(), &burst, 1.0f, 1, 100000))
+						{
+							sp.singleBurstCount = static_cast<uint32_t>(std::max(1, burst));
+							rebuildSpawners = true;
+						}
+					}
+					else
+					{
+						rebuildSpawners |= ImGui::DragFloat(("Repeat Interval##" + std::to_string(i)).c_str(), &sp.repeatingInterval, 0.01f, 0.01f, 1000.0f);
+						int maxCount = static_cast<int>(sp.repeatingMaxCount);
+						if (ImGui::DragInt(("Repeat Max Count##" + std::to_string(i)).c_str(), &maxCount, 1.0f, 1, 100000))
+						{
+							sp.repeatingMaxCount = static_cast<uint32_t>(std::max(1, maxCount));
+							rebuildSpawners = true;
+						}
+					}
+
+					rebuildSpawners |= ImGui::DragFloat(("Radius Min##" + std::to_string(i)).c_str(), &sp.radiusMin, 0.01f, 0.01f, 1000.0f);
+					rebuildSpawners |= ImGui::DragFloat(("Radius Max##" + std::to_string(i)).c_str(), &sp.radiusMax, 0.01f, 0.01f, 1000.0f);
+					rebuildSpawners |= ImGui::DragFloat(("Height Min##" + std::to_string(i)).c_str(), &sp.heightMin, 0.01f, 0.01f, 1000.0f);
+					rebuildSpawners |= ImGui::DragFloat(("Height Max##" + std::to_string(i)).c_str(), &sp.heightMax, 0.01f, 0.01f, 1000.0f);
+					rebuildSpawners |= ImGui::DragFloat3(("Size Min##" + std::to_string(i)).c_str(), &sp.sizeMin.x, 0.01f);
+					rebuildSpawners |= ImGui::DragFloat3(("Size Max##" + std::to_string(i)).c_str(), &sp.sizeMax.x, 0.01f);
+
+					if (ImGui::Button(("Remove##" + std::to_string(i)).c_str()))
+					{
+						removeIndex = i;
+					}
+
+					ImGui::TreePop();
+				}
+
+				if (removeIndex >= 0)
+				{
+					m_spawners.erase(m_spawners.begin() + removeIndex);
+					rebuildSpawners = true;
+				}
+
+				if (rebuildSpawners)
+				{
+					RebuildSpawnerRuntime();
+				}
+
+				ImGui::End();
+			}
+
 			if (show_demo_window)
 				ImGui::ShowDemoWindow(&show_demo_window);
 
@@ -1244,6 +1467,9 @@ void FlatBufferScene::DeserializeState()
 {
 	m_entities.clear();
 	m_entities.clear();
+
+	uint32_t objectIndex = 0; // moved to function scope
+
 	std::ifstream infile("scenes/Level1.bin", std::ios::binary);
 	if (!infile.is_open())
 	{
@@ -1593,8 +1819,7 @@ void FlatBufferScene::DeserializeState()
 	// Load objects
 	if (scene->objects())
 	{
-		uint32_t objectIndex = 0; // Use an index to distribute ownership
-
+		// uint32_t objectIndex = 0; // remove this inner declaration
 		for (auto objFlat : *scene->objects())
 		{
 			if (!objFlat) continue;
@@ -1717,11 +1942,11 @@ void FlatBufferScene::DeserializeState()
 			case Simulation::Shape_Sphere:
 				meshData = ResourceManager::CreateSphereMesh(1.0f, 24, 16);
 				break;
-			case Simulation::Shape_Capsule:
-				meshData = ResourceManager::CreateCapsuleMesh(1.0f, shapeRadius, shapeHeight, 24, 16);
-				break;
 			case Simulation::Shape_Cylinder:
 				meshData = ResourceManager::CreateCylinderMesh(1.0f, shapeRadius, shapeHeight, 24);
+				break;
+			case Simulation::Shape_Capsule:
+				meshData = ResourceManager::CreateCapsuleMesh(1.0f, shapeRadius, shapeHeight, 24, 16);
 				break;
 			case Simulation::Shape_Plane:
 				meshData = ResourceManager::CreatePlaneMesh(1.0f, std::max(1.0f, scale.x), std::max(1.0f, scale.z), 1, 1);
@@ -1871,6 +2096,10 @@ void FlatBufferScene::DeserializeState()
 		}
 	}
 
+	// Set next network ID for spawners and rebuild runtime spawners
+	m_nextSpawnNetworkId = objectIndex;
+	RebuildSpawnerRuntime();
+
 	// Apply gravity flag to all existing physics components in scene
 	for (auto &e : m_entities)
 	{
@@ -1891,4 +2120,211 @@ void FlatBufferScene::RemoveEntity(int index)
 {
 	if (index >= 0 && index < m_entities.size())
 		m_entities.erase(m_entities.begin() + index);
+}
+
+void FlatBufferScene::RebuildSpawnerRuntime()
+{
+	m_runtimeSpawners.clear();
+
+	std::vector<PeerID> peers;
+	for (PeerID i = 0; i < kRuntimePeerCount; ++i)
+	{
+		peers.push_back(i);
+	}
+
+	m_runtimeSpawners.reserve(m_spawners.size());
+
+	for (const SpawnerData& sd : m_spawners)
+	{
+		SpawnerConfig cfg;
+		cfg.name = sd.name;
+		cfg.startTime = sd.startTime;
+		cfg.spawnType = ToRuntimeSpawnType(sd.spawnType);
+		cfg.locationType = ToRuntimeSpawnLocation(sd.locationType);
+		cfg.shapeType = ToRuntimeSpawnerShape(sd.spawnerType);
+
+		cfg.fixedPosition = sd.fixedPosition;
+		cfg.boxMin = sd.boxMin;
+		cfg.boxMax = sd.boxMax;
+		cfg.sphereCenter = sd.sphereCenter;
+		cfg.sphereRadius = sd.sphereRadius;
+
+		cfg.linearVelMin = sd.linearVelMin;
+		cfg.linearVelMax = sd.linearVelMax;
+		cfg.angularVelMin = sd.angularVelMin;
+		cfg.angularVelMax = sd.angularVelMax;
+
+		cfg.radiusMin = std::min(sd.radiusMin, sd.radiusMax);
+		cfg.radiusMax = std::max(sd.radiusMin, sd.radiusMax);
+		cfg.heightMin = std::min(sd.heightMin, sd.heightMax);
+		cfg.heightMax = std::max(sd.heightMin, sd.heightMax);
+		cfg.sizeMin = glm::min(sd.sizeMin, sd.sizeMax);
+		cfg.sizeMax = glm::max(sd.sizeMin, sd.sizeMax);
+
+		cfg.material = sd.material;
+		cfg.ownerSequential = (sd.owner == static_cast<int>(Simulation::SpawnerOwnerType_SEQUENTIAL));
+		cfg.owner = cfg.ownerSequential
+			? 0
+			: RemapOwnerForRuntime(SpawnerOwnerToPeerId(static_cast<Simulation::SpawnerOwnerType>(std::clamp(sd.owner, 0, 3))));
+
+		cfg.burstCount = std::max(1u, sd.singleBurstCount);
+		cfg.repeatInterval = std::max(0.01f, sd.repeatingInterval);
+		cfg.repeatMaxCount = std::max(1u, sd.repeatingMaxCount);
+
+		Spawner runtimeSpawner(cfg);
+		runtimeSpawner.SetPeers(peers);
+		runtimeSpawner.Start();
+		runtimeSpawner.SetActive(true);
+
+		runtimeSpawner.SetSpawnCallback(
+			[this, sd](const glm::vec3& pos,
+				const glm::vec3& linearVel,
+				const glm::vec3& angularVel,
+				const glm::vec3& randomSize,
+				float radius,
+				float height,
+				PeerID owner)
+			{
+				SpawnEntityFromSpawner(sd, pos, linearVel, angularVel, randomSize, radius, height, RemapOwnerForRuntime(owner));
+			});
+
+		m_runtimeSpawners.push_back(std::move(runtimeSpawner));
+	}
+}
+
+void FlatBufferScene::UpdateSpawnerRuntime(float deltaTime)
+{
+	if (deltaTime <= 0.0f || m_runtimeSpawners.empty())
+		return;
+
+	m_sceneTime += deltaTime;
+
+	std::lock_guard<std::mutex> lock(m_sceneMutex);
+	for (Spawner& spawner : m_runtimeSpawners)
+	{
+		if (spawner.Update(deltaTime, m_sceneTime))
+		{
+			spawner.Spawn(m_sceneTime);
+		}
+	}
+}
+
+void FlatBufferScene::SpawnEntityFromSpawner(
+	const SpawnerData& spawner,
+	const glm::vec3& position,
+	const glm::vec3& linearVelocity,
+	const glm::vec3& angularVelocity,
+	const glm::vec3& randomSize,
+	float radius,
+	float height,
+	PeerID ownerId)
+{
+	Entity entity;
+
+	const Simulation::Shape shape = SpawnerTypeToShape(spawner.spawnerType);
+
+	glm::vec3 scale(1.0f);
+	if (shape == Simulation::Shape_Cuboid)
+	{
+		scale = glm::max(randomSize, glm::vec3(0.01f));
+	}
+	else if (shape == Simulation::Shape_Sphere)
+	{
+		const float d = std::max(0.02f, radius * 2.0f);
+		scale = glm::vec3(d);
+	}
+
+	entity.AddComponent(EComponentType::Component_Transform, position, glm::vec3(0.0f), scale);
+	entity.AddComponent(EComponentType::Component_Geometry);
+
+	entity.AddComponent(
+		EComponentType::Component_Network,
+		m_nextSpawnNetworkId++,
+		ObjectType::Simulated,
+		ownerId,
+		spawner.material,
+		static_cast<uint8_t>(shape),
+		static_cast<uint8_t>(Simulation::Behaviour_SimulatedObject),
+		static_cast<uint8_t>(Simulation::CollisionType_SOLID));
+
+	entity.AddComponent(EComponentType::Component_Velocity, linearVelocity, angularVelocity, glm::vec3(0.0f));
+	entity.AddComponent(EComponentType::Component_Physics);
+	if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+	{
+		phys->SetMass(1.0f);
+		phys->SetAffectedByGravity(m_gravityOn);
+	}
+
+	MeshData meshData;
+	switch (shape)
+	{
+	case Simulation::Shape_Sphere:
+		meshData = ResourceManager::CreateSphereMesh(1.0f, 24, 16);
+		break;
+	case Simulation::Shape_Cylinder:
+		meshData = ResourceManager::CreateCylinderMesh(1.0f, std::max(0.01f, radius), std::max(0.01f, height), 24);
+		break;
+	case Simulation::Shape_Capsule:
+		meshData = ResourceManager::CreateCapsuleMesh(1.0f, std::max(0.01f, radius), std::max(0.01f, height), 24, 16);
+		break;
+	case Simulation::Shape_Cuboid:
+	default:
+		meshData = ResourceManager::CreateCubeMesh();
+		break;
+	}
+
+	if (auto* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry))
+	{
+		const auto [verts, indices] = meshData;
+		geom->InitializeMesh(m_vulkanRHI, verts, indices);
+		geom->InitializePipeline(
+			m_vulkanRHI,
+			m_vulkanRHI->GetRenderPass(),
+			m_vulkanRHI->GetSwapchainExtent(),
+			"SHADERS/object.vert.spv",
+			"SHADERS/object.frag.spv");
+
+		const Texture ownerTex = CreateOwnerTexture(m_vulkanRHI, ownerId);
+		geom->AddTexture(m_vulkanRHI, ownerTex);
+	}
+
+	entity.AddComponent(EComponentType::Component_Collision);
+	if (auto* collision = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision))
+	{
+		collision->SetCollisionRole(CollisionRole::Solid);
+
+		switch (shape)
+		{
+		case Simulation::Shape_Sphere:
+			collision->SetCollider(std::make_unique<Physics::Sphere>(position, std::max(0.01f, radius)));
+			break;
+
+		case Simulation::Shape_Cylinder:
+		{
+			const float h = std::max(0.01f, height);
+			const glm::vec3 a = position + glm::vec3(0.0f, h * 0.5f, 0.0f);
+			const glm::vec3 b = position - glm::vec3(0.0f, h * 0.5f, 0.0f);
+			collision->SetCollider(std::make_unique<Physics::Cylinder>(a, b, std::max(0.01f, radius)));
+			break;
+		}
+		case Simulation::Shape_Capsule:
+		{
+			const float h = std::max(0.01f, height);
+			const glm::vec3 a = position + glm::vec3(0.0f, h * 0.5f, 0.0f);
+			const glm::vec3 b = position - glm::vec3(0.0f, h * 0.5f, 0.0f);
+			collision->SetCollider(std::make_unique<Physics::Capsule>(a, b, std::max(0.01f, radius)));
+			break;
+		}
+		case Simulation::Shape_Cuboid:
+		default:
+		{
+			// no dedicated box collider in current physics shapes, fallback to bounding sphere
+			const float r = std::max(0.01f, 0.5f * glm::length(scale));
+			collision->SetCollider(std::make_unique<Physics::Sphere>(position, r));
+			break;
+		}
+		}
+	}
+
+	m_entities.push_back(std::move(entity));
 }

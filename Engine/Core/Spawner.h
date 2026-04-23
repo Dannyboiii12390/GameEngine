@@ -3,26 +3,29 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
-#include <memory>
 #include <functional>
 #include <random>
 #include "NetworkTypes.h"
 
-namespace Simulation {
-    enum class SpawnType : uint8_t {
-        NONE = 0,
+namespace RuntimeSpawner
+{
+    enum class SpawnType : uint8_t
+    {
+        None = 0,
         SingleBurst = 1,
         Repeating = 2
     };
 
-    enum class SpawnLocation : uint8_t {
-        NONE = 0,
+    enum class SpawnLocation : uint8_t
+    {
+        None = 0,
         Fixed = 1,
         Box = 2,
         Sphere = 3
     };
 
-    enum class SpawnerShapeType : uint8_t {
+    enum class SpawnerShapeType : uint8_t
+    {
         Sphere = 1,
         Cylinder = 2,
         Capsule = 3,
@@ -30,14 +33,13 @@ namespace Simulation {
     };
 }
 
-class Entity;
-
-struct SpawnerConfig {
+struct SpawnerConfig
+{
     std::string name;
     float startTime = 0.0f;
-    Simulation::SpawnType spawnType = Simulation::SpawnType::NONE;
-    Simulation::SpawnLocation locationType = Simulation::SpawnLocation::NONE;
-    Simulation::SpawnerShapeType shapeType = Simulation::SpawnerShapeType::Sphere;
+    RuntimeSpawner::SpawnType spawnType = RuntimeSpawner::SpawnType::None;
+    RuntimeSpawner::SpawnLocation locationType = RuntimeSpawner::SpawnLocation::None;
+    RuntimeSpawner::SpawnerShapeType shapeType = RuntimeSpawner::SpawnerShapeType::Sphere;
 
     // Location parameters
     glm::vec3 fixedPosition = glm::vec3(0.0f);
@@ -52,7 +54,7 @@ struct SpawnerConfig {
     glm::vec3 angularVelMin = glm::vec3(-1.0f);
     glm::vec3 angularVelMax = glm::vec3(1.0f);
 
-    // Shape-specific parameters
+    // Shape-specific ranges
     float radiusMin = 0.5f;
     float radiusMax = 0.5f;
     float heightMin = 1.0f;
@@ -65,49 +67,59 @@ struct SpawnerConfig {
     PeerID owner = 0;
     bool ownerSequential = false;
 
-    // Single burst specific
+    // Single burst
     uint32_t burstCount = 1;
 
-    // Repeating specific
+    // Repeating
     float repeatInterval = 1.0f;
     uint32_t repeatMaxCount = 10;
 };
 
-class Spawner {
+class Spawner
+{
 public:
     explicit Spawner(const SpawnerConfig& config);
     ~Spawner() = default;
 
-    // Lifecycle
     void Start();
     void Stop();
     void SetActive(bool active);
     bool IsActive() const { return m_isActive; }
 
-    // Update: returns true if spawn should occur this frame
+    // returns true when Spawn() should be called
     bool Update(float deltaTime, float currentTime);
 
-    // Spawning
-    void SetSpawnCallback(std::function<Entity(const glm::vec3&, const glm::vec3&, const glm::vec3&, const glm::vec3&, float)> callback) {
-        m_spawnCallback = callback;
+    using SpawnCallback = std::function<void(
+        const glm::vec3& position,
+        const glm::vec3& linearVelocity,
+        const glm::vec3& angularVelocity,
+        const glm::vec3& randomSize,
+        float radius,
+        float height,
+        PeerID owner)>;
+
+    void SetSpawnCallback(SpawnCallback callback)
+    {
+        m_spawnCallback = std::move(callback);
     }
 
     void Spawn(float currentTime);
 
-    // Sequential ownership tracking
-    void SetPeers(const std::vector<PeerID>& activePeers) {
+    void SetPeers(const std::vector<PeerID>& activePeers)
+    {
         m_peers = activePeers;
         m_nextPeerIndex = 0;
     }
 
-    PeerID GetNextSequentialOwner() {
-        if (m_peers.empty()) return 0;
-        PeerID assignedOwner = m_peers[m_nextPeerIndex];
+    PeerID GetNextSequentialOwner()
+    {
+        if (m_peers.empty())
+            return 0;
+        const PeerID assignedOwner = m_peers[m_nextPeerIndex];
         m_nextPeerIndex = (m_nextPeerIndex + 1) % m_peers.size();
         return assignedOwner;
     }
 
-    // Accessors
     const SpawnerConfig& GetConfig() const { return m_config; }
     const std::string& GetName() const { return m_config.name; }
     float GetStartTime() const { return m_config.startTime; }
@@ -120,6 +132,8 @@ private:
     float GetRandomRadius();
     float GetRandomHeight();
     glm::vec3 GetRandomSize();
+
+    PeerID ResolveOwnerForSpawn();
 
     SpawnerConfig m_config;
     bool m_isActive = false;
@@ -134,5 +148,5 @@ private:
     std::vector<PeerID> m_peers;
     size_t m_nextPeerIndex = 0;
 
-    std::function<Entity(const glm::vec3&, const glm::vec3&, const glm::vec3&, const glm::vec3&, float)> m_spawnCallback;
+    SpawnCallback m_spawnCallback;
 };

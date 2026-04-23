@@ -254,6 +254,11 @@
     <None Include="Assets\sample_scene.json" />
     <None Include="Assets\Scene.fbs" />
     <None Include="check_list.md" />
+    <None Include="D:\Scenes\galtonBox.bin" />
+    <None Include="D:\Scenes\newtonsCradle.bin" />
+    <None Include="D:\Scenes\piston.bin" />
+    <None Include="D:\Scenes\scene.bin" />
+    <None Include="D:\Scenes\tumbler.bin" />
     <None Include="DebugUtils.h" />
     <None Include="flocking_brute_compute_times.csv" />
     <None Include="flocking_spatial_compute_times.csv" />

@@ -8,6 +8,7 @@
 #include "../InputHandler.h"
 #include "../../Renderer/Camera.h"
 #include "../NetworkTypes.h"
+#include "../Spawner.h"
 
 #include "../../../PhysicsEngine/Networking/ListeningSocket.h"
 
@@ -23,20 +24,34 @@ class Window;
 struct SpawnerData {
 	std::string name;
 	float startTime = 0.0f;
-	uint8_t spawnType = 0; // Simulation::SpawnType
-	uint8_t locationType = 0; // Simulation::SpawnLocation
+	uint8_t spawnType = 0;     // Simulation::SpawnType
+	uint8_t locationType = 0;  // Simulation::SpawnLocation
+	uint8_t spawnerType = 0;   // Simulation::SpawnerType
+
 	std::string material;
 	int owner = 0; // Simulation::SpawnerOwnerType
-	// Basic location info (one of these used depending on locationType)
+
 	glm::vec3 fixedPosition = glm::vec3(0.0f);
-	glm::vec3 boxMin = glm::vec3(0.0f);
-	glm::vec3 boxMax = glm::vec3(0.0f);
+	glm::vec3 boxMin = glm::vec3(-1.0f);
+	glm::vec3 boxMax = glm::vec3(1.0f);
 	glm::vec3 sphereCenter = glm::vec3(0.0f);
-	float sphereRadius = 0.0f;
-	// spawn-specific
-	uint32_t singleBurstCount = 0;
-	float repeatingInterval = 0.0f;
-	uint32_t repeatingMaxCount = 0;
+	float sphereRadius = 1.0f;
+
+	glm::vec3 linearVelMin = glm::vec3(-1.0f);
+	glm::vec3 linearVelMax = glm::vec3(1.0f);
+	glm::vec3 angularVelMin = glm::vec3(-1.0f);
+	glm::vec3 angularVelMax = glm::vec3(1.0f);
+
+	float radiusMin = 0.5f;
+	float radiusMax = 0.5f;
+	float heightMin = 1.0f;
+	float heightMax = 1.0f;
+	glm::vec3 sizeMin = glm::vec3(1.0f);
+	glm::vec3 sizeMax = glm::vec3(1.0f);
+
+	uint32_t singleBurstCount = 1;
+	float repeatingInterval = 1.0f;
+	uint32_t repeatingMaxCount = 10;
 };
 struct MaterialInteractionData {
 	std::string materialA;
@@ -70,6 +85,18 @@ public:
 
 private:
 	Networking::Address GetClientAddress();
+
+	void RebuildSpawnerRuntime();
+	void UpdateSpawnerRuntime(float deltaTime);
+	void SpawnEntityFromSpawner(
+		const SpawnerData& spawner,
+		const glm::vec3& position,
+		const glm::vec3& linearVelocity,
+		const glm::vec3& angularVelocity,
+		const glm::vec3& randomSize,
+		float radius,
+		float height,
+		PeerID ownerId);
 
 	std::vector<Entity> m_entities;
 	VulkanRHI* m_vulkanRHI;
@@ -110,6 +137,9 @@ private:
 	std::vector<MaterialInteractionData> m_materialInteractions;
 	std::vector<SpawnerData> m_spawners;
 
+	std::vector<Spawner> m_runtimeSpawners;
+	float m_sceneTime = 0.0f;
+	uint32_t m_nextSpawnNetworkId = 0;
 
 	int num_boids = 2048;
 };
