@@ -240,6 +240,18 @@ namespace
 		default:                                 return 0;
 		}
 	}
+
+	// Add near existing mapping helpers in anonymous namespace:
+	static Simulation::Behaviour ObjectTypeToBehaviour(ObjectType type)
+	{
+		switch (type)
+		{
+		case ObjectType::Static:    return Simulation::Behaviour_StaticObject;
+		case ObjectType::Animated:  return Simulation::Behaviour_AnimatedObject;
+		case ObjectType::Simulated:
+		default:                    return Simulation::Behaviour_SimulatedObject;
+		}
+	}
 }
 
 // Call once at startup (before OpenMP work)
@@ -274,7 +286,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	// 1. Ensure the file exists before attempting to load
 	if (!std::filesystem::exists("scenes/Level1.bin"))
 	{
-		std::cout << "Bin file not found, creating a default one...\n";
+		std::cout << "Bin file not found, creation a default one...\n";
 		SerializeState();
 	}
 
@@ -2222,6 +2234,10 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 	Entity entity;
 
 	const Simulation::Shape shape = SpawnerTypeToShape(spawner.spawnerType);
+	const Simulation::Behaviour behaviour = ObjectTypeToBehaviour(spawner.objectType);
+	const Simulation::CollisionType collisionType = spawner.spawnAsSolid
+		? Simulation::CollisionType_SOLID
+		: Simulation::CollisionType_CONTAINER;
 
 	glm::vec3 scale(1.0f);
 	if (shape == Simulation::Shape_Cuboid)
@@ -2240,19 +2256,22 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 	entity.AddComponent(
 		EComponentType::Component_Network,
 		m_nextSpawnNetworkId++,
-		ObjectType::Simulated,
+		spawner.objectType,
 		ownerId,
 		spawner.material,
 		static_cast<uint8_t>(shape),
-		static_cast<uint8_t>(Simulation::Behaviour_SimulatedObject),
-		static_cast<uint8_t>(Simulation::CollisionType_SOLID));
+		static_cast<uint8_t>(behaviour),
+		static_cast<uint8_t>(collisionType));
 
-	entity.AddComponent(EComponentType::Component_Velocity, linearVelocity, angularVelocity, glm::vec3(0.0f));
-	entity.AddComponent(EComponentType::Component_Physics);
-	if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+	if (spawner.objectType == ObjectType::Simulated)
 	{
-		phys->SetMass(1.0f);
-		phys->SetAffectedByGravity(m_gravityOn);
+		entity.AddComponent(EComponentType::Component_Velocity, linearVelocity, angularVelocity, glm::vec3(0.0f));
+		entity.AddComponent(EComponentType::Component_Physics);
+		if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+		{
+			phys->SetMass(1.0f);
+			phys->SetAffectedByGravity(m_gravityOn);
+		}
 	}
 
 	MeshData meshData;
@@ -2291,7 +2310,7 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 	entity.AddComponent(EComponentType::Component_Collision);
 	if (auto* collision = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision))
 	{
-		collision->SetCollisionRole(CollisionRole::Solid);
+		collision->SetCollisionRole(spawner.spawnAsSolid ? CollisionRole::Solid : CollisionRole::Container);
 
 		switch (shape)
 		{
@@ -2318,7 +2337,6 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 		case Simulation::Shape_Cuboid:
 		default:
 		{
-			// no dedicated box collider in current physics shapes, fallback to bounding sphere
 			const float r = std::max(0.01f, 0.5f * glm::length(scale));
 			collision->SetCollider(std::make_unique<Physics::Sphere>(position, r));
 			break;

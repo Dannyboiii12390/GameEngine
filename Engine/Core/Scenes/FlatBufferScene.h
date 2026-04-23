@@ -31,6 +31,10 @@ struct SpawnerData {
 	std::string material;
 	int owner = 0; // Simulation::SpawnerOwnerType
 
+	// New: configurable spawned object behavior/collision defaults
+	ObjectType objectType = ObjectType::Simulated;
+	bool spawnAsSolid = true;
+
 	glm::vec3 fixedPosition = glm::vec3(0.0f);
 	glm::vec3 boxMin = glm::vec3(-1.0f);
 	glm::vec3 boxMax = glm::vec3(1.0f);
