@@ -29,16 +29,7 @@
 #define GLM_FORCE_INTRINSICS
 #define GLM_FORCE_SSE2
 #define GLM_FORCE_AVX
-/*
-- [ ] {Bug: after swapping scenes, camera can no longer be controlled by input}
-    - likely due to dangling pointer in VulkanRHI after old scene's camera is destroyed 
-    - fix by having VulkanRHI not take ownership of camera and instead just have a raw pointer that scenes set to point to their active camera
-- [ ] changes needed to extend to 3 peers
-    1.	Set runtime peer count to 3.
-    2.	Implement host-assigned IDs (0,1,2) in handshake.
-    3.	Keep host as relay (no full mesh yet).
-    4.	Include sourcePeerId in packets.
-*/
+
 int main()
 {
     try

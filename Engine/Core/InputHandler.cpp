@@ -35,7 +35,11 @@ InputHandler::InputHandler(Window& window) : m_window(&window) {
 }
 InputHandler::~InputHandler() {
     if (m_window && m_window->getGLFWwindow()) {
-        s_instances.erase(m_window->getGLFWwindow());
+        GLFWwindow* win = m_window->getGLFWwindow();
+        auto it = s_instances.find(win);
+        if (it != s_instances.end() && it->second == this) {
+            s_instances.erase(it);
+        }
     }
 }
 void InputHandler::update() {
