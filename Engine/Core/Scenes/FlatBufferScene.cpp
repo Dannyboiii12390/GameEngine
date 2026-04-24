@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <array>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -174,7 +175,7 @@ namespace
 		return Texture(rhi, "Assets/red_brick_diff_1k.jpg", TextureType::Albedo, true);
 	}
 
-	static constexpr PeerID kRuntimePeerCount = 2;
+	static constexpr PeerID kRuntimePeerCount = 3;
 	static PeerID RemapOwnerForRuntime(PeerID ownerId)
 	{
 		if (ownerId == ALL_PEERS)
@@ -270,7 +271,10 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	LimitOpenMPCores();
 
 	m_instanceId = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
-	m_localPeerId.store(static_cast<PeerID>(std::hash<std::string>{}(m_instanceId) % 2));
+
+	// Host defaults to id 0. Clients are reassigned by host during handshake.
+	m_networkRole = NetworkRole::Host;
+	m_localPeerId.store(0);
 
 	// Camera, vulkan, and imgui Initialisation
 	m_cameras.reserve(100);
@@ -280,7 +284,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	// fall back to explicit defaults.
 	m_sceneName = "";
 	m_sceneDescription = "";
-	m_gravityOn = true; // default to gravity enabled unless scene explicitly disables it
+	m_gravityOn = true;
 	m_selectedEntityIndex = -1;
 
 	// 1. Ensure the file exists before attempting to load
@@ -292,9 +296,24 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 
 	// 2. Load properties directly into the scene
 	DeserializeState();
-	m_activeCamera = &m_cameras[0];
-	//m_entities.clear();
 
+	if (m_cameras.empty())
+	{
+		float aspect = 16.0f / 9.0f;
+		if (m_vulkanRHI)
+		{
+			auto extent = m_vulkanRHI->GetSwapchainExtent();
+			if (extent.height != 0)
+				aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+		}
+		m_cameras.emplace_back(60.0f, aspect, 0.1f, 1000.0f);
+	}
+
+	m_activeCamera = &m_cameras[0];
+	if (m_vulkanRHI)
+	{
+		m_vulkanRHI->SetActiveCamera(m_activeCamera);
+	}
 
 	// Lambda now accepts the texture to apply as an explicit parameter.
 	auto createBoid = [&](glm::vec3 pos, const Texture& tex)
@@ -400,22 +419,21 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>(&m_localPeerId, m_networkData));
 }
 
+// REPLACE GetClientAddress() completely
 Networking::Address FlatBufferScene::GetClientAddress()
 {
 	static std::mt19937 rng{ std::random_device{}() };
 	static std::uniform_int_distribution<int> dist(10000, 19999);
 	const int random = dist(rng);
 
-	// Listen on 0.0.0.0 to support discovery broadcast and external clients
 	Networking::Address bindAddr("0.0.0.0", random);
 	m_tcpListener = std::make_unique<Networking::ListeningSocket>(bindAddr);
-	m_tcpListener->SetNonBlocking(true); // Don't block when accepting
+	m_tcpListener->SetNonBlocking(true);
 
 	m_networkRunning = true;
 	m_networkThread = std::thread([this, random]() {
 		ApplyThreadAffinity(ThreadRole::Network);
 
-		// 1. Setup UDP Broadcast Socket for Discovery (send + receive)
 		SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		if (udpSocket != INVALID_SOCKET) {
 			char broadcastEnable = 1;
@@ -425,7 +443,7 @@ Networking::Address FlatBufferScene::GetClientAddress()
 			setsockopt(udpSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 
 			sockaddr_in listenAddr{};
-		 listenAddr.sin_family = AF_INET;
+			listenAddr.sin_family = AF_INET;
 			listenAddr.sin_port = htons(8888);
 			listenAddr.sin_addr.s_addr = INADDR_ANY;
 			bind(udpSocket, reinterpret_cast<sockaddr*>(&listenAddr), sizeof(listenAddr));
@@ -436,40 +454,58 @@ Networking::Address FlatBufferScene::GetClientAddress()
 
 		sockaddr_in broadcastAddr{};
 		broadcastAddr.sin_family = AF_INET;
-		broadcastAddr.sin_port = htons(8888); // An agreed port for clients to listen for broadcasts
+		broadcastAddr.sin_port = htons(8888);
 		inet_pton(AF_INET, "255.255.255.255", &broadcastAddr.sin_addr);
 
-		// Per-client bookkeeping so we can exchange/receive peer instance IDs (handshake)
+		struct HelloMsg {
+			uint32_t magic;
+			char instanceId[64];
+		};
+
+		struct WelcomeMsg {
+			uint32_t magic;
+			PeerID assignedPeerId;
+			PeerID runtimePeerCount;
+		};
+
+		static constexpr uint32_t kHelloMagic = 0x48454C4F;   // HELO
+		static constexpr uint32_t kWelcomeMagic = 0x57454C43; // WELC
+
 		struct ClientInfo {
-			SOCKET socket;
+			SOCKET socket = INVALID_SOCKET;
+			PeerID assignedPeerId = ALL_PEERS;
+			bool handshakeDone = false;
 			std::string peerInstanceId;
-			bool handshakeDone;
-			ClientInfo(SOCKET s) : socket(s), peerInstanceId(), handshakeDone(false) {}
+			std::vector<uint8_t> rxBuffer; // NEW: stream reassembly buffer
 		};
 
 		std::vector<ClientInfo> clientSockets;
+		PeerID nextAssignedPeerId = 1; // host keeps 0
+		std::string connectedHostInstanceId;
 
-		// If we initiated an outgoing TCP client connection, we store its peerId here after discovery parsing.
-		std::string outgoingPeerInstanceId;
+		std::vector<uint8_t> hostRxBuffer; // NEW: client-side stream reassembly
+		bool clientGotWelcome = false;     // NEW
 
 		auto lastBroadcastTime = std::chrono::steady_clock::now();
 
 		while (m_networkRunning) {
-			// Broadcast presence (e.g. every 1 second)
-			auto now = std::chrono::steady_clock::now();
-			if (udpSocket != INVALID_SOCKET && std::chrono::duration_cast<std::chrono::seconds>(now - lastBroadcastTime).count() >= 1) {
-				std::string msg = "SERVER_DISCOVERY:" + std::to_string(random) + ":" + m_instanceId;
+			const auto now = std::chrono::steady_clock::now();
+
+			// Broadcast presence
+			if (udpSocket != INVALID_SOCKET &&
+				std::chrono::duration_cast<std::chrono::seconds>(now - lastBroadcastTime).count() >= 1) {
+				const std::string msg = "SERVER_DISCOVERY:" + std::to_string(random) + ":" + m_instanceId;
 				sendto(udpSocket, msg.c_str(), static_cast<int>(msg.size()), 0,
 					reinterpret_cast<sockaddr*>(&broadcastAddr), sizeof(broadcastAddr));
 				lastBroadcastTime = now;
 			}
 
-			// Listen for discovery broadcasts and connect to the first peer we see
-			if (!m_peerConnected && udpSocket != INVALID_SOCKET) {
+			// Discovery + host election (lowest instanceId becomes host)
+			if (udpSocket != INVALID_SOCKET && !m_peerConnected) {
 				char recvBuf[256]{};
 				sockaddr_in from{};
 				int fromLen = sizeof(from);
-				int recvBytes = recvfrom(udpSocket, recvBuf, sizeof(recvBuf) - 1, 0,
+				const int recvBytes = recvfrom(udpSocket, recvBuf, sizeof(recvBuf) - 1, 0,
 					reinterpret_cast<sockaddr*>(&from), &fromLen);
 
 				if (recvBytes > 0) {
@@ -481,36 +517,43 @@ Networking::Address FlatBufferScene::GetClientAddress()
 						const std::string payload = msg.substr(prefix.size());
 						const size_t sep = payload.find(':');
 						if (sep != std::string::npos) {
-							const int port = std::stoi(payload.substr(0, sep));
-							const std::string peerId = payload.substr(sep + 1);
+							const int peerPort = std::stoi(payload.substr(0, sep));
+							const std::string peerInstanceId = payload.substr(sep + 1);
 
-							if (peerId != m_instanceId && port != random) {
-								char ipStr[INET_ADDRSTRLEN]{};
-								inet_ntop(AF_INET, &from.sin_addr, ipStr, sizeof(ipStr));
+							if (!peerInstanceId.empty() && peerInstanceId != m_instanceId && peerPort != random) {
+								// If we discover a "smaller" instanceId, we must be a client of that host.
+								if (peerInstanceId < m_instanceId) {
+									try {
+										char ipStr[INET_ADDRSTRLEN]{};
+										inet_ntop(AF_INET, &from.sin_addr, ipStr, sizeof(ipStr));
 
-								try {
-									m_tcpClient = std::make_unique<Networking::TCPSocket>(Networking::Address(ipStr, static_cast<uint16_t>(port)));
-									m_peerConnected = true;
+										m_tcpClient = std::make_unique<Networking::TCPSocket>(
+											Networking::Address(ipStr, static_cast<uint16_t>(peerPort)));
 
-									// Set the client to non-blocking
-									u_long mode = 1;
-									ioctlsocket(m_tcpClient->native_handle(), FIONBIO, &mode);
+										u_long mode = 1;
+										ioctlsocket(m_tcpClient->native_handle(), FIONBIO, &mode);
 
-									// We know the peer's instance id from the UDP discovery message.
-									outgoingPeerInstanceId = peerId;
+										m_networkRole = NetworkRole::Client;
+										m_peerConnected = true;
+										connectedHostInstanceId = peerInstanceId;
 
-									// Deterministically assign local peer index using lexicographic ordering of instance IDs.
-									// Both sides will agree after exchanging instance ids (the connecting side already knows peerId).
-									if (m_instanceId < peerId) m_localPeerId = 0;
-									else m_localPeerId = 1;
+										HelloMsg hello{};
+										hello.magic = kHelloMagic;
+										strncpy_s(hello.instanceId, sizeof(hello.instanceId), m_instanceId.c_str(), sizeof(hello.instanceId) - 1);
+										hello.instanceId[sizeof(hello.instanceId) - 1] = '\0';
 
-									// Send our instance id immediately as a handshake so the acceptor can compute the same ordering.
-									send(m_tcpClient->native_handle(), m_instanceId.c_str(), static_cast<int>(m_instanceId.size()), 0);
+										send(m_tcpClient->native_handle(),
+											reinterpret_cast<const char*>(&hello),
+											static_cast<int>(sizeof(hello)),
+											0);
 
-									std::cout << "Connected to peer at " << ipStr << ":" << port << " peerId=" << peerId << "\n";
-								}
-								catch (const std::exception& ex) {
-									std::cerr << "Peer connect failed: " << ex.what() << "\n";
+										std::cout << "Connected to host " << ipStr << ":" << peerPort << "\n";
+									}
+									catch (const std::exception& ex) {
+										std::cerr << "Host connect failed: " << ex.what() << "\n";
+										m_peerConnected = false;
+										m_tcpClient.reset();
+									}
 								}
 							}
 						}
@@ -518,157 +561,254 @@ Networking::Address FlatBufferScene::GetClientAddress()
 				}
 			}
 
-			// 2. Accept TCP connections
-			Networking::Address clientAddr;
-			SOCKET newClient = m_tcpListener->Accept(clientAddr);
-			if (newClient != INVALID_SOCKET) {
-				u_long mode = 1;
-				ioctlsocket(newClient, FIONBIO, &mode); // Set the client to non-blocking
+			// Host: accept up to runtimePeerCount-1 clients
+			if (m_networkRole == NetworkRole::Host &&
+				static_cast<PeerID>(clientSockets.size()) < (kRuntimePeerCount - 1)) {
+				Networking::Address clientAddr;
+				SOCKET newClient = m_tcpListener->Accept(clientAddr);
+				if (newClient != INVALID_SOCKET) {
+					u_long mode = 1;
+					ioctlsocket(newClient, FIONBIO, &mode);
 
-				// push into client list; handshake will be read on the incoming recv path
-				clientSockets.emplace_back(newClient);
+					ClientInfo ci{};
+					ci.socket = newClient;
+					clientSockets.push_back(ci);
 
-				std::cout << "Peer to peer client connected from: " << clientAddr.getIP() << ":" << clientAddr.getPort() << std::endl;
+					std::cout << "Client connected from: "
+						<< clientAddr.getIP() << ":" << clientAddr.getPort() << "\n";
+				}
 			}
 
-			// Extract outgoing packets safely
+			// Pull outgoing packets from simulation/system layer
 			std::vector<SyncPacket> outgoing;
-			if (m_networkData)
-			{
+			if (m_networkData) {
 				std::lock_guard<std::mutex> lock(m_networkData->outgoingMutex);
 				outgoing = m_networkData->outgoingPackets;
 				m_networkData->outgoingPackets.clear();
 			}
 
-			// 3. Send/Receive data and gracefully handle disconnects
-			for (auto it = clientSockets.begin(); it != clientSockets.end(); ) {
-				ClientInfo& ci = *it;
-				SOCKET client = ci.socket;
-				bool clientOk = true;
+			// Host path: send local outgoing to clients + receive client state and relay
+			if (m_networkRole == NetworkRole::Host) {
+				// Host always id 0
+				m_localPeerId.store(0);
 
-				// Send outgoing data
-				for (const auto& packet : outgoing) {
-					int sent = send(client, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
-					if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
-						clientOk = false;
-						break;
+				// Send host-local outgoing to all handshaken clients
+				for (auto& ci : clientSockets) {
+					if (!ci.handshakeDone || ci.socket == INVALID_SOCKET) continue;
+					for (const auto& packet : outgoing) {
+						int sent = send(ci.socket, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+						if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
+							closesocket(ci.socket);
+							ci.socket = INVALID_SOCKET;
+							break;
+						}
 					}
 				}
 
-				// Receive: could be handshake string (instance id) or SyncPacket(s)
-				SyncPacket incomPacket;
-				int bytes;
-				do {
-					bytes = recv(client, reinterpret_cast<char*>(&incomPacket), sizeof(SyncPacket), 0);
-					if (bytes == sizeof(SyncPacket)) {
-						if (m_networkData) {
-							std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
-							m_networkData->incomingPackets.push_back(incomPacket);
-						}
+				for (auto it = clientSockets.begin(); it != clientSockets.end();) {
+					ClientInfo& ci = *it;
+					if (ci.socket == INVALID_SOCKET) {
+						it = clientSockets.erase(it);
+						continue;
 					}
-					else if (bytes > 0) {
-						// Likely a handshake string (peer instance id) -- read into buffer and store
-						std::string hsBuf;
-						hsBuf.resize(bytes);
-						// we already have the bytes in the recv buffer (incomPacket raw memory) - copy them safely
-						std::memcpy(&hsBuf[0], &incomPacket, bytes);
-						if (!ci.handshakeDone) {
-							ci.peerInstanceId = hsBuf;
-							ci.handshakeDone = true;
 
-							// Compute and set local peer id deterministically so both sides agree.
-							// If we already know outgoing peer id (we initiated connection), that side set m_localPeerId earlier.
-							// For acceptor, compute ordering now.
-							if (!outgoingPeerInstanceId.empty()) {
-								// If this socket corresponds to the outgoing connection (rare), ensure ordering matches
-								if (ci.peerInstanceId == outgoingPeerInstanceId) {
-									// already handled by connector side
+					bool clientOk = true;
+					char recvBuf[512]{};
+					int bytes = 0;
+
+					do {
+						bytes = recv(ci.socket, recvBuf, sizeof(recvBuf), 0);
+
+							if (bytes > 0) {
+							const uint8_t* begin = reinterpret_cast<const uint8_t*>(recvBuf);
+							ci.rxBuffer.insert(ci.rxBuffer.end(), begin, begin + bytes);
+						}
+
+						// Parse as stream: first handshake, then sync packets
+						for (;;)
+						{
+							if (!ci.handshakeDone)
+							{
+								if (ci.rxBuffer.size() < sizeof(HelloMsg))
+									break;
+
+								HelloMsg hello{};
+								std::memcpy(&hello, ci.rxBuffer.data(), sizeof(HelloMsg));
+								ci.rxBuffer.erase(ci.rxBuffer.begin(), ci.rxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(HelloMsg)));
+
+								if (hello.magic != kHelloMagic)
+								{
+									clientOk = false;
+									break;
+								}
+
+								ci.peerInstanceId = hello.instanceId;
+
+								if (nextAssignedPeerId >= kRuntimePeerCount) {
+									clientOk = false;
+									break;
+								}
+
+								ci.assignedPeerId = nextAssignedPeerId++;
+								ci.handshakeDone = true;
+
+								WelcomeMsg welcome{};
+								welcome.magic = kWelcomeMagic;
+								welcome.assignedPeerId = ci.assignedPeerId;
+								welcome.runtimePeerCount = kRuntimePeerCount;
+
+								send(ci.socket,
+									reinterpret_cast<const char*>(&welcome),
+									static_cast<int>(sizeof(welcome)),
+									0);
+
+								std::cout << "Assigned peerId " << ci.assignedPeerId
+									<< " to " << ci.peerInstanceId << "\n";
+
+								continue;
+							}
+
+							if (ci.rxBuffer.size() < sizeof(SyncPacket))
+								break;
+
+							SyncPacket packet{};
+							std::memcpy(&packet, ci.rxBuffer.data(), sizeof(SyncPacket));
+							ci.rxBuffer.erase(ci.rxBuffer.begin(), ci.rxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(SyncPacket)));
+
+							// Host enforces true source id from socket assignment
+							packet.sourcePeerId = ci.assignedPeerId;
+
+							if (m_networkData) {
+								std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
+								m_networkData->incomingPackets.push_back(packet);
+							}
+
+							// Relay to all other connected clients (star topology)
+							for (auto& target : clientSockets) {
+								if (!target.handshakeDone || target.socket == INVALID_SOCKET) continue;
+								if (target.socket == ci.socket) continue;
+
+								int sent = send(target.socket, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+								if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
+									closesocket(target.socket);
+									target.socket = INVALID_SOCKET;
 								}
 							}
-							else {
-								// We accepted an incoming connection; compare our instance id with peer's to set local peer index
-								if (m_instanceId < ci.peerInstanceId) m_localPeerId = 0;
-								else m_localPeerId = 1;
-							}
 						}
-					}
-				} while (bytes > 0);
 
-				if (bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)) {
-					std::cout << "Client disconnected.\n";
-					closesocket(client);
-					it = clientSockets.erase(it);
-				}
-				else if (!clientOk) {
-					std::cout << "Client transmission failed.\n";
-					closesocket(client);
-					it = clientSockets.erase(it);
-				}
-				else {
-					++it;
+						if (!clientOk)
+							break;
+
+					} while (bytes > 0);
+
+					if (bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) || !clientOk) {
+						closesocket(ci.socket);
+						it = clientSockets.erase(it);
+					}
+					else {
+						++it;
+					}
 				}
 			}
-			
-			// 4. Do the same for m_tcpClient if connected out to a peer
-			if (m_peerConnected && m_tcpClient) {
-				SOCKET client = m_tcpClient->native_handle();
-				bool clientOk = true;
+
+			// Client path: send outgoing to host + receive relayed state + receive welcome
+			if (m_networkRole == NetworkRole::Client && m_peerConnected && m_tcpClient) {
+				SOCKET hostSock = m_tcpClient->native_handle();
+				bool ok = true;
 
 				for (const auto& packet : outgoing) {
-					int sent = send(client, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+					int sent = send(hostSock, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
 					if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
-						clientOk = false;
+						ok = false;
 						break;
 					}
 				}
 
-				SyncPacket incomPacket;
-				int bytes;
+				char recvBuf[512]{};
+				int bytes = 0;
 				do {
-					bytes = recv(client, reinterpret_cast<char*>(&incomPacket), sizeof(SyncPacket), 0);
-					if (bytes == sizeof(SyncPacket)) {
+					bytes = recv(hostSock, recvBuf, sizeof(recvBuf), 0);
+
+					if (bytes > 0) {
+						const uint8_t* begin = reinterpret_cast<const uint8_t*>(recvBuf);
+						hostRxBuffer.insert(hostRxBuffer.end(), begin, begin + bytes);
+					}
+
+					for (;;)
+					{
+						// First packet expected is welcome
+						if (!clientGotWelcome)
+						{
+							if (hostRxBuffer.size() < sizeof(WelcomeMsg))
+								break;
+
+							WelcomeMsg welcome{};
+							std::memcpy(&welcome, hostRxBuffer.data(), sizeof(WelcomeMsg));
+							hostRxBuffer.erase(
+								hostRxBuffer.begin(),
+								hostRxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(WelcomeMsg)));
+
+							if (welcome.magic != kWelcomeMagic) {
+								ok = false;
+								break;
+							}
+
+							m_localPeerId.store(welcome.assignedPeerId);
+							m_runtimePeerCount.store(welcome.runtimePeerCount);
+							clientGotWelcome = true;
+							continue;
+						}
+
+						// Then parse as many SyncPacket entries as available
+						if (hostRxBuffer.size() < sizeof(SyncPacket))
+							break;
+
+						SyncPacket packet{};
+						std::memcpy(&packet, hostRxBuffer.data(), sizeof(SyncPacket));
+						hostRxBuffer.erase(
+							hostRxBuffer.begin(),
+							hostRxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(SyncPacket)));
+
 						if (m_networkData) {
 							std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
-							m_networkData->incomingPackets.push_back(incomPacket);
+							m_networkData->incomingPackets.push_back(packet);
 						}
 					}
-					else if (bytes > 0) {
-						// Possibly a handshake string (peer instance id) from acceptor side
-						std::string hs;
-						hs.resize(bytes);
-						std::memcpy(&hs[0], &incomPacket, bytes);
-						// Record peer id and compute deterministic local peer index if not already set
-						if (!hs.empty()) {
-							outgoingPeerInstanceId = hs;
-							if (m_instanceId < outgoingPeerInstanceId) m_localPeerId = 0;
-							else m_localPeerId = 1;
-						}
-					}
+
+					if (!ok)
+						break;
+
 				} while (bytes > 0);
 
-				if (bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) || !clientOk) {
-					std::cout << "Disconnected from server peer.\n";
+				if (!ok || bytes == 0 || (bytes == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)) {
+					std::cout << "Disconnected from host.\n";
 					m_peerConnected = false;
 					m_tcpClient.reset();
+					m_networkRole = NetworkRole::Host;
+					m_localPeerId.store(0);
 				}
 			}
 
-			// Sleep briefly to prevent 100% CPU thread pegging
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
 
-		// Loop shut down, cleanup
 		if (udpSocket != INVALID_SOCKET) closesocket(udpSocket);
-		for (ClientInfo &ci : clientSockets) closesocket(ci.socket);
+		for (ClientInfo& ci : clientSockets) {
+			if (ci.socket != INVALID_SOCKET) closesocket(ci.socket);
+		}
 		});
 
 	std::cout << "Network server started on port " << random << std::endl;
 	return bindAddr;
 }
-
 FlatBufferScene::~FlatBufferScene()
 {
 	// Stop network thread first
+	if (m_vulkanRHI && m_vulkanRHI->GetActiveCamera() == m_activeCamera)
+	{
+		m_vulkanRHI->SetActiveCamera(nullptr);
+	}
+
 	m_networkRunning = false;
 	if (m_networkThread.joinable())
 	{
@@ -690,6 +830,11 @@ FlatBufferScene::~FlatBufferScene()
 
 void FlatBufferScene::Destroy()
 {
+	if (m_vulkanRHI && m_vulkanRHI->GetActiveCamera() == m_activeCamera)
+	{
+		m_vulkanRHI->SetActiveCamera(nullptr);
+	}
+
 	// Stop network thread
 	m_networkRunning = false;
 	if (m_networkThread.joinable())
@@ -712,6 +857,14 @@ void FlatBufferScene::Destroy()
 
 void FlatBufferScene::Start(float deltaTime)
 {
+	// Critical for scene-swap stability: bind valid camera before any graphics-thread Draw()/EndFrame()
+	if (m_vulkanRHI)
+	{
+		if (!m_activeCamera && !m_cameras.empty())
+			m_activeCamera = &m_cameras[0];
+		m_vulkanRHI->SetActiveCamera(m_activeCamera);
+	}
+
 	m_systemManager.StartSimulationThread(m_entities, m_sceneMutex, m_paused, m_physicsHz);
 	m_systemManager.StartGraphicsThread([this]() { Draw(); }, m_graphicsHz);
 }
@@ -1233,7 +1386,11 @@ void FlatBufferScene::Draw()
 
 void FlatBufferScene::HandleInput(float deltaTime)
 {
-	if (m_inputHandler.isKeyPressed(GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
+	if (m_inputHandler.isKeyPressed(GLFW_KEY_ESCAPE))
+		glfwSetWindowShouldClose(m_window->getGLFWwindow(), true);
+
+	if (!m_activeCamera)
+		return;
 
 	float cameraMoveSpeed = 5.0f;
 	if (m_inputHandler.isKeyHeld(GLFW_KEY_LEFT_SHIFT)) cameraMoveSpeed *= 2.0f;

@@ -26,6 +26,7 @@ struct Ownership {
 // Data packet to sync dynamic state every frame
 #pragma pack(push, 1)
 struct SyncPacket {
+    PeerID sourcePeerId; // NEW: sender ID for host relay + self-filtering
     uint32_t objectId;
     float posX, posY, posZ;
     float rotX, rotY, rotZ, rotW;

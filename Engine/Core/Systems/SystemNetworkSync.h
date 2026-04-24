@@ -43,6 +43,7 @@ public:
             if (netComp && transform && netComp->IsSimulated() && netComp->IsOwnedByMe(localPeerId))
             {
                 SyncPacket packet{};
+                packet.sourcePeerId = localPeerId; // NEW
                 packet.objectId = netComp->networkId;
 
                 glm::vec3 pos = transform->Position();
@@ -96,6 +97,10 @@ private:
 
     void ApplyStateToObject(const SyncPacket& packet, const std::vector<Entity*>& entities, PeerID localPeerId)
     {
+        // NEW: ignore packets originated by this peer (extra safety)
+        if (packet.sourcePeerId == localPeerId)
+            return;
+
         for (auto* entity : entities)
         {
             auto* netComp = entity->GetComponent<ComponentNetwork>(EComponentType::Component_Network);

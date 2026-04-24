@@ -43,6 +43,7 @@ void SceneManager::ApplyPending()
 	{
 		try
 		{
+			m_scenes.top()->Stop();
 			m_scenes.top()->Destroy();
 		}
 		catch (...)
@@ -52,9 +53,12 @@ void SceneManager::ApplyPending()
 		m_scenes.pop();
 	}
 
-	if (m_pendingScene)
+	m_scenes.push(std::move(m_pendingScene));
+
+	// Critical: initialize the newly activated scene
+	if (!m_scenes.empty() && m_scenes.top())
 	{
-		m_scenes.push(std::move(m_pendingScene));
+		m_scenes.top()->Start(0.0f);
 	}
 }
 

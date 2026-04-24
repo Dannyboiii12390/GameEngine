@@ -21,42 +21,42 @@ namespace Networking { class TCPSocket; }
 class Entity;
 class Window;
 
+enum class NetworkRole
+{
+	Host,
+	Client
+};
+
 struct SpawnerData {
 	std::string name;
 	float startTime = 0.0f;
-	uint8_t spawnType = 0;     // Simulation::SpawnType
-	uint8_t locationType = 0;  // Simulation::SpawnLocation
-	uint8_t spawnerType = 0;   // Simulation::SpawnerType
-
+	uint8_t spawnType = 0;
+	uint8_t locationType = 0;
+	uint8_t spawnerType = 0;
 	std::string material;
-	int owner = 0; // Simulation::SpawnerOwnerType
-
-	// New: configurable spawned object behavior/collision defaults
+	int owner = 0;
 	ObjectType objectType = ObjectType::Simulated;
 	bool spawnAsSolid = true;
-
 	glm::vec3 fixedPosition = glm::vec3(0.0f);
 	glm::vec3 boxMin = glm::vec3(-1.0f);
 	glm::vec3 boxMax = glm::vec3(1.0f);
 	glm::vec3 sphereCenter = glm::vec3(0.0f);
 	float sphereRadius = 1.0f;
-
 	glm::vec3 linearVelMin = glm::vec3(-1.0f);
 	glm::vec3 linearVelMax = glm::vec3(1.0f);
 	glm::vec3 angularVelMin = glm::vec3(-1.0f);
 	glm::vec3 angularVelMax = glm::vec3(1.0f);
-
 	float radiusMin = 0.5f;
 	float radiusMax = 0.5f;
 	float heightMin = 1.0f;
 	float heightMax = 1.0f;
 	glm::vec3 sizeMin = glm::vec3(1.0f);
 	glm::vec3 sizeMax = glm::vec3(1.0f);
-
 	uint32_t singleBurstCount = 1;
 	float repeatingInterval = 1.0f;
 	uint32_t repeatingMaxCount = 10;
 };
+
 struct MaterialInteractionData {
 	std::string materialA;
 	std::string materialB;
@@ -64,6 +64,7 @@ struct MaterialInteractionData {
 	float staticFriction = 0.0f;
 	float dynamicFriction = 0.0f;
 };
+
 struct MaterialData {
 	std::string name;
 	float density = 0.0f;
@@ -124,7 +125,6 @@ private:
 	std::string m_sceneDescription = "";
 	bool m_gravityOn = true;
 
-	// Network Server Members
 	std::unique_ptr<Networking::ListeningSocket> m_tcpListener;
 	std::unique_ptr<Networking::TCPSocket> m_tcpClient;
 	std::thread m_networkThread;
@@ -133,9 +133,12 @@ private:
 	std::string m_instanceId;
 
 	std::atomic<PeerID> m_localPeerId{ 0 };
+	std::atomic<PeerID> m_runtimePeerCount{ 3 }; // NEW
+	NetworkRole m_networkRole = NetworkRole::Host; // NEW
+
 	int m_selectedEntityIndex = -1;
 
-	std::mutex m_sceneMutex; // Protects m_entities during sync
+	std::mutex m_sceneMutex;
 	std::shared_ptr<SharedNetworkData> m_networkData;
 	std::vector<MaterialData> m_materials;
 	std::vector<MaterialInteractionData> m_materialInteractions;

@@ -125,7 +125,7 @@
 - [ ] Extend FlatBuffer schema for chosen feature
 
 ### Advanced Concurrency
-- [ ] ≥3 peers supported
+- [x] ≥3 peers supported
 - [ ] Data integrity maintained (interpolation/correction for drift)
 - [ ] Network QoS:
   - [ ] Handle latency: 100ms ± 50ms

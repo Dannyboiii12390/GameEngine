@@ -39,13 +39,6 @@
     3.	Keep host as relay (no full mesh yet).
     4.	Include sourcePeerId in packets.
 */
-
-/*
-Todo List
-- get multiple cameras to work - have multiple instances of Camera class and have pointer to the active one - friday
-- networking - next week
-- flocking - using compute shader - week after next
-*/
 int main()
 {
     try

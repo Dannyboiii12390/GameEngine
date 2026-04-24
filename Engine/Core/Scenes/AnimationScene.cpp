@@ -80,6 +80,11 @@ AnimationScene::AnimationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui)
 
 AnimationScene::~AnimationScene()
 {
+    if (m_vulkanRHI && m_vulkanRHI->GetActiveCamera() == &m_camera)
+    {
+        m_vulkanRHI->SetActiveCamera(nullptr);
+    }
+
     if (m_vulkanRHI)
     {
         m_vulkanRHI->WaitIdle();

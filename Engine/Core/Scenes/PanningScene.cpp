@@ -123,6 +123,11 @@ PanningScene::PanningScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 }
 PanningScene::~PanningScene()
 {
+	if (m_vulkanRHI && m_vulkanRHI->GetActiveCamera() == &m_camera)
+	{
+		m_vulkanRHI->SetActiveCamera(nullptr);
+	}
+
 	// save camera position and rotation to file for next time
 	auto file = std::ofstream("camera_state.txt");
 	if(file.is_open())

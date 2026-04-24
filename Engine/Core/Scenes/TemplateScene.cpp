@@ -45,6 +45,11 @@ TemplateScene::~TemplateScene()
 }
 void TemplateScene::Destroy()
 {
+	if (m_vulkanRHI && m_vulkanRHI->GetActiveCamera() == &m_camera)
+	{
+		m_vulkanRHI->SetActiveCamera(nullptr);
+	}
+
 	if (m_vulkanRHI)
 	{
 		m_vulkanRHI->WaitIdle();
