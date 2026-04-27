@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstring>
 #include <array>
+#include <cmath> // added for volume/pow calculations
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -62,6 +63,8 @@ namespace
 		Network,
 		Simulation
 	};
+
+	constexpr float kPI = 3.14159265358979323846f;
 
 	DWORD_PTR BuildMaskFromRange(uint32_t start, uint32_t endInclusive, uint32_t coreCount)
 	{
@@ -251,6 +254,59 @@ namespace
 		case ObjectType::Animated:  return Simulation::Behaviour_AnimatedObject;
 		case ObjectType::Simulated:
 		default:                    return Simulation::Behaviour_SimulatedObject;
+		}
+	}
+
+	// New helper: lookup density from material table (default 1.0f if not found or invalid)
+	static float LookupMaterialDensity(const std::vector<MaterialData>& mats, const std::string& name)
+	{
+		if (name.empty()) return 1.0f;
+		for (const auto& m : mats)
+		{
+			if (m.name == name)
+				return (m.density > 0.0f) ? m.density : 1.0f;
+		}
+		return 1.0f;
+	}
+
+	// New helper: compute approximate volume for common shapes using passed dimensions.
+	static float ComputeVolumeForShape(Simulation::Shape shape, const glm::vec3& scale, float radius, float height)
+	{
+		switch (shape)
+		{
+		case Simulation::Shape_Sphere:
+		{
+			// radius is taken directly
+			float r = std::max(0.0f, radius);
+			return (4.0f / 3.0f) * kPI * r * r * r;
+		}
+		case Simulation::Shape_Cylinder:
+		{
+			float r = std::max(0.0f, radius);
+			float h = std::max(0.0f, height);
+			return kPI * r * r * h;
+		}
+		case Simulation::Shape_Capsule:
+		{
+			float r = std::max(0.0f, radius);
+			float h = std::max(0.0f, height);
+			// cylinder portion + two hemispheres
+			return kPI * r * r * h + (4.0f / 3.0f) * kPI * r * r * r;
+		}
+		case Simulation::Shape_Plane:
+		{
+			// Plane has effectively no volume - return small value to avoid zero-mass issues.
+			return 0.0f;
+		}
+		case Simulation::Shape_Cuboid:
+		default:
+		{
+			// treat scale as full size (width x height x depth)
+			float sx = std::max(0.0f, scale.x);
+			float sy = std::max(0.0f, scale.y);
+			float sz = std::max(0.0f, scale.z);
+			return sx * sy * sz;
+		}
 		}
 	}
 }
@@ -620,8 +676,8 @@ Networking::Address FlatBufferScene::GetClientAddress()
 						bytes = recv(ci.socket, recvBuf, sizeof(recvBuf), 0);
 
 							if (bytes > 0) {
-							const uint8_t* begin = reinterpret_cast<const uint8_t*>(recvBuf);
-							ci.rxBuffer.insert(ci.rxBuffer.end(), begin, begin + bytes);
+						 const uint8_t* begin = reinterpret_cast<const uint8_t*>(recvBuf);
+						 ci.rxBuffer.insert(ci.rxBuffer.end(), begin, begin + bytes);
 						}
 
 						// Parse as stream: first handshake, then sync packets
@@ -1370,7 +1426,7 @@ void FlatBufferScene::Draw()
 				ImGui::DragInt("Render frames per second: %d", reinterpret_cast<int*>(&m_graphicsHz));
 				if (m_physicsHz <= 0) m_physicsHz = 1;
 				if (m_graphicsHz <= 0) m_graphicsHz = 1;
-					
+				
 				if (ImGui::Button("Start/Stop Simulation"))
 					m_paused = !m_paused;
 				if(ImGui::Button("Save State")) SerializeState();
@@ -2069,7 +2125,7 @@ void FlatBufferScene::DeserializeState()
 				entity.AddComponent(EComponentType::Component_Physics);
 				if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
 				{
-					phys->SetMass(1.0f);
+					// defer setting mass until we have precise geometry below; still ensure gravity flag now
 					phys->SetAffectedByGravity(m_gravityOn);
 				}
 			}
@@ -2206,6 +2262,25 @@ void FlatBufferScene::DeserializeState()
 				{
 					collider->setRotation(rot);
 					collider->setScale(scale);
+				}
+			}
+
+			// Compute mass from material density and object volume for simulated objects
+			if (objectType == ObjectType::Simulated)
+			{
+				float density = LookupMaterialDensity(m_materials, materialName);
+				float volume = ComputeVolumeForShape(shapeType, scale, shapeRadius, shapeHeight);
+
+				// If volume ended up zero (plane or unknown), fall back to small default volume to avoid zero mass
+				if (volume <= 0.0f)
+					volume = 1.0f; // conservative fallback
+
+				const float mass = density * volume;
+
+				if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+				{
+					phys->SetMass(std::max(0.0001f, mass));
+					phys->SetAffectedByGravity(m_gravityOn);
 				}
 			}
 
@@ -2426,7 +2501,7 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 		entity.AddComponent(EComponentType::Component_Physics);
 		if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
 		{
-			phys->SetMass(1.0f);
+			// Defer mass assignment until we compute exact geometry below; ensure gravity flag
 			phys->SetAffectedByGravity(m_gravityOn);
 		}
 	}
@@ -2498,6 +2573,24 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 			collision->SetCollider(std::make_unique<Physics::Sphere>(position, r));
 			break;
 		}
+		}
+	}
+
+	// Compute and assign mass based on material density and shape volume
+	if (spawner.objectType == ObjectType::Simulated)
+	{
+		float density = LookupMaterialDensity(m_materials, spawner.material);
+		float volume = ComputeVolumeForShape(shape, scale, radius, height);
+
+		if (volume <= 0.0f)
+			volume = 1.0f; // fallback to conservative default
+
+		const float mass = density * volume;
+
+		if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+		{
+			phys->SetMass(std::max(0.0001f, mass));
+			phys->SetAffectedByGravity(m_gravityOn);
 		}
 	}
 
