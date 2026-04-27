@@ -103,208 +103,62 @@ namespace
 
 void SystemCollision::OnUpdate(std::span<Entity> entities, float deltaTime)
 {
-	const PeerID localPeerId = m_localPeerId ? m_localPeerId->load(std::memory_order_relaxed) : 0;
-	EComponentType requiredComponents = EComponentType::Component_Collision | EComponentType::Component_Transform;
+    // First, update all collider positions from their transforms
+    for (Entity& entity : entities)
+    {
+        if (!entity.HasComponent(EComponentType::Component_Collision) || !entity.HasComponent(EComponentType::Component_Transform))
+            continue;
 
-	const int count = static_cast<int>(entities.size());
+        auto* colComp = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+        auto* transComp = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
 
-	// Sync collider positions from the committed (read) transform buffer.
-	#pragma omp parallel for
-	for (int i = 0; i < count; ++i)
-	{
-		Entity& entity = entities[i];
+        if (colComp && transComp)
+        {
+            Physics::Collider* collider = colComp->GetCollider();
+            if (collider)
+            {
+                collider->setPosition(transComp->Position());
+                collider->setRotation(transComp->Rotation());
+            }
+        }
+    }
 
-		if (!entity.HasComponent(requiredComponents))
-			continue;
+    // Now, proceed with collision detection
+    const size_t numEntities = entities.size();
+    if (numEntities == 0) return;
 
-		ComponentCollision* collisionComp = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-		ComponentTransform* thisTransform = entity.GetComponent<ComponentTransform>(EComponentType::Component_Transform);
+    // Simple N-squared collision detection for now
+    for (size_t i = 0; i < numEntities; ++i)
+    {
+        Entity& entityA = entities[i];
+        if (!entityA.HasComponent(EComponentType::Component_Collision)) continue;
 
-		Physics::Collider* collider = collisionComp->GetCollider();
-		if (!collider)
-			continue;
+        auto* colCompA = entityA.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+        if (!colCompA || colCompA->GetCollisionRole() == CollisionRole::Container) continue;
 
-		collider->setPosition(thisTransform->Position());
-		collider->setRotation(thisTransform->Rotation());
-	}
+        for (size_t j = i + 1; j < numEntities; ++j)
+        {
+            Entity& entityB = entities[j];
+            if (!entityB.HasComponent(EComponentType::Component_Collision)) continue;
 
+            auto* colCompB = entityB.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+            if (!colCompB) continue;
 
+            Physics::Collider* colliderA = colCompA->GetCollider();
+            Physics::Collider* colliderB = colCompB->GetCollider();
 
-	std::vector<int> collidableIndices;
-	collidableIndices.reserve(count);
+            if (colliderA && colliderB && colliderA->isColliding(*colliderB))
+            {
+                colCompA->InvokeCollision(entityA, entityB);
 
-	for (int i = 0; i < count; ++i)
-	{
-		if (!entities[i].HasComponent(requiredComponents))
-			continue;
-
-		ComponentCollision* collisionComp = entities[i].GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-		if (collisionComp && collisionComp->GetCollider())
-		{
-			collidableIndices.push_back(i);
-		}
-	}
-
-	std::vector<BroadPhaseBody> finiteBodies;
-	std::vector<BroadPhaseBody> infiniteBodies;
-	finiteBodies.reserve(collidableIndices.size());
-
-	float diameterAccum = 0.0f;
-	int diameterSamples = 0;
-
-	for (int idx : collidableIndices)
-	{
-		ComponentCollision* collision = entities[idx].GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-		Physics::Collider* collider = collision->GetCollider();
-
-		if (!collider)
-			continue;
-
-		glm::vec3 aabbMin{};
-		glm::vec3 aabbMax{};
-		bool infinite = false;
-
-		if (BuildAabb(*collider, aabbMin, aabbMax, infinite))
-		{
-			finiteBodies.push_back({ idx, collision, aabbMin, aabbMax });
-			
-			const glm::vec3 diff = aabbMax - aabbMin;
-			const float maxDiff = std::max({ diff.x, diff.y, diff.z });
-			diameterAccum += maxDiff;
-
-			++diameterSamples;
-		}
-		else if (infinite)
-		{
-			infiniteBodies.push_back({ idx, collision, aabbMin, aabbMax });
-		}
-	}
-
-	const float averageDiameter = diameterSamples > 0 ? diameterAccum / static_cast<float>(diameterSamples) : 1.0f;
-	const float cellSize = std::max(0.5f, averageDiameter);
-
-	std::unordered_map<CellCoord, std::vector<int>, CellCoordHasher> grid;
-	grid.reserve(finiteBodies.size() * 2);
-
-	for (int i = 0; i < static_cast<int>(finiteBodies.size()); ++i)
-	{
-		const BroadPhaseBody& body = finiteBodies[i];
-		const glm::vec3 cellMinF = glm::floor(body.min / cellSize);
-		const glm::vec3 cellMaxF = glm::floor(body.max / cellSize);
-
-		const CellCoord cellMin{ static_cast<int>(cellMinF.x), static_cast<int>(cellMinF.y), static_cast<int>(cellMinF.z) };
-		const CellCoord cellMax{ static_cast<int>(cellMaxF.x), static_cast<int>(cellMaxF.y), static_cast<int>(cellMaxF.z) };
-
-		for (int z = cellMin.z; z <= cellMax.z; ++z)
-		{
-			for (int y = cellMin.y; y <= cellMax.y; ++y)
-			{
-				for (int x = cellMin.x; x <= cellMax.x; ++x)
-				{
-					grid[{ x, y, z }].push_back(i);
-				}
-			}
-		}
-	}
-
-	std::vector<std::pair<int, int>> candidatePairs;
-	candidatePairs.reserve(finiteBodies.size() * 2);
-
-	std::unordered_set<uint64_t> seenPairs;
-	seenPairs.reserve(finiteBodies.size() * 4);
-
-	for (const auto& cell : grid)
-	{
-		const std::vector<int>& indices = cell.second;
-		for (size_t i = 0; i < indices.size(); ++i)
-		{
-			for (size_t j = i + 1; j < indices.size(); ++j)
-			{
-				const int a = finiteBodies[indices[i]].entityIndex;
-				const int b = finiteBodies[indices[j]].entityIndex;
-				const uint64_t key = MakePairKey(a, b);
-
-				if (seenPairs.insert(key).second)
-				{
-					candidatePairs.emplace_back(a, b);
-				}
-			}
-		}
-	}
-
-	for (const BroadPhaseBody& infinite : infiniteBodies)
-	{
-		for (const BroadPhaseBody& body : finiteBodies)
-		{
-			const uint64_t key = MakePairKey(infinite.entityIndex, body.entityIndex);
-			if (seenPairs.insert(key).second)
-			{
-				candidatePairs.emplace_back(infinite.entityIndex, body.entityIndex);
-			}
-		}
-	}
-
-	for (size_t i = 0; i < infiniteBodies.size(); ++i)
-	{
-		for (size_t j = i + 1; j < infiniteBodies.size(); ++j)
-		{
-			const int a = infiniteBodies[i].entityIndex;
-			const int b = infiniteBodies[j].entityIndex;
-			const uint64_t key = MakePairKey(a, b);
-			if (seenPairs.insert(key).second)
-			{
-				candidatePairs.emplace_back(a, b);
-			}
-		}
-	}
-
-	#pragma omp parallel for
-	for (int p = 0; p < static_cast<int>(candidatePairs.size()); ++p)
-	{
-		const auto [aIndex, bIndex] = candidatePairs[p];
-		Entity& entityA = entities[aIndex];
-		Entity& entityB = entities[bIndex];
-
-		ComponentCollision* collisionA = entityA.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-		ComponentCollision* collisionB = entityB.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
-
-		if (!collisionA || !collisionB)
-			continue;
-
-		if (collisionA->GetCollisionRole() == CollisionRole::Container &&
-			collisionB->GetCollisionRole() == CollisionRole::Container)
-		{
-			continue;
-		}
-
-		auto* netA = entityA.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
-		auto* netB = entityB.GetComponent<ComponentNetwork>(EComponentType::Component_Network);
-
-		const bool canResolveA = !netA || !netA->IsSimulated() || netA->IsOwnedByMe(localPeerId);
-		const bool canResolveB = !netB || !netB->IsSimulated() || netB->IsOwnedByMe(localPeerId);
-
-		if (!canResolveA && !canResolveB)
-			continue;
-
-		if (collisionA->Collided(*collisionB->GetCollider()))
-		{
-			Physics::Collider* colliderA = collisionA->GetCollider();
-			Physics::Collider* colliderB = collisionB->GetCollider();
-
-			const bool aIsPlane = colliderA && colliderA->getType() == Physics::EColliderType::PLANE;
-			const bool bIsPlane = colliderB && colliderB->getType() == Physics::EColliderType::PLANE;
-
-			const bool aHasVelocity = entityA.HasComponent(EComponentType::Component_Velocity);
-			const bool bHasVelocity = entityB.HasComponent(EComponentType::Component_Velocity);
-
-			// Normal ownership-based resolve
-			if (canResolveA)
-				collisionA->InvokeCollision(entityA, entityB);
-
-			if (canResolveB)
-				collisionB->InvokeCollision(entityB, entityA);
-		}
-	}
+                // If B is not a container, it can also handle the collision
+                if (colCompB->GetCollisionRole() != CollisionRole::Container)
+                {
+                    colCompB->InvokeCollision(entityB, entityA);
+                }
+            }
+        }
+    }
 }
 
 

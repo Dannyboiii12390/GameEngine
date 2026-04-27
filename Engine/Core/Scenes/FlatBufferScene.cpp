@@ -2289,6 +2289,7 @@ void FlatBufferScene::DeserializeState()
 
 			if (objectType == ObjectType::Animated)
 			{
+				entity.AddComponent(EComponentType::Component_Collision);
 				// Load animation component if the object is animated
 				if (auto* animBehaviour = objFlat->behaviour_as_AnimatedObject())
 				{

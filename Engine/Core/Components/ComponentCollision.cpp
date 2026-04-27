@@ -218,7 +218,13 @@ void CollisionResponse(Entity& self, Entity& other)
 
 	glm::vec3 n = contactNormal;
 
-	bool otherHasFiniteMass = (physOther && physOther->GetInverseMass() > 0.0f);
+	// Check if the 'other' entity is an animated object
+	bool otherIsAnimated = other.HasComponent(EComponentType::Component_Animation);
+
+	// If the other object is animated, treat it as having infinite mass.
+	// Otherwise, check if it has a finite mass via its physics component.
+	bool otherHasFiniteMass = !otherIsAnimated && (physOther && physOther->GetInverseMass() > 0.0f);
+
 	if (otherHasFiniteMass)
 	{
 		float massOther = physOther->GetMass();

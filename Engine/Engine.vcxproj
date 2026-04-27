@@ -169,7 +169,6 @@
     <ClCompile Include="Core\Scenes\PanningScene.cpp" />
     <ClCompile Include="Core\Scenes\TemplateScene.cpp" />
     <ClCompile Include="Core\Spawner.cpp" />
-    <ClCompile Include="Core\Spawner.h" />
     <ClCompile Include="Core\Systems\SystemAnimation.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.cpp" />
     <ClCompile Include="Core\Systems\SystemCollision.h" />
@@ -217,6 +216,7 @@
     <ClInclude Include="Core\Scenes\PanningScene.h" />
     <ClInclude Include="Core\Scenes\Spawner.h" />
     <ClInclude Include="Core\Scenes\TemplateScene.h" />
+    <ClInclude Include="Core\Spawner.h" />
     <ClInclude Include="Core\Systems\ISystem.h" />
     <ClInclude Include="Core\Systems\SystemAnimation.h" />
     <ClInclude Include="Core\Systems\SystemFlocking.h" />

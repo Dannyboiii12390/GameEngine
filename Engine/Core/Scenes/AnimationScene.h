@@ -38,6 +38,7 @@ private:
     void CreateReversingPathObject();
     void CreateSmoothstepObject();
     void CreateCollisionDemoObjects();
+	void CreateSimulatedBouncingBall();
 
     // Scene members
     Window* m_window = nullptr;

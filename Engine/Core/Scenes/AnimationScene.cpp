@@ -21,7 +21,7 @@ AnimationScene::AnimationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui)
       m_systemManager(rhi, 2)
 {
     // Setup camera - position it to see the animated objects
-    m_camera.SetPosition(glm::vec3(0.0f, 3.0f, 8.0f));
+    m_camera.SetPosition(glm::vec3(0.0f, 3.0f, 15.0f));
     m_camera.LookAt(glm::vec3(0.0f, 2.0f, 0.0f));
     m_vulkanRHI->SetActiveCamera(&m_camera);
 
@@ -32,14 +32,18 @@ AnimationScene::AnimationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui)
     // Create ground plane
     {
         Entity planeEntity;
-        planeEntity.AddComponent(EComponentType::Component_Transform, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(50.0f));
+        glm::vec3 planePos(0.0f, 0.0f, 0.0f);
+        // Apply a -90 degree rotation on the X-axis to the transform.
+        // This will rotate the visually upright mesh to be a flat floor.
+        planeEntity.AddComponent(EComponentType::Component_Transform, planePos, glm::vec3(-90.0f, 0.0f, 0.0f), glm::vec3(50.0f));
         planeEntity.AddComponent(EComponentType::Component_Geometry);
         planeEntity.AddComponent(EComponentType::Component_Collision);
 
         ComponentGeometry* geom = planeEntity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
         if (geom)
         {
-            MeshData meshData = ResourceManager::CreatePlaneMesh(10.0f, 1.0f, 1.0f);
+            // The mesh is created as an upright plane in the XY plane.
+            MeshData meshData = ResourceManager::CreatePlaneMesh(1.0f, 1.0f, 1.0f, 1, 1);
             auto [verts, indices] = meshData;
             geom->InitializeMesh(m_vulkanRHI, verts, indices);
             geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(),
@@ -50,11 +54,12 @@ AnimationScene::AnimationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui)
         ComponentCollision* col = planeEntity.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
         if (col)
         {
-            // Plane collider: normal pointing UP, positioned at origin
+            // Define the physics plane as a VERTICAL wall.
+            // When the entity's transform rotates it -90 degrees on X, it becomes a HORIZONTAL floor.
             col->SetCollider(std::make_unique<Physics::Plane>(
-                glm::vec3(0.0f, 1.0f, 0.0f),  // Normal pointing up
-                glm::vec3(1.0f, 0.0f, 0.0f),  // Right vector
-                glm::vec3(0.0f, 0.0f, 1.0f)   // Forward vector
+                planePos,                     // A point on the plane
+                glm::vec3(1.0f, 0.0f, 0.0f),  // Basis vector 1 (along world X-axis)
+                glm::vec3(0.0f, 1.0f, 0.0f)   // Basis vector 2 (along world Y-axis)
             ));
         }
 
@@ -67,6 +72,7 @@ AnimationScene::AnimationScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui)
     CreateReversingPathObject();
     CreateSmoothstepObject();
     CreateCollisionDemoObjects();
+    CreateSimulatedBouncingBall(); // Add the new simulated object
 
     // Register systems - CRITICAL: Animation must run FIRST to update animated transforms
     m_systemManager.RegisterSystem(std::make_unique<SystemAnimation>());
@@ -306,9 +312,10 @@ void AnimationScene::CreateSmoothstepObject()
 
 void AnimationScene::CreateCollisionDemoObjects()
 {
-    // Create a falling cube that will collide with moving platform
+    // Create a falling cube that will collide with the moving red cube
     Entity fallingCube;
-    glm::vec3 cubePos(0.0f, 5.0f, 2.0f);
+    // Positioned to fall onto the path of the red cube
+    glm::vec3 cubePos(0.0f, 5.0f, 0.0f);
     fallingCube.AddComponent(EComponentType::Component_Transform, cubePos, glm::vec3(0.0f), glm::vec3(0.8f));
     fallingCube.AddComponent(EComponentType::Component_Velocity, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f));
     fallingCube.AddComponent(EComponentType::Component_Physics);
@@ -324,12 +331,12 @@ void AnimationScene::CreateCollisionDemoObjects()
         geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(),
             "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
 
-        // Create and add WHITE 1x1 solid color texture
-        unsigned char whitePixel[4] = { 255, 255, 255, 255 };
-        auto whiteTexture = Texture::CreateFromMemory(m_vulkanRHI, whitePixel, 1, 1, 4, TextureType::Albedo, false);
-        if (whiteTexture)
+        // Create and add CYAN 1x1 solid color texture
+        unsigned char cyanPixel[4] = { 0, 255, 255, 255 };
+        auto cyanTexture = Texture::CreateFromMemory(m_vulkanRHI, cyanPixel, 1, 1, 4, TextureType::Albedo, false);
+        if (cyanTexture)
         {
-            geom->AddTexture(m_vulkanRHI, *whiteTexture);
+            geom->AddTexture(m_vulkanRHI, *cyanTexture);
         }
     }
 
@@ -347,6 +354,53 @@ void AnimationScene::CreateCollisionDemoObjects()
     }
 
     m_entities.push_back(std::move(fallingCube));
+}
+
+void AnimationScene::CreateSimulatedBouncingBall()
+{
+    Entity bouncingBall;
+    glm::vec3 startPos(-4.0f, 8.0f, -3.0f);
+    bouncingBall.AddComponent(EComponentType::Component_Transform, startPos, glm::vec3(0.0f), glm::vec3(1.2f));
+    bouncingBall.AddComponent(EComponentType::Component_Velocity, glm::vec3(1.0f, 0.0f, 0.5f), glm::vec3(15.0f), glm::vec3(0.0f));
+    bouncingBall.AddComponent(EComponentType::Component_Physics);
+    bouncingBall.AddComponent(EComponentType::Component_Geometry);
+    bouncingBall.AddComponent(EComponentType::Component_Collision);
+
+    // Setup geometry
+    ComponentGeometry* geom = bouncingBall.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry);
+    if (geom)
+    {
+        MeshData meshData = ResourceManager::CreateSphereMesh(1.0f, 24, 24);
+        auto [verts, indices] = meshData;
+        geom->InitializeMesh(m_vulkanRHI, verts, indices);
+        geom->InitializePipeline(m_vulkanRHI, m_vulkanRHI->GetRenderPass(), m_vulkanRHI->GetSwapchainExtent(),
+            "SHADERS/object.vert.spv", "SHADERS/object.frag.spv");
+
+        // Create and add a Cyan texture
+        unsigned char purplePixel[4] = { 0, 255, 255, 255 };
+        auto purpleTexture = Texture::CreateFromMemory(m_vulkanRHI, purplePixel, 1, 1, 4, TextureType::Albedo, false);
+        if (purpleTexture)
+        {
+            geom->AddTexture(m_vulkanRHI, *purpleTexture);
+        }
+    }
+
+    // Setup physics
+    ComponentPhysics* phys = bouncingBall.GetComponent<ComponentPhysics>(EComponentType::Component_Physics);
+    if (phys)
+    {
+        phys->SetMass(2.0f);
+        phys->SetAffectedByGravity(true);
+    }
+
+    // Setup collision
+    ComponentCollision* col = bouncingBall.GetComponent<ComponentCollision>(EComponentType::Component_Collision);
+    if (col)
+    {
+        col->SetCollider(std::make_unique<Physics::Sphere>(startPos, 1.2f));
+    }
+
+    m_entities.push_back(std::move(bouncingBall));
 }
 
 void AnimationScene::Start(float deltaTime)
