@@ -1390,7 +1390,7 @@ void FlatBufferScene::Draw()
 					sd.spawnType = static_cast<uint8_t>(Simulation::SpawnType_SingleBurstSpawn);
 					sd.locationType = static_cast<uint8_t>(Simulation::SpawnLocation_FixedLocation);
 					sd.spawnerType = static_cast<uint8_t>(Simulation::SpawnerType_SphereSpawner);
-					sd.owner = static_cast<int>(Simulation::SpawnerOwnerType_ONE);
+					sd.owner = static_cast<int>(std::clamp<PeerID>(m_localPeerId.load(), 0u, 3u));
 					m_spawners.push_back(sd);
 					rebuildSpawners = true;
 				}
@@ -2540,27 +2540,29 @@ void FlatBufferScene::RebuildSpawnerRuntime()
 		cfg.repeatInterval = std::max(0.01f, sd.repeatingInterval);
 		cfg.repeatMaxCount = std::max(1u, sd.repeatingMaxCount);
 
+		const PeerID spawnerOwnerId = cfg.owner;
+		const PeerID localPeerId = m_localPeerId.load();
+
 		Spawner runtimeSpawner(cfg);
 		runtimeSpawner.SetPeers(peers);
 		runtimeSpawner.Start();
-		runtimeSpawner.SetActive(true);
+		runtimeSpawner.SetActive(spawnerOwnerId == localPeerId);
 
 		runtimeSpawner.SetSpawnCallback(
-			[this, sd](const glm::vec3& pos,
+			[this, sd, spawnerOwnerId](const glm::vec3& pos,
 				const glm::vec3& linearVel,
 				const glm::vec3& angularVel,
 				const glm::vec3& randomSize,
 				float radius,
 				float height,
-				PeerID owner)
+				PeerID /*owner*/)
 			{
-				SpawnEntityFromSpawner(sd, pos, linearVel, angularVel, randomSize, radius, height, RemapOwnerForRuntime(owner));
+				SpawnEntityFromSpawner(sd, pos, linearVel, angularVel, randomSize, radius, height, spawnerOwnerId);
 			});
 
 		m_runtimeSpawners.push_back(std::move(runtimeSpawner));
 	}
 }
-
 void FlatBufferScene::UpdateSpawnerRuntime(float deltaTime)
 {
 	if (deltaTime <= 0.0f || m_runtimeSpawners.empty())
