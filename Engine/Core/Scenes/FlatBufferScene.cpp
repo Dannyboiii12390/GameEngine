@@ -56,6 +56,7 @@
 #include "../Components/ComponentAnimation.h"
 #include "AnimationScene.h"
 
+
 namespace
 {
 	enum class ThreadRole
@@ -479,10 +480,21 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 // REPLACE GetClientAddress() completely
 Networking::Address FlatBufferScene::GetClientAddress()
 {
+	// Manual overrides (set these for campus demos)
+	// - Leave empty/0 to use normal UDP discovery + random port.
+	static constexpr const char* kManualHost = "";  // e.g. "192.168.1.50"
+	static constexpr uint16_t kManualHostPort = 0;  // e.g. 12664
+	static constexpr uint16_t kFixedTcpPort = 0;    // e.g. 12664 (host only)
 
 	static std::mt19937 rng{ std::random_device{}() };
 	static std::uniform_int_distribution<int> dist(10000, 19999);
-	const int random = dist(rng);
+
+	const int random = (kFixedTcpPort != 0) ? static_cast<int>(kFixedTcpPort) : dist(rng);
+
+	if (kFixedTcpPort != 0)
+	{
+		std::cout << "Using fixed TCP port " << kFixedTcpPort << "\n";
+	}
 
 	Networking::Address bindAddr("0.0.0.0", random);
 	m_tcpListener = std::make_unique<Networking::ListeningSocket>(bindAddr);
@@ -575,6 +587,16 @@ Networking::Address FlatBufferScene::GetClientAddress()
 
 		std::vector<sockaddr_in> broadcastTargets = buildBroadcastTargets();
 
+		const bool hasHostOverride = kManualHost[0] != '\0' && kManualHostPort != 0;
+
+		if (hasHostOverride)
+		{
+			std::cout << "Using host override " << kManualHost << ":" << kManualHostPort << "\n";
+			m_networkRole = NetworkRole::Client;
+		}
+
+		auto lastDirectAttempt = std::chrono::steady_clock::now() - std::chrono::seconds(5);
+
 		struct HelloMsg {
 			uint32_t magic;
 			char instanceId[64];
@@ -609,8 +631,43 @@ Networking::Address FlatBufferScene::GetClientAddress()
 		while (m_networkRunning) {
 			const auto now = std::chrono::steady_clock::now();
 
+			if (hasHostOverride && !m_peerConnected &&
+				std::chrono::duration_cast<std::chrono::seconds>(now - lastDirectAttempt).count() >= 1)
+			{
+				lastDirectAttempt = now;
+				try
+				{
+					m_tcpClient = std::make_unique<Networking::TCPSocket>(
+						Networking::Address(kManualHost, kManualHostPort));
+
+					u_long mode = 1;
+					ioctlsocket(m_tcpClient->native_handle(), FIONBIO, &mode);
+
+					m_networkRole = NetworkRole::Client;
+					m_peerConnected = true;
+
+					HelloMsg hello{};
+					hello.magic = kHelloMagic;
+					strncpy_s(hello.instanceId, sizeof(hello.instanceId), m_instanceId.c_str(), sizeof(hello.instanceId) - 1);
+					hello.instanceId[sizeof(hello.instanceId) - 1] = '\0';
+
+					send(m_tcpClient->native_handle(),
+						reinterpret_cast<const char*>(&hello),
+						static_cast<int>(sizeof(hello)),
+						0);
+
+					std::cout << "Connected to host " << kManualHost << ":" << kManualHostPort << "\n";
+				}
+				catch (const std::exception& ex)
+				{
+					std::cerr << "Host connect failed: " << ex.what() << "\n";
+					m_peerConnected = false;
+					m_tcpClient.reset();
+				}
+			}
+
 			// Broadcast presence
-			if (udpSocket != INVALID_SOCKET &&
+			if (!hasHostOverride && udpSocket != INVALID_SOCKET &&
 				std::chrono::duration_cast<std::chrono::seconds>(now - lastBroadcastTime).count() >= 1) {
 				const std::string msg = "SERVER_DISCOVERY:" + std::to_string(random) + ":" + m_instanceId;
 
@@ -624,7 +681,7 @@ Networking::Address FlatBufferScene::GetClientAddress()
 			}
 
 			// Discovery + host election (lowest instanceId becomes host)
-			if (udpSocket != INVALID_SOCKET && !m_peerConnected) {
+			if (!hasHostOverride && udpSocket != INVALID_SOCKET && !m_peerConnected) {
 				char recvBuf[256]{};
 				sockaddr_in from{};
 				int fromLen = sizeof(from);
