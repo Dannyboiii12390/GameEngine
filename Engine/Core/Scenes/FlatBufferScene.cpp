@@ -29,6 +29,7 @@
 #endif
 #include <Windows.h>
 #include <iphlpapi.h>
+#pragma comment(lib, "Iphlpapi.lib")
 
 #include "../Systems/SystemVelocity.h"
 #include "../Systems/SystemPhysics.h"
@@ -474,10 +475,11 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 	m_systemManager.RegisterSystem(std::make_unique<SystemSwapBuffers>());
 
 	m_networkData = std::make_shared<SharedNetworkData>();
-	m_systemManager.RegisterSystem(std::make_unique<SystemNetworkSync>(&m_localPeerId, m_networkData));
+	auto netSync = std::make_unique<SystemNetworkSync>(&m_localPeerId, m_networkData);
+	netSync->SetSpawnHandler([this](const SpawnPacket& packet) { HandleSpawnMessage(packet); });
+	m_systemManager.RegisterSystem(std::move(netSync));
 }
 
-// REPLACE GetClientAddress() completely
 Networking::Address FlatBufferScene::GetClientAddress()
 {
 	// Manual overrides (set these for campus demos)
@@ -609,7 +611,7 @@ Networking::Address FlatBufferScene::GetClientAddress()
 		};
 
 		static constexpr uint32_t kHelloMagic = 0x48454C4F;   // HELO
-		static constexpr uint32_t kWelcomeMagic = 0x57454C43; // WELC
+	 static constexpr uint32_t kWelcomeMagic = 0x57454C43; // WELC
 
 		struct ClientInfo {
 			SOCKET socket = INVALID_SOCKET;
@@ -760,7 +762,7 @@ Networking::Address FlatBufferScene::GetClientAddress()
 			}
 
 			// Pull outgoing packets from simulation/system layer
-			std::vector<SyncPacket> outgoing;
+			std::vector<NetworkMessage> outgoing;
 			if (m_networkData) {
 				std::lock_guard<std::mutex> lock(m_networkData->outgoingMutex);
 				outgoing = m_networkData->outgoingPackets;
@@ -772,11 +774,10 @@ Networking::Address FlatBufferScene::GetClientAddress()
 				// Host always id 0
 				m_localPeerId.store(0);
 
-				// Send host-local outgoing to all handshaken clients
 				for (auto& ci : clientSockets) {
 					if (!ci.handshakeDone || ci.socket == INVALID_SOCKET) continue;
 					for (const auto& packet : outgoing) {
-						int sent = send(ci.socket, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+						int sent = send(ci.socket, reinterpret_cast<const char*>(&packet), sizeof(NetworkMessage), 0);
 						if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
 							closesocket(ci.socket);
 							ci.socket = INVALID_SOCKET;
@@ -799,12 +800,11 @@ Networking::Address FlatBufferScene::GetClientAddress()
 					do {
 						bytes = recv(ci.socket, recvBuf, sizeof(recvBuf), 0);
 
-							if (bytes > 0) {
-						 const uint8_t* begin = reinterpret_cast<const uint8_t*>(recvBuf);
-						 ci.rxBuffer.insert(ci.rxBuffer.end(), begin, begin + bytes);
+						if (bytes > 0) {
+							const uint8_t* begin = reinterpret_cast<const uint8_t*>(recvBuf);
+							ci.rxBuffer.insert(ci.rxBuffer.end(), begin, begin + bytes);
 						}
 
-						// Parse as stream: first handshake, then sync packets
 						for (;;)
 						{
 							if (!ci.handshakeDone)
@@ -848,27 +848,33 @@ Networking::Address FlatBufferScene::GetClientAddress()
 								continue;
 							}
 
-							if (ci.rxBuffer.size() < sizeof(SyncPacket))
+							if (ci.rxBuffer.size() < sizeof(NetworkMessage))
 								break;
 
-							SyncPacket packet{};
-							std::memcpy(&packet, ci.rxBuffer.data(), sizeof(SyncPacket));
-							ci.rxBuffer.erase(ci.rxBuffer.begin(), ci.rxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(SyncPacket)));
+							NetworkMessage message{};
+							std::memcpy(&message, ci.rxBuffer.data(), sizeof(NetworkMessage));
+							ci.rxBuffer.erase(ci.rxBuffer.begin(), ci.rxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(NetworkMessage)));
 
-							// Host enforces true source id from socket assignment
-							packet.sourcePeerId = ci.assignedPeerId;
+							if (message.type == NetworkMessageType::SyncState)
+							{
+								message.sync.sourcePeerId = ci.assignedPeerId;
+							}
+							else if (message.type == NetworkMessageType::SpawnEntity)
+							{
+								message.spawn.sourcePeerId = ci.assignedPeerId;
+								message.spawn.ownerId = ci.assignedPeerId;
+							}
 
 							if (m_networkData) {
 								std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
-								m_networkData->incomingPackets.push_back(packet);
+								m_networkData->incomingPackets.push_back(message);
 							}
 
-							// Relay to all other connected clients (star topology)
 							for (auto& target : clientSockets) {
 								if (!target.handshakeDone || target.socket == INVALID_SOCKET) continue;
 								if (target.socket == ci.socket) continue;
 
-								int sent = send(target.socket, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+								int sent = send(target.socket, reinterpret_cast<const char*>(&message), sizeof(NetworkMessage), 0);
 								if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
 									closesocket(target.socket);
 									target.socket = INVALID_SOCKET;
@@ -897,7 +903,7 @@ Networking::Address FlatBufferScene::GetClientAddress()
 				bool ok = true;
 
 				for (const auto& packet : outgoing) {
-					int sent = send(hostSock, reinterpret_cast<const char*>(&packet), sizeof(SyncPacket), 0);
+					int sent = send(hostSock, reinterpret_cast<const char*>(&packet), sizeof(NetworkMessage), 0);
 					if (sent == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
 						ok = false;
 						break;
@@ -916,7 +922,6 @@ Networking::Address FlatBufferScene::GetClientAddress()
 
 					for (;;)
 					{
-						// First packet expected is welcome
 						if (!clientGotWelcome)
 						{
 							if (hostRxBuffer.size() < sizeof(WelcomeMsg))
@@ -939,19 +944,18 @@ Networking::Address FlatBufferScene::GetClientAddress()
 							continue;
 						}
 
-						// Then parse as many SyncPacket entries as available
-						if (hostRxBuffer.size() < sizeof(SyncPacket))
+						if (hostRxBuffer.size() < sizeof(NetworkMessage))
 							break;
 
-						SyncPacket packet{};
-						std::memcpy(&packet, hostRxBuffer.data(), sizeof(SyncPacket));
+						NetworkMessage message{};
+						std::memcpy(&message, hostRxBuffer.data(), sizeof(NetworkMessage));
 						hostRxBuffer.erase(
 							hostRxBuffer.begin(),
-							hostRxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(SyncPacket)));
+							hostRxBuffer.begin() + static_cast<std::ptrdiff_t>(sizeof(NetworkMessage)));
 
 						if (m_networkData) {
 							std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);
-							m_networkData->incomingPackets.push_back(packet);
+							m_networkData->incomingPackets.push_back(message);
 						}
 					}
 
@@ -1387,7 +1391,7 @@ void FlatBufferScene::Draw()
 				{
 					SpawnerData sd;
 					sd.name = "Spawner_" + std::to_string(m_spawners.size());
-					sd.spawnType = static_cast<uint8_t>(Simulation::SpawnType_SingleBurstSpawn);
+				 sd.spawnType = static_cast<uint8_t>(Simulation::SpawnType_SingleBurstSpawn);
 					sd.locationType = static_cast<uint8_t>(Simulation::SpawnLocation_FixedLocation);
 					sd.spawnerType = static_cast<uint8_t>(Simulation::SpawnerType_SphereSpawner);
 					sd.owner = static_cast<int>(std::clamp<PeerID>(m_localPeerId.load(), 0u, 3u));
@@ -1410,7 +1414,7 @@ void FlatBufferScene::Draw()
 						continue;
 
 					char nameBuf[128]{};
-					std::snprintf(nameBuf, sizeof(nameBuf), "%s", sp.name.c_str());
+				 std::snprintf(nameBuf, sizeof(nameBuf), "%s", sp.name.c_str());
 					if (ImGui::InputText(("Name##" + std::to_string(i)).c_str(), nameBuf, sizeof(nameBuf)))
 					{
 						sp.name = nameBuf;
@@ -1502,7 +1506,7 @@ void FlatBufferScene::Draw()
 						int maxCount = static_cast<int>(sp.repeatingMaxCount);
 						if (ImGui::DragInt(("Repeat Max Count##" + std::to_string(i)).c_str(), &maxCount, 1.0f, 1, 100000))
 						{
-							sp.repeatingMaxCount = static_cast<uint32_t>(std::max(1, maxCount));
+						 sp.repeatingMaxCount = static_cast<uint32_t>(std::max(1, maxCount));
 							rebuildSpawners = true;
 						}
 					}
@@ -2054,7 +2058,7 @@ void FlatBufferScene::DeserializeState()
 					sd.startTime = b->start_time();
 					if (b->material()) sd.material = b->material()->str();
 					sd.owner = b->owner();
-					sd.spawnType = static_cast<uint8_t>(b->spawn_type_type());
+				 sd.spawnType = static_cast<uint8_t>(b->spawn_type_type());
 					sd.locationType = static_cast<uint8_t>(b->location_type());
 				}
 				break;
@@ -2480,103 +2484,258 @@ void FlatBufferScene::DeserializeState()
 	}
 }
 
-void FlatBufferScene::AddEntity(Entity&& entity)
+uint32_t FlatBufferScene::BuildSpawnNetworkId(PeerID ownerId)
 {
+	const uint32_t localCounter = m_nextSpawnNetworkId++;
+	return (static_cast<uint32_t>(ownerId) << 24) | (localCounter & 0x00FFFFFF);
+}
+
+void FlatBufferScene::HandleSpawnMessage(const SpawnPacket& packet)
+{
+	if (packet.sourcePeerId == m_localPeerId.load())
+		return;
+
+	std::lock_guard<std::mutex> lock(m_sceneMutex);
+
+	for (auto& entity : m_entities)
+	{
+		if (auto* netComp = entity.GetComponent<ComponentNetwork>(EComponentType::Component_Network))
+		{
+			if (netComp->networkId == packet.objectId)
+				return;
+		}
+	}
+
+	const Simulation::Shape shape = static_cast<Simulation::Shape>(packet.shapeType);
+	const Simulation::Behaviour behaviour = static_cast<Simulation::Behaviour>(packet.behaviourType);
+	const Simulation::CollisionType collisionType = static_cast<Simulation::CollisionType>(packet.collisionType);
+	const ObjectType objectType = static_cast<ObjectType>(packet.objectType);
+
+	const glm::vec3 position(packet.posX, packet.posY, packet.posZ);
+	const glm::vec3 scale(packet.scaleX, packet.scaleY, packet.scaleZ);
+	const glm::vec3 linearVelocity(packet.velX, packet.velY, packet.velZ);
+	const glm::vec3 angularVelocity(packet.angVelX, packet.angVelY, packet.angVelZ);
+
+	SpawnerData spawner;
+	spawner.objectType = objectType;
+	spawner.spawnAsSolid = (collisionType == Simulation::CollisionType_SOLID);
+	spawner.material = packet.materialName.data();
+	spawner.spawnerType = static_cast<uint8_t>(Simulation::SpawnerType_SphereSpawner);
+
+	Entity entity;
+
+	entity.AddComponent(EComponentType::Component_Transform, position, glm::vec3(0.0f), scale);
+	entity.AddComponent(EComponentType::Component_Geometry);
+
+	entity.AddComponent(
+		EComponentType::Component_Network,
+		packet.objectId,
+		objectType,
+		packet.ownerId,
+		spawner.material,
+		static_cast<uint8_t>(shape),
+		static_cast<uint8_t>(behaviour),
+		static_cast<uint8_t>(collisionType));
+
+	if (objectType == ObjectType::Simulated)
+	{
+		entity.AddComponent(EComponentType::Component_Velocity, linearVelocity, angularVelocity, glm::vec3(0.0f));
+		entity.AddComponent(EComponentType::Component_Physics);
+		if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+		{
+			phys->SetAffectedByGravity(m_gravityOn);
+		}
+	}
+
+	MeshData meshData;
+	switch (shape)
+	{
+	case Simulation::Shape_Sphere:
+		meshData = ResourceManager::CreateSphereMesh(1.0f, 24, 16);
+		break;
+	case Simulation::Shape_Cylinder:
+		meshData = ResourceManager::CreateCylinderMesh(1.0f, std::max(0.01f, packet.radius), std::max(0.01f, packet.height), 24);
+		break;
+	case Simulation::Shape_Capsule:
+		meshData = ResourceManager::CreateCapsuleMesh(1.0f, std::max(0.01f, packet.radius), std::max(0.01f, packet.height), 24, 16);
+		break;
+	case Simulation::Shape_Cuboid:
+	default:
+		meshData = ResourceManager::CreateCubeMesh();
+		break;
+	}
+
+	if (auto* geom = entity.GetComponent<ComponentGeometry>(EComponentType::Component_Geometry))
+	{
+		const auto [verts, indices] = meshData;
+		geom->InitializeMesh(m_vulkanRHI, verts, indices);
+		geom->InitializePipeline(
+			m_vulkanRHI,
+			m_vulkanRHI->GetRenderPass(),
+			m_vulkanRHI->GetSwapchainExtent(),
+			"SHADERS/object.vert.spv",
+			"SHADERS/object.frag.spv");
+
+		const Texture ownerTex = CreateOwnerTexture(m_vulkanRHI, packet.ownerId);
+		geom->AddTexture(m_vulkanRHI, ownerTex);
+	}
+
+	entity.AddComponent(EComponentType::Component_Collision);
+	if (auto* collision = entity.GetComponent<ComponentCollision>(EComponentType::Component_Collision))
+	{
+		collision->SetCollisionRole(spawner.spawnAsSolid ? CollisionRole::Solid : CollisionRole::Container);
+
+		switch (shape)
+		{
+		case Simulation::Shape_Sphere:
+			collision->SetCollider(std::make_unique<Physics::Sphere>(position, std::max(0.01f, packet.radius)));
+			break;
+
+		case Simulation::Shape_Cylinder:
+		{
+			const float h = std::max(0.01f, packet.height);
+			const glm::vec3 a = position + glm::vec3(0.0f, h * 0.5f, 0.0f);
+			const glm::vec3 b = position - glm::vec3(0.0f, h * 0.5f, 0.0f);
+			collision->SetCollider(std::make_unique<Physics::Cylinder>(a, b, std::max(0.01f, packet.radius)));
+			break;
+		}
+		case Simulation::Shape_Capsule:
+		{
+			const float h = std::max(0.01f, packet.height);
+			const glm::vec3 a = position + glm::vec3(0.0f, h * 0.5f, 0.0f);
+			const glm::vec3 b = position - glm::vec3(0.0f, h * 0.5f, 0.0f);
+			collision->SetCollider(std::make_unique<Physics::Capsule>(a, b, std::max(0.01f, packet.radius)));
+			break;
+		}
+		case Simulation::Shape_Cuboid:
+		default:
+		{
+			const float r = std::max(0.01f, 0.5f * glm::length(scale));
+			collision->SetCollider(std::make_unique<Physics::Sphere>(position, r));
+			break;
+		}
+		}
+	}
+
+	if (objectType == ObjectType::Simulated)
+	{
+		float density = LookupMaterialDensity(m_materials, spawner.material);
+		float volume = ComputeVolumeForShape(shape, scale, packet.radius, packet.height);
+
+		if (volume <= 0.0f)
+			volume = 1.0f;
+
+		const float mass = density * volume;
+
+		if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
+		{
+			phys->SetMass(std::max(0.0001f, mass));
+			phys->SetAffectedByGravity(m_gravityOn);
+		}
+	}
+
 	m_entities.push_back(std::move(entity));
-}
 
-void FlatBufferScene::RemoveEntity(int index)
-{
-	if (index >= 0 && index < m_entities.size())
-		m_entities.erase(m_entities.begin() + index);
-}
+	if (m_networkData)
+	{
+		SpawnPacket spawn{};
+		spawn.sourcePeerId = m_localPeerId.load();
+		spawn.objectId = packet.objectId;
+		spawn.objectType = static_cast<uint8_t>(spawner.objectType);
+		spawn.ownerId = packet.ownerId;
+		spawn.shapeType = static_cast<uint8_t>(shape);
+		spawn.behaviourType = static_cast<uint8_t>(behaviour);
+		spawn.collisionType = static_cast<uint8_t>(collisionType);
+		spawn.posX = position.x; spawn.posY = position.y; spawn.posZ = position.z;
+		spawn.scaleX = scale.x; spawn.scaleY = scale.y; spawn.scaleZ = scale.z;
+		spawn.velX = linearVelocity.x; spawn.velY = linearVelocity.y; spawn.velZ = linearVelocity.z;
+		spawn.angVelX = angularVelocity.x; spawn.angVelY = angularVelocity.y; spawn.angVelZ = angularVelocity.z;
+		spawn.radius = packet.radius;
+		spawn.height = packet.height;
+		std::snprintf(spawn.materialName.data(), spawn.materialName.size(), "%s", spawner.material.c_str());
 
+		NetworkMessage msg{};
+		msg.type = NetworkMessageType::SpawnEntity;
+		msg.spawn = spawn;
+
+		std::lock_guard<std::mutex> lock(m_networkData->outgoingMutex);
+		m_networkData->outgoingPackets.push_back(msg);
+	}
+}
 void FlatBufferScene::RebuildSpawnerRuntime()
 {
 	m_runtimeSpawners.clear();
-
-	std::vector<PeerID> peers;
-	for (PeerID i = 0; i < kRuntimePeerCount; ++i)
-	{
-		peers.push_back(i);
-	}
-
 	m_runtimeSpawners.reserve(m_spawners.size());
+	m_sceneTime = 0.0f;
 
-	for (const SpawnerData& sd : m_spawners)
+	const PeerID runtimeCount = m_runtimePeerCount.load();
+	std::vector<PeerID> peers;
+	peers.reserve(runtimeCount);
+	for (PeerID i = 0; i < runtimeCount; ++i)
+		peers.push_back(i);
+
+	for (const auto& sp : m_spawners)
 	{
-		SpawnerConfig cfg;
-		cfg.name = sd.name;
-		cfg.startTime = sd.startTime;
-		cfg.spawnType = ToRuntimeSpawnType(sd.spawnType);
-		cfg.locationType = ToRuntimeSpawnLocation(sd.locationType);
-		cfg.shapeType = ToRuntimeSpawnerShape(sd.spawnerType);
+		SpawnerConfig config{};
+		config.name = sp.name;
+		config.startTime = sp.startTime;
+		config.spawnType = ToRuntimeSpawnType(sp.spawnType);
+		config.locationType = ToRuntimeSpawnLocation(sp.locationType);
+		config.shapeType = ToRuntimeSpawnerShape(sp.spawnerType);
+		config.fixedPosition = sp.fixedPosition;
+		config.boxMin = sp.boxMin;
+		config.boxMax = sp.boxMax;
+		config.sphereCenter = sp.sphereCenter;
+		config.sphereRadius = sp.sphereRadius;
+		config.linearVelMin = sp.linearVelMin;
+		config.linearVelMax = sp.linearVelMax;
+		config.angularVelMin = sp.angularVelMin;
+		config.angularVelMax = sp.angularVelMax;
+		config.radiusMin = sp.radiusMin;
+		config.radiusMax = sp.radiusMax;
+		config.heightMin = sp.heightMin;
+		config.heightMax = sp.heightMax;
+		config.sizeMin = sp.sizeMin;
+		config.sizeMax = sp.sizeMax;
+		config.material = sp.material.empty() ? "default" : sp.material;
+		config.ownerSequential = (sp.owner >= 4);
+		config.owner = static_cast<PeerID>(std::clamp(sp.owner, 0, 3));
+		config.burstCount = sp.singleBurstCount;
+		config.repeatInterval = sp.repeatingInterval;
+		config.repeatMaxCount = sp.repeatingMaxCount;
 
-		cfg.fixedPosition = sd.fixedPosition;
-		cfg.boxMin = sd.boxMin;
-		cfg.boxMax = sd.boxMax;
-		cfg.sphereCenter = sd.sphereCenter;
-		cfg.sphereRadius = sd.sphereRadius;
+		Spawner runtime(config);
+		SpawnerData spawnerData = sp;
 
-		cfg.linearVelMin = sd.linearVelMin;
-		cfg.linearVelMax = sd.linearVelMax;
-		cfg.angularVelMin = sd.angularVelMin;
-		cfg.angularVelMax = sd.angularVelMax;
-
-		cfg.radiusMin = std::min(sd.radiusMin, sd.radiusMax);
-		cfg.radiusMax = std::max(sd.radiusMin, sd.radiusMax);
-		cfg.heightMin = std::min(sd.heightMin, sd.heightMax);
-		cfg.heightMax = std::max(sd.heightMin, sd.heightMax);
-		cfg.sizeMin = glm::min(sd.sizeMin, sd.sizeMax);
-		cfg.sizeMax = glm::max(sd.sizeMin, sd.sizeMax);
-
-		cfg.material = sd.material;
-		cfg.ownerSequential = (sd.owner == static_cast<int>(Simulation::SpawnerOwnerType_SEQUENTIAL));
-		cfg.owner = cfg.ownerSequential
-			? 0
-			: RemapOwnerForRuntime(SpawnerOwnerToPeerId(static_cast<Simulation::SpawnerOwnerType>(std::clamp(sd.owner, 0, 3))));
-
-		cfg.burstCount = std::max(1u, sd.singleBurstCount);
-		cfg.repeatInterval = std::max(0.01f, sd.repeatingInterval);
-		cfg.repeatMaxCount = std::max(1u, sd.repeatingMaxCount);
-
-		const PeerID spawnerOwnerId = cfg.owner;
-		const PeerID localPeerId = m_localPeerId.load();
-
-		Spawner runtimeSpawner(cfg);
-		runtimeSpawner.SetPeers(peers);
-		runtimeSpawner.Start();
-		runtimeSpawner.SetActive(spawnerOwnerId == localPeerId);
-
-		runtimeSpawner.SetSpawnCallback(
-			[this, sd, spawnerOwnerId](const glm::vec3& pos,
-				const glm::vec3& linearVel,
-				const glm::vec3& angularVel,
-				const glm::vec3& randomSize,
-				float radius,
-				float height,
-				PeerID /*owner*/)
+		runtime.SetSpawnCallback([this, spawnerData](const glm::vec3& position,
+			const glm::vec3& linearVelocity,
+			const glm::vec3& angularVelocity,
+			const glm::vec3& randomSize,
+			float radius,
+			float height,
+			PeerID ownerId)
 			{
-				SpawnEntityFromSpawner(sd, pos, linearVel, angularVel, randomSize, radius, height, spawnerOwnerId);
+				SpawnEntityFromSpawner(spawnerData, position, linearVelocity, angularVelocity, randomSize, radius, height, ownerId);
 			});
 
-		m_runtimeSpawners.push_back(std::move(runtimeSpawner));
+		if (config.ownerSequential)
+			runtime.SetPeers(peers);
+
+		runtime.SetActive(true);
+		runtime.Start();
+
+		m_runtimeSpawners.push_back(std::move(runtime));
 	}
 }
+
 void FlatBufferScene::UpdateSpawnerRuntime(float deltaTime)
 {
-	if (deltaTime <= 0.0f || m_runtimeSpawners.empty())
-		return;
-
 	m_sceneTime += deltaTime;
 
-	std::lock_guard<std::mutex> lock(m_sceneMutex);
-	for (Spawner& spawner : m_runtimeSpawners)
+	for (auto& spawner : m_runtimeSpawners)
 	{
 		if (spawner.Update(deltaTime, m_sceneTime))
-		{
 			spawner.Spawn(m_sceneTime);
-		}
 	}
 }
 
@@ -2590,7 +2749,7 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 	float height,
 	PeerID ownerId)
 {
-	Entity entity;
+	std::lock_guard<std::mutex> lock(m_sceneMutex);
 
 	const Simulation::Shape shape = SpawnerTypeToShape(spawner.spawnerType);
 	const Simulation::Behaviour behaviour = ObjectTypeToBehaviour(spawner.objectType);
@@ -2598,25 +2757,20 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 		? Simulation::CollisionType_SOLID
 		: Simulation::CollisionType_CONTAINER;
 
-	glm::vec3 scale(1.0f);
-	if (shape == Simulation::Shape_Cuboid)
-	{
-		scale = glm::max(randomSize, glm::vec3(0.01f));
-	}
-	else if (shape == Simulation::Shape_Sphere)
-	{
-		const float d = std::max(0.02f, radius * 2.0f);
-		scale = glm::vec3(d);
-	}
+	const PeerID spawnOwnerId = (spawner.objectType == ObjectType::Simulated) ? ownerId : ALL_PEERS;
+	const PeerID netOwnerId = (spawnOwnerId == ALL_PEERS) ? m_localPeerId.load() : spawnOwnerId;
+	const uint32_t networkId = BuildSpawnNetworkId(netOwnerId);
 
+	const glm::vec3 scale = (shape == Simulation::Shape_Cuboid) ? randomSize : glm::vec3(1.0f);
+
+	Entity entity;
 	entity.AddComponent(EComponentType::Component_Transform, position, glm::vec3(0.0f), scale);
 	entity.AddComponent(EComponentType::Component_Geometry);
-
 	entity.AddComponent(
 		EComponentType::Component_Network,
-		m_nextSpawnNetworkId++,
+		networkId,
 		spawner.objectType,
-		ownerId,
+		spawnOwnerId,
 		spawner.material,
 		static_cast<uint8_t>(shape),
 		static_cast<uint8_t>(behaviour),
@@ -2628,7 +2782,6 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 		entity.AddComponent(EComponentType::Component_Physics);
 		if (auto* phys = entity.GetComponent<ComponentPhysics>(EComponentType::Component_Physics))
 		{
-			// Defer mass assignment until we compute exact geometry below; ensure gravity flag
 			phys->SetAffectedByGravity(m_gravityOn);
 		}
 	}
@@ -2662,7 +2815,7 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 			"SHADERS/object.vert.spv",
 			"SHADERS/object.frag.spv");
 
-		const Texture ownerTex = CreateOwnerTexture(m_vulkanRHI, ownerId);
+		const Texture ownerTex = CreateOwnerTexture(m_vulkanRHI, spawnOwnerId);
 		geom->AddTexture(m_vulkanRHI, ownerTex);
 	}
 
@@ -2676,7 +2829,6 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 		case Simulation::Shape_Sphere:
 			collision->SetCollider(std::make_unique<Physics::Sphere>(position, std::max(0.01f, radius)));
 			break;
-
 		case Simulation::Shape_Cylinder:
 		{
 			const float h = std::max(0.01f, height);
@@ -2703,14 +2855,12 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 		}
 	}
 
-	// Compute and assign mass based on material density and shape volume
 	if (spawner.objectType == ObjectType::Simulated)
 	{
 		float density = LookupMaterialDensity(m_materials, spawner.material);
 		float volume = ComputeVolumeForShape(shape, scale, radius, height);
-
 		if (volume <= 0.0f)
-			volume = 1.0f; // fallback to conservative default
+			volume = 1.0f;
 
 		const float mass = density * volume;
 
@@ -2722,4 +2872,30 @@ void FlatBufferScene::SpawnEntityFromSpawner(
 	}
 
 	m_entities.push_back(std::move(entity));
+
+	if (m_networkData)
+	{
+		SpawnPacket spawn{};
+		spawn.sourcePeerId = m_localPeerId.load();
+		spawn.objectId = networkId;
+		spawn.objectType = static_cast<uint8_t>(spawner.objectType);
+		spawn.ownerId = spawnOwnerId;
+		spawn.shapeType = static_cast<uint8_t>(shape);
+		spawn.behaviourType = static_cast<uint8_t>(behaviour);
+		spawn.collisionType = static_cast<uint8_t>(collisionType);
+		spawn.posX = position.x; spawn.posY = position.y; spawn.posZ = position.z;
+		spawn.scaleX = scale.x; spawn.scaleY = scale.y; spawn.scaleZ = scale.z;
+		spawn.velX = linearVelocity.x; spawn.velY = linearVelocity.y; spawn.velZ = linearVelocity.z;
+		spawn.angVelX = angularVelocity.x; spawn.angVelY = angularVelocity.y; spawn.angVelZ = angularVelocity.z;
+		spawn.radius = radius;
+		spawn.height = height;
+		std::snprintf(spawn.materialName.data(), spawn.materialName.size(), "%s", spawner.material.c_str());
+
+		NetworkMessage msg{};
+		msg.type = NetworkMessageType::SpawnEntity;
+		msg.spawn = spawn;
+
+		std::lock_guard<std::mutex> netLock(m_networkData->outgoingMutex);
+		m_networkData->outgoingPackets.push_back(msg);
+	}
 }

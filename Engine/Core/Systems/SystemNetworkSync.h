@@ -7,6 +7,7 @@
 #include <span>
 #include <memory>
 #include <atomic>
+#include <functional>
 #include "../Entity.h"
 #include "ISystem.h"
 
@@ -17,6 +18,11 @@ public:
         : m_localPeerId(localPeerId), m_networkData(networkData)
     { 
         m_SystemType = ESystemType::System_Network_Sync; 
+    }
+
+    void SetSpawnHandler(std::function<void(const SpawnPacket&)> handler)
+    {
+        m_spawnHandler = std::move(handler);
     }
 
     void OnUpdate(std::span<Entity> entities, float deltaTime) override
@@ -32,7 +38,7 @@ public:
 
     void Update(PeerID localPeerId, const std::vector<Entity*>& entities)
     {
-        std::vector<SyncPacket> outgoingPackets;
+        std::vector<NetworkMessage> outgoingMessages;
 
         for (auto* entity : entities)
         {
@@ -63,30 +69,43 @@ public:
                     packet.angVelX = av.x; packet.angVelY = av.y; packet.angVelZ = av.z;
                 }
 
-                outgoingPackets.push_back(packet);
+                NetworkMessage msg{};
+                msg.type = NetworkMessageType::SyncState;
+                msg.sync = packet;
+                outgoingMessages.push_back(msg);
             }
         }
 
-        if (!outgoingPackets.empty())
-            BroadcastToPeers(outgoingPackets);
+        if (!outgoingMessages.empty())
+            BroadcastToPeers(outgoingMessages);
 
-        std::vector<SyncPacket> incomingPackets = ReceiveFromPeers();
-        for (const auto& packet : incomingPackets)
-            ApplyStateToObject(packet, entities, localPeerId);
+        std::vector<NetworkMessage> incomingMessages = ReceiveFromPeers();
+        for (const auto& msg : incomingMessages)
+        {
+            if (msg.type == NetworkMessageType::SyncState)
+            {
+                ApplyStateToObject(msg.sync, entities, localPeerId);
+            }
+            else if (msg.type == NetworkMessageType::SpawnEntity && m_spawnHandler)
+            {
+                m_spawnHandler(msg.spawn);
+            }
+        }
     }
 
 private:
     std::atomic<PeerID>* m_localPeerId = nullptr;
     std::shared_ptr<SharedNetworkData> m_networkData;
+    std::function<void(const SpawnPacket&)> m_spawnHandler;
 
-    void BroadcastToPeers(std::span<SyncPacket> packets)
+    void BroadcastToPeers(std::span<NetworkMessage> messages)
     {
         if (!m_networkData) return;
         std::lock_guard<std::mutex> lock(m_networkData->outgoingMutex);
-        m_networkData->outgoingPackets.insert(m_networkData->outgoingPackets.end(), packets.begin(), packets.end());
+        m_networkData->outgoingPackets.insert(m_networkData->outgoingPackets.end(), messages.begin(), messages.end());
     }
 
-    std::vector<SyncPacket> ReceiveFromPeers()
+    std::vector<NetworkMessage> ReceiveFromPeers()
     {
         if (!m_networkData) return {};
         std::lock_guard<std::mutex> lock(m_networkData->incomingMutex);

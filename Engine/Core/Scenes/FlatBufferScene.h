@@ -82,8 +82,16 @@ public:
 	void DeserializeState() override;
 	void HandleInput(float deltaTime) override;
 	void Destroy() override;
-	void AddEntity(Entity&& entity) override;
-	void RemoveEntity(int index) override;
+	void AddEntity(Entity&& entity) override { 
+		std::lock_guard<std::mutex> lock(m_sceneMutex);
+		m_entities.push_back(std::move(entity)); 
+	}
+	void RemoveEntity(int index) override { 
+		std::lock_guard<std::mutex> lock(m_sceneMutex);
+		if (index >= 0 && index < m_entities.size()) {
+			m_entities.erase(m_entities.begin() + index); 
+		}
+	}
 
 	FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui);
 	~FlatBufferScene() override;
@@ -102,6 +110,8 @@ private:
 		float radius,
 		float height,
 		PeerID ownerId);
+	uint32_t BuildSpawnNetworkId(PeerID ownerId);
+	void HandleSpawnMessage(const SpawnPacket& packet);
 
 	std::vector<Entity> m_entities;
 	VulkanRHI* m_vulkanRHI;

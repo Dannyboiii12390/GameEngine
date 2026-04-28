@@ -139,6 +139,9 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Dependencies\GLFW\include;$(SolutionDir)Dependencies\GLM\include;C:\VulkanSDK\1.4.313.2\Include;$(SolutionDir)Dependencies;$(SolutionDir)Dependencies\IMGUI;$(SolutionDir)Dependencies\stb_image\stb-master;$(SolutionDir)packages\Assimp.3.0.0\build\native\include;C:\Users\711805.ADIR\source\repos\GameEngine\Dependencies\stb_image\stb-master</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+      <ProgramDataBaseFileName>$(IntDir)$(ProjectName).pdb</ProgramDataBaseFileName>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
