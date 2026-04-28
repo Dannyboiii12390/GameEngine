@@ -28,6 +28,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <Windows.h>
+#include <iphlpapi.h>
 
 #include "../Systems/SystemVelocity.h"
 #include "../Systems/SystemPhysics.h"
@@ -478,6 +479,7 @@ FlatBufferScene::FlatBufferScene(Window& p_window, VulkanRHI* rhi, GUI* p_gui) :
 // REPLACE GetClientAddress() completely
 Networking::Address FlatBufferScene::GetClientAddress()
 {
+
 	static std::mt19937 rng{ std::random_device{}() };
 	static std::uniform_int_distribution<int> dist(10000, 19999);
 	const int random = dist(rng);
@@ -508,10 +510,70 @@ Networking::Address FlatBufferScene::GetClientAddress()
 			ioctlsocket(udpSocket, FIONBIO, &mode);
 		}
 
-		sockaddr_in broadcastAddr{};
-		broadcastAddr.sin_family = AF_INET;
-		broadcastAddr.sin_port = htons(8888);
-		inet_pton(AF_INET, "255.255.255.255", &broadcastAddr.sin_addr);
+		auto buildBroadcastTargets = []()
+		{
+			std::vector<sockaddr_in> targets;
+
+			auto addTarget = [&targets](const sockaddr_in& addr)
+			{
+				for (const auto& t : targets)
+				{
+					if (t.sin_addr.s_addr == addr.sin_addr.s_addr && t.sin_port == addr.sin_port)
+						return;
+				}
+				targets.push_back(addr);
+			};
+
+			auto makeTarget = [](uint32_t addrNetworkOrder)
+			{
+				sockaddr_in target{};
+				target.sin_family = AF_INET;
+				target.sin_port = htons(8888);
+				target.sin_addr.s_addr = addrNetworkOrder;
+				return target;
+			};
+
+			// Global broadcast (works on many home/LANs).
+			addTarget(makeTarget(INADDR_BROADCAST));
+
+			// Enumerate adapters for directed broadcasts (campus-friendly).
+			ULONG size = 0;
+			if (GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER, nullptr, nullptr, &size) == ERROR_BUFFER_OVERFLOW)
+			{
+				std::vector<uint8_t> buffer(size);
+				auto* adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
+				if (GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER, nullptr, adapters, &size) == NO_ERROR)
+				{
+					for (auto* adapter = adapters; adapter; adapter = adapter->Next)
+					{
+						if (adapter->OperStatus != IfOperStatusUp)
+							continue;
+
+						if (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK)
+							continue;
+
+						for (auto* uni = adapter->FirstUnicastAddress; uni; uni = uni->Next)
+						{
+							if (!uni->Address.lpSockaddr || uni->Address.lpSockaddr->sa_family != AF_INET)
+								continue;
+
+							const auto* sa = reinterpret_cast<const sockaddr_in*>(uni->Address.lpSockaddr);
+							const uint32_t prefix = std::min<uint32_t>(uni->OnLinkPrefixLength, 32);
+							const uint32_t ipHost = ntohl(sa->sin_addr.s_addr);
+
+							const uint32_t maskHost = (prefix == 0) ? 0u : (0xFFFFFFFFu << (32 - prefix));
+							const uint32_t broadcastHost = (ipHost & maskHost) | (~maskHost);
+
+							addTarget(makeTarget(htonl(broadcastHost)));
+						}
+					}
+				}
+			}
+
+			return targets;
+		};
+
+		std::vector<sockaddr_in> broadcastTargets = buildBroadcastTargets();
 
 		struct HelloMsg {
 			uint32_t magic;
@@ -551,8 +613,13 @@ Networking::Address FlatBufferScene::GetClientAddress()
 			if (udpSocket != INVALID_SOCKET &&
 				std::chrono::duration_cast<std::chrono::seconds>(now - lastBroadcastTime).count() >= 1) {
 				const std::string msg = "SERVER_DISCOVERY:" + std::to_string(random) + ":" + m_instanceId;
-				sendto(udpSocket, msg.c_str(), static_cast<int>(msg.size()), 0,
-					reinterpret_cast<sockaddr*>(&broadcastAddr), sizeof(broadcastAddr));
+
+				for (const auto& target : broadcastTargets)
+				{
+					sendto(udpSocket, msg.c_str(), static_cast<int>(msg.size()), 0,
+						reinterpret_cast<const sockaddr*>(&target), sizeof(target));
+				}
+
 				lastBroadcastTime = now;
 			}
 
