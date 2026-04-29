@@ -2495,7 +2495,7 @@ void FlatBufferScene::HandleSpawnMessage(const SpawnPacket& packet)
 	if (packet.sourcePeerId == m_localPeerId.load())
 		return;
 
-	std::lock_guard<std::mutex> lock(m_sceneMutex);
+	//std::lock_guard<std::mutex> lock(m_sceneMutex);
 
 	for (auto& entity : m_entities)
 	{
